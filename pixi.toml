@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Max Nutz <max.nutz@boku.ac.at>"]
+channels = ["conda-forge"]
+name = "pypsa_validation_processing"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.11,<3.13"
+pandas = ">=1.5.2,<3"
+pypsa = ">=1.1.2,<2"
+
+[pypi-dependencies]
+pypsa_validation_processing = { path = ".", editable = true }

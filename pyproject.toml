@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypsa_validation_processing"
+version = "0.1.0"
+description = "Process PyPSA network outputs into IAMC-formatted validation tables"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Max Nutz", email = "max.nutz@boku.ac.at" },
+]
+dependencies = [
+    "pandas>=1.0.0",
+    "pyam-iamc>=2.0.0",
+    "nomenclature-iamc>=0.29",
+    "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/maxnutz/pypsa_validation_processing"
+Repository = "https://github.com/maxnutz/pypsa_validation_processing"
+Issues = "https://github.com/maxnutz/pypsa_validation_processing/issues"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["pypsa_validation_processing"]
+
+[tool.setuptools.package-dir]
+pypsa_validation_processing = "pypsa_validation_processing"
+
+[tool.setuptools.package-data]
+pypsa_validation_processing = ["configs/*.yml", "configs/*.yaml", "configs/*.json", "configs/*.toml"]

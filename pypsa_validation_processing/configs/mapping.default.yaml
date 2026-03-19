@@ -1,0 +1,425 @@
+meta:
+  schema: pypsa-statistics-statement-mapping/v1
+  scope: non-emissions
+  covered_variable_templates:
+    - Carbon Sequestration
+    - Net Imports|{Final Energy Carrier}
+    - Final Energy
+    - Final Energy [by Carrier]|{Final Energy Carrier}
+    - Final Energy [by Sector]|{Sector}
+    - Final Energy [by Sector]|{Sector}|{Final Energy Carrier}
+    - Secondary Energy|Electricity
+    - Secondary Energy|Electricity|{Electricity Generation by Source}
+  source_tags:
+    - Final Energy Carrier
+    - Sector
+    - Electricity Generation by Source
+  notes:
+    - First template-based mapping from IAMC variables to pypsa.statistics.energy_balance parameters.
+    - Primary query fields are components, carrier, bus_carrier, at_port.
+    - Where the primary fields are insufficient for uniqueness, extended selector fields are provided.
+
+pypsa_statistics_defaults:
+  groupby_method: sum
+  groupby: carrier
+  positive_values: true
+
+proposed_extra_parameters:
+  selector_mode: exact_or_regex
+  carrier_regex: null
+  bus_carrier_regex: null
+  component_regex: null
+  asset_scope: null
+  boundary_selector: null
+  end_use_scope: null
+  conversion_stage: null
+  flow_direction: null
+  combine: union_or_intersection
+  postprocess:
+    abs: true
+    sum_over_results: true
+
+selectors:
+  sectors:
+    Agriculture:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - agriculture electricity
+            - agriculture heat
+            - agriculture machinery electric
+            - agriculture machinery oil
+          bus_carrier: []
+          at_port: null
+
+    Industry:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - industry electricity
+            - H2 for industry
+            - gas for industry
+            - solid biomass for industry
+            - naphtha for industry
+            - industry methanol
+            - low-temperature heat for industry
+          bus_carrier: []
+          at_port: null
+
+    Residential and Commercial:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - electricity
+            - rural heat
+            - urban central heat
+            - urban decentral heat
+          bus_carrier: []
+          at_port: null
+
+    Transportation:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - land transport EV
+            - land transport fuel cell
+            - kerosene for aviation
+            - shipping methanol
+          bus_carrier: []
+          at_port: null
+
+  final_energy_carrier:
+    Coal:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(coal|lignite)'
+        bus_carrier_regex: '(?i)(coal|lignite|AC|low voltage)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Oil:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - agriculture machinery oil
+            - kerosene for aviation
+            - naphtha for industry
+          bus_carrier: []
+          at_port: null
+
+    Natural Gas:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - gas for industry
+          bus_carrier: []
+          at_port: null
+
+    Electricity:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - electricity
+            - agriculture electricity
+            - agriculture machinery electric
+            - industry electricity
+            - land transport EV
+          bus_carrier: []
+          at_port: null
+
+    Biomass:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - solid biomass for industry
+          bus_carrier: []
+          at_port: null
+
+    Biofuels:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - kerosene for aviation
+            - shipping methanol
+          bus_carrier: []
+          at_port: null
+
+    E-Fuels:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(electrofuel|e-fuel|synthetic.*(oil|kerosene|methanol))'
+        bus_carrier_regex: '(?i)(oil|kerosene for aviation|shipping methanol|industry methanol)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Biogas:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link, Generator]
+        carrier_regex: '(?i)(biogas)'
+        bus_carrier_regex: '(?i)(biogas|gas)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Biomethane:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(biomethane|bioSNG|Sabatier)'
+        bus_carrier_regex: '(?i)(gas|methane)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    E-Methane:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(e-methane|Sabatier)'
+        bus_carrier_regex: '(?i)(gas|methane)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Hydrogen:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - H2 for industry
+            - land transport fuel cell
+          bus_carrier: []
+          at_port: null
+
+    Solar Thermal:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link, Generator]
+        carrier_regex: '(?i)(solar thermal)'
+        bus_carrier_regex: '(?i)(urban central heat|urban decentral heat|rural heat)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Waste:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(waste|municipal solid waste)'
+        bus_carrier_regex: '(?i)(urban central heat|AC|low voltage|non-sequestered HVC)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    District Heat:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - urban central heat
+            - low-temperature heat for industry
+          bus_carrier: []
+          at_port: null
+
+    Ambient Heat:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(heat pump|ambient|ground heat|air heat)'
+        bus_carrier_regex: '(?i)(rural heat|urban central heat|urban decentral heat)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+    Other:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load]
+        carrier_regex: '.*'
+        bus_carrier_regex: '.*'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+        residual_category: true
+
+    Renewables:
+      parameter_sets:
+        - components: [Load]
+          carrier:
+            - solid biomass for industry
+            - H2 for industry
+            - land transport EV
+            - land transport fuel cell
+          bus_carrier: []
+          at_port: null
+
+    Renewables incl. Ambient Heat:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Load, Link]
+        carrier_regex: '(?i)(solid biomass|biogas|biomethane|hydrogen|heat pump|solar thermal|renewable)'
+        bus_carrier_regex: '(?i)(rural heat|urban central heat|urban decentral heat|H2|gas|low voltage|AC)'
+        end_use_scope: demand_only
+        conversion_stage: final_energy
+
+  electricity_generation_source:
+    Coal:
+      parameter_sets:
+        - components: [Generator, Link]
+          carrier: [coal, lignite, urban central coal CHP]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Oil:
+      parameter_sets:
+        - components: [Link]
+          carrier: [oil]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Natural Gas:
+      parameter_sets:
+        - components: [Link]
+          carrier:
+            - CCGT
+            - OCGT
+            - urban central gas CHP
+            - urban central gas CHP CC
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Biomass:
+      parameter_sets:
+        - components: [Generator, Link]
+          carrier:
+            - solid biomass
+            - urban central solid biomass CHP
+            - urban central solid biomass CHP CC
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Biogas:
+      parameter_sets:
+        - components: [Generator, Link]
+          carrier: [biogas, biogas to gas, biogas to gas CC]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    E-Methane:
+      parameter_sets:
+        - components: [Link]
+          carrier: [Sabatier]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Hydro:
+      parameter_sets:
+        - components: [Generator, StorageUnit]
+          carrier: [ror, hydro, PHS]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Solar:
+      parameter_sets:
+        - components: [Generator]
+          carrier: [solar, solar-hsat, solar rooftop]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Wind:
+      parameter_sets:
+        - components: [Generator]
+          carrier: [onwind, offwind-ac, offwind-dc]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Geothermal:
+      parameter_sets: []
+      uniqueness_extensions:
+        components: [Generator, Link]
+        carrier_regex: '(?i)(geothermal)'
+        bus_carrier_regex: '(?i)(AC|low voltage|heat)'
+        conversion_stage: secondary_energy
+
+    Waste:
+      parameter_sets:
+        - components: [Generator, Link]
+          carrier: [municipal solid waste, waste CHP, waste CHP CC]
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+    Other Renewables:
+      parameter_sets:
+        - components: [Link]
+          carrier:
+            - H2 Fuel Cell
+            - H2 OCGT
+            - H2 turbine
+            - urban central H2 CHP
+            - urban central H2 retrofit CHP
+          bus_carrier: [AC, low voltage]
+          at_port: null
+
+templates:
+  Carbon Sequestration:
+    status: draft
+    mode: direct
+    parameter_sets:
+      - components: [Link, Store]
+        carrier: [co2 sequestered, co2 stored]
+        bus_carrier: [co2 sequestered, co2 stored]
+        at_port: null
+
+  Net Imports|{Final Energy Carrier}:
+    status: draft
+    mode: direct
+    parameter_sets:
+      - components: [Line, Link]
+        carrier: []
+        bus_carrier: []
+        at_port: null
+        asset_scope: cross_border
+        boundary_selector: national_border
+        flow_direction: import_minus_export
+        end_use_scope: final_energy_carrier_group
+        carrier_group_selector: '{Final Energy Carrier}'
+
+  Final Energy:
+    status: draft
+    mode: composed
+    combine: union
+    from_selectors:
+      - sectors.Agriculture
+      - sectors.Industry
+      - sectors.Residential and Commercial
+      - sectors.Transportation
+
+  Final Energy [by Carrier]|{Final Energy Carrier}:
+    status: draft
+    mode: composed
+    combine: union
+    from_selector_template: final_energy_carrier.{Final Energy Carrier}
+
+  Final Energy [by Sector]|{Sector}:
+    status: draft
+    mode: composed
+    combine: union
+    from_selector_template: sectors.{Sector}
+
+  Final Energy [by Sector]|{Sector}|{Final Energy Carrier}:
+    status: draft
+    mode: composed
+    combine: intersection
+    from_selector_templates:
+      - sectors.{Sector}
+      - final_energy_carrier.{Final Energy Carrier}
+
+  Secondary Energy|Electricity:
+    status: draft
+    mode: direct
+    parameter_sets:
+      - components: [Generator, Link, StorageUnit]
+        carrier: []
+        bus_carrier: [AC, low voltage]
+        at_port: null
+        conversion_stage: secondary_energy
+
+  Secondary Energy|Electricity|{Electricity Generation by Source}:
+    status: draft
+    mode: composed
+    combine: union
+    from_selector_template: electricity_generation_source.{Electricity Generation by Source}

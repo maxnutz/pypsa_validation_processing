@@ -14,11 +14,11 @@ This repository processes PyPSA network outputs and nomenclature-based variable 
 
 ## Folder structure
 ```
-└── pypsa-validation_processing/
+└── pypsa_validation_processing/
     ├── workflow.py
     ├── README.md
     ├── LICENSE
-    ├── pypsa-validation_processing/
+    ├── pypsa_validation_processing/
     │   ├── workflow.py
     │   └── class_definitions.py
     │   └── configs/
@@ -26,8 +26,11 @@ This repository processes PyPSA network outputs and nomenclature-based variable 
     ├── .github/
     │   └── copilot-instructions.md
     └── resources/
+    └── sister_packages/
 ```
-
+- folder `sister_packages`: python packages to create background information. Use this repositories as background information or directly if directly told to do so.
+  - eurostat-energy-balance_processing: processing of the energy balance in a similar manner to create validation basis 
+  - energy-scenarios-at-workflow: initial definition of IAMC-variables in `/definitions/variable`
 ---
 
 # Global operating rules

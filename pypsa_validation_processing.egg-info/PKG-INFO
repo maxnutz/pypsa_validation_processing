@@ -1,0 +1,67 @@
+Metadata-Version: 2.4
+Name: pypsa_validation_processing
+Version: 0.1.0
+Summary: Process PyPSA network outputs into IAMC-formatted validation tables
+Author-email: Max Nutz <max.nutz@boku.ac.at>
+License: MIT License
+        
+        Copyright (c) 2026 max_nutz
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/maxnutz/pypsa_validation_processing
+Project-URL: Repository, https://github.com/maxnutz/pypsa_validation_processing
+Project-URL: Issues, https://github.com/maxnutz/pypsa_validation_processing/issues
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pandas>=1.0.0
+Requires-Dist: pyam-iamc>=2.0.0
+Requires-Dist: nomenclature-iamc>=0.29
+Requires-Dist: PyYAML>=6.0
+Dynamic: license-file
+
+![Python](https://img.shields.io/badge/python-3.11-blue)  [![license](https://img.shields.io/badge/License-MIT-blue)](https://github.com/maxnutz/pypsa_validation_processing/blob/master/LICENSE) [![pyam](https://img.shields.io/badge/pyam-iamc-blue)](https://github.com/IAMconsortium/pyam) [![Tests](https://github.com/maxnutz/pypsa_validation_processing/actions/workflows/test.yml/badge.svg)](https://github.com/maxnutz/pypsa_validation_processing/actions/workflows/test.yml)
+
+# PyPSA-network processing for validation
+This repository is licensed under the [MIT License](https://github.com/maxnutz/pypsa_validation_processing/blob/main/LICENSE)
+
+> [!NOTE]  
+> This package is currently in an **early state of development**. Expect ongoing changes and updates. Documentation and Readme will be continuously updated with changes.
+
+This package processes a PyPSA network for a given set of defined IAMC-Variables to build a structured timeseries output and data-output to be used for model validation against the Eurostat Energy Balance. 
+
+> [!TIP]
+> The corresponding package for Eurostat Energy Balance Evaluation is available [here](https://github.com/maxnutz/eurostat-energy-balance_processing/tree/main)
+
+
+
+## Project structure
+
+```text
+pypsa_validation_processing/
+|-- workflow.py                         # CLI/entry script
+|-- pypsa_validation_processing/
+|   |-- workflow.py                     # package-level workflow orchestration
+|   |-- class_definitions.py            # core processing classes
+|   `-- configs/                        # package configuration files
+|-- resources/
+`-- tests/                              # test suite
+```
+

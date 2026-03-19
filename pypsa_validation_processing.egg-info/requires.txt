@@ -1,0 +1,4 @@
+pandas>=1.0.0
+pyam-iamc>=2.0.0
+nomenclature-iamc>=0.29
+PyYAML>=6.0
