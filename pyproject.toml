@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypsa-validation-processing"
+version = "0.1.0"
+description = "Processing pypsa output to IAMC-Variables for validation workflow"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Max Nutz", email = "max.nutz@boku.ac.at" }
+]
+dependencies = [
+    "pyyaml",
+    "pandas",
+    "pypsa",
+    "pyam-iamc",
+    "nomenclature-iamc",
+]
+
+[project.urls]
+Homepage = "https://github.com/maxnutz/pypsa_validation_processing"
+
+[project.scripts]
+pypsa-validation-processing = "pypsa_validation_processing.workflow:main"
+
+[tool.setuptools.packages.find]
+include = ["pypsa_validation_processing*"]
+
+[tool.setuptools.package-data]
+pypsa_validation_processing = ["configs/*.yaml"]
