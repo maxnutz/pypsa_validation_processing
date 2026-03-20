@@ -81,6 +81,7 @@ classDiagram
 |  |  `- mapping.default.yaml
 |  |- class_definitions.py
 |  |- statistics_functions.py
+|  `- utils.py
 |  `- workflow.py
 |- workflow.py
 |- resources
