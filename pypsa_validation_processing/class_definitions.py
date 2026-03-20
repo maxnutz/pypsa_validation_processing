@@ -137,7 +137,7 @@ class Network_Processor:
 
         Returns
         -------
-        pyam.IamDataFrame | None
+        pd.Series | None
             Computed values for the variable, or ``None`` if no function
             is registered for it.
         """
@@ -166,7 +166,7 @@ class Network_Processor:
         return pd.DataFrame(
             {
                 "variable": [variable] * len(list(result.values)),
-                "unit": list(result.ndex.get_level_values("unit")),
+                "unit": list(result.index.get_level_values("unit")),
                 "value": list(result.values),
             }
         )
@@ -199,7 +199,7 @@ class Network_Processor:
             data=df.drop_duplicates(),
             model=self.model_name,
             scenario=self.scenario_name,
-            region=self.country,
+            region=self.country,  # TODO: add country-codes mapping
             variable="variable_name",
             unit="unit_pypsa",
         )
