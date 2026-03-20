@@ -36,6 +36,6 @@ pypsa_validation_processing/
 |   `-- configs/                        # package configuration files
         `-- config.default.yaml         # default configuration file
         `-- mapping.default.yaml        # mapping IAMC-variable - statistics-function 
-|-- resources/                          # non-versioneered resources
+|-- resources/                          # non-versioned resources
 `-- tests/                              # test suite
 ```

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import yaml
+import pandas as pd
+import pypsa
 import nomenclature
 import pyam
 
@@ -21,8 +23,8 @@ class Network_Processor:
         self.config_path = config_path
         self.config = self._read_config()
 
-        network_results_path: str = self.config.get("network_results_path")
-        if not self.network_results_path is None:
+        network_results_path = self.config.get("network_results_path")
+        if network_results_path is None:
             raise ValueError(
                 f"'network_results_path' not set in config at {self.config_path}"
             )
@@ -32,8 +34,8 @@ class Network_Processor:
                 f"Network results folder does not exist: {self.network_results_path}"
             )
 
-        definitions_path: str = self.config["definition_path"]
-        if not self.definitions_path is None:
+        definitions_path = self.config.get("definitions_path")
+        if definitions_path is None:
             raise ValueError(
                 f"'definition_path' not set in config at {self.config_path}"
             )
@@ -63,7 +65,7 @@ class Network_Processor:
             )
         self.network_collection = self._read_pypsa_network_collection()
         self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
-        self.functions_dict: dict[str, str | list] = self.read_mappings()
+        self.functions_dict: dict[str, str | list] = self._read_mappings()
         self.dsd_with_values: pyam.IamDataFrame | None = None
         default_path_dsd_with_values = (
             Path(__file__).resolve().parent
@@ -151,6 +153,7 @@ class Network_Processor:
             print(
                 f"WARNING: Variable {variable}: No function '{func_name}' not found in statistics_functions.py"
             )
+            return None
         return func(self.network_collection)
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
@@ -158,7 +161,7 @@ class Network_Processor:
 
         Parameters
         ----------
-        ds_with_values : pd.DataFrame
+        df : pd.DataFrame
             DataFrame with IAMC variables as columns and years as index.
 
         Returns
@@ -178,7 +181,7 @@ class Network_Processor:
 
         # initialize pyam.IamDataFrame
         dsd = pyam.IamDataFrame(
-            data=df.drop_doplicates(),
+            data=df.drop_duplicates(),
             model=self.model_name,
             scenario=self.scenario_name,
             region=self.country,
@@ -189,7 +192,7 @@ class Network_Processor:
 
         return dsd
 
-    def calculate_variables_values(self) -> pyam.IamDataFrame:
+    def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
 
         Iterates over all variables in ``self.dsd``, calls
@@ -202,8 +205,6 @@ class Network_Processor:
         pyam.IamDataFrame
             Combined results for all variables that have a registered function.
         """
-        if self.dsd is None:
-            self.read_definitions()
 
         results = []
         for variable in self.dsd.variable.to_pandas()["variable"]:
@@ -216,9 +217,7 @@ class Network_Processor:
         else:
             ds_with_values = None
 
-        dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
-
-        return dsd_with_values
+        self.dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
 
     def write_output_to_xlsx(self, output_path: str | Path | None = None) -> Path:
         """Write the computed IAMC data to an Excel file.

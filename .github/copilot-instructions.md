@@ -104,7 +104,7 @@ A task is complete when:
 - In chat mode: the user has reviewed the changes and given approval.
 - For a pull-request: the user has to be reviewer of the pull request to give approval.
 
-## Forbitten Actions
+## Forbidden Actions
 - Do NOT invent datasets, files, or APIs.
 - Do NOT assume undocumented variables exist.
 - Do NOT change any definitions in `definitions/`, or any statement in `configs/` unless explicitly asked for.
