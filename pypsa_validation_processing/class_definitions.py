@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import os
 from pathlib import Path
 import yaml
 import pandas as pd
@@ -102,7 +102,9 @@ class Network_Processor:
 
     def _read_pypsa_network_collection(self) -> pypsa.NetworkCollection:
         """Reads in pypsa networks as NetworkCollection from network_results_path / networks"""
-        return pypsa.NetworkCollection(self.network_results_path / "networks")
+        nw_path = self.network_results_path / "networks"
+        file_list = [nw_path / f for f in os.listdir(nw_path) if f.endswith(".nc")]
+        return pypsa.NetworkCollection(file_list)
 
     def read_definitions(self) -> nomenclature.DataStructureDefinition:
         """Read IAMC variable definitions from the definitions folder.
@@ -120,8 +122,8 @@ class Network_Processor:
         return dsd
 
     def _execute_function_for_variable(
-        self, variable: str
-    ) -> pyam.IamDataFrame | None:
+        self, variable: str, n: pypsa.Network
+    ) -> pd.Series | None:
         """Look up and execute the statistics function for a single variable.
 
         Looks up *variable* in ``self.functions_dict``, imports the
@@ -135,7 +137,7 @@ class Network_Processor:
 
         Returns
         -------
-        pyam.IamDataFrame | None
+        pd.Series | None
             Computed values for the variable, or ``None`` if no function
             is registered for it.
         """
@@ -154,7 +156,20 @@ class Network_Processor:
                 f"WARNING: Variable {variable}: No function '{func_name}' not found in statistics_functions.py"
             )
             return None
-        return func(self.network_collection)
+        return func(n)
+
+    def _postprocess_statistics_result(
+        self, variable: str, result: pd.Series
+    ) -> pd.DataFrame:
+        """Formatting and creating a pandas dataframe from results Series and variable_name"""
+
+        return pd.DataFrame(
+            {
+                "variable": [variable] * len(list(result.values)),
+                "unit": list(result.index.get_level_values("unit")),
+                "value": list(result.values),
+            }
+        )
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
         """Creates a pyam.IamDataFrame from a pandas DataFrame.
@@ -184,7 +199,7 @@ class Network_Processor:
             data=df.drop_duplicates(),
             model=self.model_name,
             scenario=self.scenario_name,
-            region=self.country,
+            region=self.country,  # TODO: add country-codes mapping
             variable="variable_name",
             unit="unit_pypsa",
         )
@@ -205,17 +220,30 @@ class Network_Processor:
         pyam.IamDataFrame
             Combined results for all variables that have a registered function.
         """
+        container_investment_years = []
+        for i in range(0, self.network_collection.__len__()):
+            n = self.network_collection[i]
+            investment_year = n.name[
+                -4:
+            ]  # TODO: get more robust way for investment_year!
+            results = []
+            for variable in self.dsd.variable.to_pandas()["variable"]:
+                result = self._execute_function_for_variable(variable, n)
+                if result is not None:
+                    results.append(
+                        self._postprocess_statistics_result(variable, result)
+                    )
 
-        results = []
-        for variable in self.dsd.variable.to_pandas()["variable"]:
-            result = self._execute_function_for_variable(variable)
-            if result is not None:
-                results.append(result)
-
-        if results:
-            ds_with_values = pyam.concat(results)
-        else:
-            ds_with_values = None
+            if results:
+                year_df = pd.concat(results, ignore_index=True)
+                year_df.rename(columns={"value": str(investment_year)}, inplace=True)
+                container_investment_years.append(year_df)
+        ds_with_values = container_investment_years[0]
+        if len(container_investment_years) > 1:
+            for year_df in container_investment_years[1:]:
+                ds_with_values = ds_with_values.merge(
+                    year_df, on=["variable", "unit"], how="outer"
+                )
 
         self.dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
 
