@@ -20,7 +20,7 @@ import pypsa
 
 
 def Final_Energy_by_Carrier__Electricity(
-    network_collection: pypsa.NetworkCollection,
+    n: pypsa.Network,
 ) -> pd.DataFrame:
     """Extract electricity final energy from a PyPSA NetworkCollection.
 
@@ -52,19 +52,17 @@ def Final_Energy_by_Carrier__Electricity(
     year 2020 so that the end-to-end workflow can be tested.
     """
     # Dummy placeholder – to be replaced with the actual pypsa statistics call.
-    # e.g.: network_collection.statistics.energy_balance(comps=["Load"], bus_carrier="AC")
-    return pd.DataFrame(
-        {
-            "variable": ["Final Energy [by Carrier]|Electricity"],
-            "unit": ["MWh"],
-            "year": [2020],
-            "value": [0.0],
-        }
-    )
+    # e.g.: n.statistics.energy_balance(comps=["Load"], bus_carrier="AC")
+    result = n.statistics.energy_balance(
+        components=["Load"],
+        carrier="agriculture electricity",
+        groupby=["country", "carrier", "unit"],
+    ).xs("AT", level="country")
+    return result
 
 
 def Final_Energy_by_Sector__Transportation(
-    network_collection: pypsa.NetworkCollection,
+    n: pypsa.Network,
 ) -> pd.DataFrame:
     """Extract transportation-sector final energy from a PyPSA NetworkCollection.
 
@@ -97,12 +95,11 @@ def Final_Energy_by_Sector__Transportation(
     year 2020 so that the end-to-end workflow can be tested.
     """
     # Dummy placeholder – to be replaced with the actual pypsa statistics call.
-    # e.g.: network_collection.statistics.energy_balance(comps=["Load"], carrier="transport")
-    return pd.DataFrame(
-        {
-            "variable": ["Final Energy [by Sector]|Transportation"],
-            "unit": ["MWh"],
-            "year": [2020],
-            "value": [0.0],
-        }
-    )
+    # e.g.: n.statistics.energy_balance(comps=["Load"], carrier="transport")
+
+    result = n.statistics.energy_balance(
+        components=["Load"],
+        carrier="agriculture electricity",
+        groupby=["country", "carrier", "unit"],
+    ).xs("AT", level="country")
+    return result
