@@ -19,6 +19,10 @@ classDiagram
         one function per variable
     }
 
+    class utils.py{
+        EU27_COUNTRY_CODES: dict
+    }
+
     class mapping.yaml{
         mapping variables to function names
     }
@@ -29,6 +33,7 @@ classDiagram
 
     Network_Processor <-- workflow.py : executes
     statistics_functions.py <-- Network_Processor : executes
+    utils.py <-- Network_Processor : imports
     mapping.yaml <|-- Network_Processor : includes
     config.yaml <|-- Network_Processor : includes
 
@@ -44,7 +49,7 @@ classDiagram
         network_collection: pypsa.NetworkCollection
         dsd: nomenclature.DataStructureDefinition
         functions_dict: dict
-        dsd_with_values: dict
+        dsd_with_values: pyam.IamDataFrame | None
         path_dsd_with_values: pathlib.Path
 
         __init__()
@@ -54,8 +59,9 @@ classDiagram
         _read_pypsa_network_collection()
         read_definitions()
         _execute_function_for_variable()
-        structure_pyan_from_pandas()
-        calculate_variable_values()
+        _postprocess_statistics_result()
+        structure_pyam_from_pandas()
+        calculate_variables_values()
         write_output_to_xlsx()
     }
     note for Network_Processor "in class_definitions.py"

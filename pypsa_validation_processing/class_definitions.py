@@ -7,6 +7,8 @@ import pypsa
 import nomenclature
 import pyam
 
+from pypsa_validation_processing.utils import EU27_COUNTRY_CODES
+
 
 class Network_Processor:
     """Processes a PyPSA NetworkCollection against IAMC variable definitions.
@@ -199,7 +201,7 @@ class Network_Processor:
             data=df.drop_duplicates(),
             model=self.model_name,
             scenario=self.scenario_name,
-            region=self.country,  # TODO: add country-codes mapping
+            region=EU27_COUNTRY_CODES.get(self.country, self.country),
             variable="variable_name",
             unit="unit_pypsa",
         )
