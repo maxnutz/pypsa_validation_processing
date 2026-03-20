@@ -213,7 +213,7 @@ class Network_Processor:
                 results.append(result)
 
         if results:
-            ds_with_values = pyam.concat(results)
+            ds_with_values = pd.concat(results, ignore_index=True)
         else:
             ds_with_values = None
 
