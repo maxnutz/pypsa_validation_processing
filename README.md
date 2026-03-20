@@ -33,9 +33,56 @@ pypsa_validation_processing/
 |   |-- workflow.py                     # package-level workflow orchestration
 |   |-- class_definitions.py            # core processing classes
 |   |-- statistics_functions.py         # pypsa statistics functions
+|   |-- utils.py                        # static information and general utility functions
 |   `-- configs/                        # package configuration files
         `-- config.default.yaml         # default configuration file
         `-- mapping.default.yaml        # mapping IAMC-variable - statistics-function 
 |-- resources/                          # non-versioned resources
 `-- tests/                              # test suite
 ```
+
+## Variable's Statistics - Functions
+
+This section describes the conventions for adding new variable statistics functions to `pypsa_validation_processing/statistics_functions.py`.
+
+### Naming Convention
+
+Function names follow the IAMC variable name with these substitutions:
+
+- Each `|` (pipe / hierarchy separator) is replaced by `__` (double underscore).
+- Spaces are replaced by `_` (single underscore).
+
+Examples:
+
+| IAMC Variable | Function Name |
+|---|---|
+| `Final Energy [by Carrier]\|Electricity` | `Final_Energy_by_Carrier__Electricity` |
+| `Final Energy [by Sector]\|Transportation` | `Final_Energy_by_Sector__Transportation` |
+
+### Function Signature (fixed)
+
+Every function receives exactly one argument – a single `pypsa.Network` object representing one investment year – and returns a `pandas.Series`:
+
+```python
+def <function_name>(n: pypsa.Network) -> pd.Series:
+    ...
+```
+
+**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` so that the post-processing step can extract the unit information. It is possible to return multiple values with different units. This is then forwarded and further processed as two indipendend rows of the pyam.IamDataFrame.
+
+### Mapping File
+
+`configs/mapping.default.yaml` maps each IAMC variable name to the corresponding function name in `statistics_functions.py`:
+
+```yaml
+Final Energy [by Carrier]|Electricity: Final_Energy_by_Carrier__Electricity
+Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
+```
+
+At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. 
+
+### Register a new variable-statistics
+To register a new variable
+- add an entry to the mapping file
+- implement the corresponding function
+- make shure, that the introduces variable is also part of your variable set to be executed.
