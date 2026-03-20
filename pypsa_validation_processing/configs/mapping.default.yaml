@@ -1,0 +1,6 @@
+# Mapping of IAMC variable names to statistics function names.
+# Each entry maps the full IAMC variable string to the name of the
+# corresponding function in statistics_functions.py.
+#
+# Example:
+# Primary Energy|Coal: primary_energy_coal

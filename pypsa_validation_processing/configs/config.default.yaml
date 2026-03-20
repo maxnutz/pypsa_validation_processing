@@ -1,0 +1,10 @@
+# General section
+country:               # ISO 3166-1 alpha-2 country code, e.g. AT
+definition_path:       # path to the IAMC variable definitions folder
+# mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
+output_path:           # path the outputfile should be written to
+
+# Network
+network_results_path:  # path to the folder containing PyPSA network results
+model_name:            # name of the PyPSA model
+scenario_name:         # name of the PyPSA scenario
