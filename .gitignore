@@ -22,15 +22,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
 # Pixi
 .pixi/
 
@@ -56,6 +47,7 @@ cover/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+.ipynb
 
 # IPython
 profile_default/
@@ -64,21 +56,17 @@ ipython_config.py
 # pyenv
 .python-version
 
-# Environments
-.env
-.env.*
 
-# IDEs
+# IDE
 .vscode/
-.idea/
-*.swp
-*.swo
+.gitattributes
 
 # OS
 .DS_Store
 Thumbs.db
 
 # Data and output (non-versioned)
-data/
+resources/
+sister_packages/
 *.xlsx
 *.csv

@@ -16,19 +16,28 @@ class Network_Processor:
 
     def __init__(
         self,
-        config_path: str | Path,
+        config_path: Path,
     ) -> None:
-        self.config_path = Path(config_path)
+        self.config_path = config_path
         self.config = self._read_config()
 
-        network_results_path = self.config.get("network_results_path")
-        if network_results_path is None:
+        network_results_path: str = self.config.get("network_results_path")
+        if not self.network_results_path is None:
             raise ValueError(
                 f"'network_results_path' not set in config at {self.config_path}"
             )
         self.network_results_path: Path = Path(network_results_path)
+        if not self.network_results_path.exists():
+            raise FileNotFoundError(
+                f"Network results folder does not exist: {self.network_results_path}"
+            )
 
-        self.definitions_path: Path = Path(self.config["definition_path"])
+        definitions_path: str = self.config["definition_path"]
+        if not self.definitions_path is None:
+            raise ValueError(
+                f"'definition_path' not set in config at {self.config_path}"
+            )
+        self.definitions_path: Path = Path(definitions_path)
         if not self.definitions_path.exists():
             raise FileNotFoundError(
                 f"Definition folder does not exist: {self.definitions_path}"
@@ -43,11 +52,29 @@ class Network_Processor:
             else default_mappings_path
         )
 
-        self.country: str = self.config.get("country", "")
-        self.network_collection = None
-        self.dsd: nomenclature.DataStructureDefinition | None = None
-        self.functions_dict: dict[str, str | list] = {}
+        self.country: str = self.config.get("country", None)
+        if self.country == None:
+            raise ValueError(f"'country' not set in config at {self.config_path}")
+        self.model_name: str = self.config["model_name"]
+        self.scenario_name: str = self.config["scenario_name"]
+        if self.model_name == None or self.scenario_name == None:
+            raise ValueError(
+                f"'model_name' and 'scenario_name' must be set in config at {self.config_path}"
+            )
+        self.network_collection = self._read_pypsa_network_collection()
+        self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
+        self.functions_dict: dict[str, str | list] = self.read_mappings()
         self.dsd_with_values: pyam.IamDataFrame | None = None
+        default_path_dsd_with_values = (
+            Path(__file__).resolve().parent
+            / "resources"
+            / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
+        )
+        self.path_dsd_with_values: Path = (
+            Path(self.config["output_path"])
+            if "output_path" in self.config
+            else default_path_dsd_with_values
+        )
 
     def __repr__(self) -> str:
         return (
@@ -56,10 +83,6 @@ class Network_Processor:
             f"  network_results_path: {self.network_results_path}\n"
             f"  definitions_path: {self.definitions_path}\n"
         )
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
 
     def _read_config(self) -> dict:
         """Read and return the YAML configuration file."""
@@ -73,29 +96,26 @@ class Network_Processor:
                 f"Mapping file not found: {self.mappings_path}"
             )
         with open(self.mappings_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            return yaml.safe_load(f)
 
-    # ------------------------------------------------------------------
-    # Public methods
-    # ------------------------------------------------------------------
+    def _read_pypsa_network_collection(self) -> pypsa.NetworkCollection:
+        """Reads in pypsa networks as NetworkCollection from network_results_path / networks"""
+        return pypsa.NetworkCollection(self.network_results_path / "networks")
 
     def read_definitions(self) -> nomenclature.DataStructureDefinition:
         """Read IAMC variable definitions from the definitions folder.
 
-        Populates ``self.dsd`` with a
+        Populates ``dsd`` with a
         :class:`nomenclature.DataStructureDefinition` built from
-        ``self.definitions_path`` and also populates ``self.functions_dict``
-        from the mapping file so that each variable name is associated with
-        the name of its corresponding statistics function.
+        ``self.definitions_path`` and returns it.
 
         Returns
         -------
         nomenclature.DataStructureDefinition
             The loaded data structure definition.
         """
-        self.dsd = nomenclature.DataStructureDefinition(self.definitions_path)
-        self.functions_dict = self._read_mappings()
-        return self.dsd
+        dsd = nomenclature.DataStructureDefinition(self.definitions_path)
+        return dsd
 
     def _execute_function_for_variable(
         self, variable: str
@@ -128,10 +148,46 @@ class Network_Processor:
         )
         func = getattr(stats_module, func_name, None)
         if func is None:
-            raise AttributeError(
-                f"Function '{func_name}' not found in statistics_functions.py"
+            print(
+                f"WARNING: Variable {variable}: No function '{func_name}' not found in statistics_functions.py"
             )
         return func(self.network_collection)
+
+    def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
+        """Creates a pyam.IamDataFrame from a pandas DataFrame.
+
+        Parameters
+        ----------
+        ds_with_values : pd.DataFrame
+            DataFrame with IAMC variables as columns and years as index.
+
+        Returns
+        -------
+        pyam.IamDataFrame
+            A pyam.IamDataFrame with IAMC variables as columns and years as index.
+        """
+        # rename columns if needed
+        col_renaming_dict = {
+            "variable": "variable_name",
+            "unit": "unit_pypsa",
+        }
+        df = df.rename(
+            columns={k: v for k, v in col_renaming_dict.items() if k in df.columns}
+        )
+        # drop columns not needed
+
+        # initialize pyam.IamDataFrame
+        dsd = pyam.IamDataFrame(
+            data=df.drop_doplicates(),
+            model=self.model_name,
+            scenario=self.scenario_name,
+            region=self.country,
+            variable="variable_name",
+            unit="unit_pypsa",
+        )
+        # perform unit conversion
+
+        return dsd
 
     def calculate_variables_values(self) -> pyam.IamDataFrame:
         """Calculate values for all defined variables.
@@ -156,11 +212,13 @@ class Network_Processor:
                 results.append(result)
 
         if results:
-            self.dsd_with_values = pyam.concat(results)
+            ds_with_values = pyam.concat(results)
         else:
-            self.dsd_with_values = None
+            ds_with_values = None
 
-        return self.dsd_with_values
+        dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
+
+        return dsd_with_values
 
     def write_output_to_xlsx(self, output_path: str | Path | None = None) -> Path:
         """Write the computed IAMC data to an Excel file.

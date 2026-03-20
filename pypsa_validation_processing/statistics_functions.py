@@ -6,6 +6,6 @@ looked up by name via the mapping defined in ``configs/mapping.default.yaml``.
 
 All functions share the same signature::
 
-    def <function_name>(network_collection) -> pyam.IamDataFrame:
+    def <function_name>(pypsa.NetworkCollection) -> pyam.IamDataFrame:
         ...
 """
