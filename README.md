@@ -41,7 +41,7 @@ pypsa_validation_processing/
 `-- tests/                              # test suite
 ```
 
-## Variable Statistics
+## Variable's Statistics - Functions
 
 This section describes the conventions for adding new variable statistics functions to `pypsa_validation_processing/statistics_functions.py`.
 
@@ -68,22 +68,9 @@ def <function_name>(n: pypsa.Network) -> pd.Series:
     ...
 ```
 
-The returned `Series` must have a **multi-level index** that includes a level named `"unit"` (e.g. `"MWh"`, `"MW"`) so that the post-processing step can extract the unit information.
+**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` so that the post-processing step can extract the unit information. It is possible to return multiple values with different units. This is then forwarded and further processed as two indipendend rows of the pyam.IamDataFrame.
 
-### Output Structure (fixed)
-
-The `Series` returned by each function is post-processed by `Network_Processor._postprocess_statistics_result()` into a long-format `pandas.DataFrame` with the columns `variable`, `unit`, and `value`.  The investment year is added as a separate column by the calling code in `calculate_variables_values()`.
-
-A minimal example of the expected output:
-
-```python
-import pandas as pd
-
-index = pd.MultiIndex.from_tuples([("MWh",)], names=["unit"])
-result = pd.Series([1234.5], index=index)
-```
-
-### Role of the Mapping File
+### Mapping File
 
 `configs/mapping.default.yaml` maps each IAMC variable name to the corresponding function name in `statistics_functions.py`:
 
@@ -92,4 +79,10 @@ Final Energy [by Carrier]|Electricity: Final_Energy_by_Carrier__Electricity
 Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
 ```
 
-At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped.  To register a new variable, add an entry to the mapping file and implement the corresponding function.
+At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. 
+
+### Register a new variable-statistics
+To register a new variable
+- add an entry to the mapping file
+- implement the corresponding function
+- make shure, that the introduces variable is also part of your variable set to be executed.
