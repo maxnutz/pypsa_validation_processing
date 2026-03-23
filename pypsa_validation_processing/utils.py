@@ -30,3 +30,11 @@ EU27_COUNTRY_CODES: dict[str, str] = {
     "SK": "Slovakia",
     "EU27_{year}": "EU27",
 }
+
+UNITS_MAPPING = {
+    "MWh_el": "MWh",
+    "MWh_LHV": "MWh",
+    "MWh_th": "MWh",
+    "t_co2": "t",
+    "": "",
+}

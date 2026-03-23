@@ -7,7 +7,7 @@ import pypsa
 import nomenclature
 import pyam
 
-from pypsa_validation_processing.utils import EU27_COUNTRY_CODES
+from pypsa_validation_processing.utils import EU27_COUNTRY_CODES, UNITS_MAPPING
 
 
 class Network_Processor:
@@ -194,6 +194,7 @@ class Network_Processor:
         df = df.rename(
             columns={k: v for k, v in col_renaming_dict.items() if k in df.columns}
         )
+        df["unit_pypsa"] = df["unit_pypsa"].map(UNITS_MAPPING)
         # drop columns not needed
 
         # initialize pyam.IamDataFrame
