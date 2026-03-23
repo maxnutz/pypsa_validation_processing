@@ -226,9 +226,7 @@ class Network_Processor:
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):
             n = self.network_collection[i]
-            investment_year = n.name[
-                -4:
-            ]  # TODO: get more robust way for investment_year!
+            investment_year = n.meta["wildcards"]["planning_horizons"]
             results = []
             for variable in self.dsd.variable.to_pandas()["variable"]:
                 result = self._execute_function_for_variable(variable, n)
@@ -241,7 +239,8 @@ class Network_Processor:
                 year_df = pd.concat(results, ignore_index=True)
                 year_df.rename(columns={"value": str(investment_year)}, inplace=True)
                 container_investment_years.append(year_df)
-        ds_with_values = container_investment_years[0]
+        if len(container_investment_years) < 0:
+            ds_with_values = container_investment_years[0]
         if len(container_investment_years) > 1:
             for year_df in container_investment_years[1:]:
                 ds_with_values = ds_with_values.merge(

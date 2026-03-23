@@ -81,8 +81,9 @@ Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
 
 At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. 
 
-### Register a new variable-statistics
+### Register statistics for a new variable
 To register a new variable
 - add an entry to the mapping file
 - implement the corresponding function
+- add a corresponding test-function
 - make shure, that the introduces variable is also part of your variable set to be executed.

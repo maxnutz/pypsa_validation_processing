@@ -1,16 +1,16 @@
 """Statistics functions for PyPSA validation processing.
 
 Each function in this module corresponds to one IAMC variable and extracts
-the relevant value from a given PyPSA NetworkCollection.  The functions are
+the relevant value from a given PyPSA Network.  The functions are
 looked up by name via the mapping defined in ``configs/mapping.default.yaml``.
 
 All functions share the same signature::
 
-    def <function_name>(network_collection: pypsa.NetworkCollection) -> pd.DataFrame:
+    def <function_name>(network_collection: pypsa.Network) -> pd.Series:
         ...
 
-Each function returns a :class:`pandas.DataFrame` in long format with at
-least the columns ``variable``, ``unit``, ``year``, and ``value``.
+Each function returns a :class:`pandas.Series`  with Multiindex, holding at
+least the indexes ``variable`` and ``unit``.
 """
 
 from __future__ import annotations
