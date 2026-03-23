@@ -68,7 +68,7 @@ def <function_name>(n: pypsa.Network) -> pd.Series:
     ...
 ```
 
-**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` so that the post-processing step can extract the unit information. It is possible to return multiple values with different units. This is then forwarded and further processed as two indipendend rows of the pyam.IamDataFrame.
+**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` so that the post-processing step can extract the unit information. It is possible to return multiple values with different units. This is then forwarded and further processed as two independent rows of the pyam.IamDataFrame.
 
 ### Mapping File
 
