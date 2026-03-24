@@ -164,14 +164,16 @@ class Network_Processor:
         self, variable: str, result: pd.Series
     ) -> pd.DataFrame:
         """Formatting and creating a pandas dataframe from results Series and variable_name"""
-
-        return pd.DataFrame(
+        result = result.xs(self.country, level="country")
+        df = pd.DataFrame(
             {
                 "variable": [variable] * len(list(result.values)),
-                "unit": list(result.index.get_level_values("unit")),
+                "unit": list(result.index.get_level_values("unit").map(UNITS_MAPPING)),
                 "value": list(result.values),
             }
         )
+        df = df.groupby(["variable", "unit"]).sum()
+        return df
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
         """Creates a pyam.IamDataFrame from a pandas DataFrame.
@@ -186,6 +188,8 @@ class Network_Processor:
         pyam.IamDataFrame
             A pyam.IamDataFrame with IAMC variables as columns and years as index.
         """
+        # add 'variable' and 'unit' columns
+        df = df.reset_index()
         # rename columns if needed
         col_renaming_dict = {
             "variable": "variable_name",
@@ -194,7 +198,6 @@ class Network_Processor:
         df = df.rename(
             columns={k: v for k, v in col_renaming_dict.items() if k in df.columns}
         )
-        df["unit_pypsa"] = df["unit_pypsa"].map(UNITS_MAPPING)
         # drop columns not needed
 
         # initialize pyam.IamDataFrame
@@ -236,10 +239,10 @@ class Network_Processor:
                     )
 
             if results:
-                year_df = pd.concat(results, ignore_index=True)
+                year_df = pd.concat(results, ignore_index=False)
                 year_df.rename(columns={"value": str(investment_year)}, inplace=True)
                 container_investment_years.append(year_df)
-        if len(container_investment_years) < 0:
+        if len(container_investment_years) > 0:
             ds_with_values = container_investment_years[0]
         if len(container_investment_years) > 1:
             for year_df in container_investment_years[1:]:
