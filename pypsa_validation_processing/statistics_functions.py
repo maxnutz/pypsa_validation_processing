@@ -51,14 +51,17 @@ def Final_Energy_by_Carrier__Electricity(
     The current implementation returns a dummy value of ``0.0 MWh`` for the
     year 2020 so that the end-to-end workflow can be tested.
     """
-    # Dummy placeholder – to be replaced with the actual pypsa statistics call.
-    # e.g.: n.statistics.energy_balance(comps=["Load"], bus_carrier="AC")
-    result = n.statistics.energy_balance(
-        components=["Load"],
-        carrier="agriculture electricity",
-        groupby=["country", "carrier", "unit"],
-    ).xs("AT", level="country")
-    return result
+    # withdrawal from electricity including low_voltage
+    res = n.statistics.energy_balance(
+        bus_carrier="AC", groupby=["carrier", "country", "unit"], direction="withdrawal"
+    )
+    # as battery is Store, discharger-link needs to be evaluated separately.
+    res_storage = n.statistics.energy_balance(
+        bus_carrier="AC",
+        groupby=["carrier", "country", "unit"],
+        carrier=["battery discharger"],
+    )
+    return pd.concat([res, res_storage], axis=0).groupby(["country", "unit"]).sum()
 
 
 def Final_Energy_by_Sector__Transportation(
@@ -94,12 +97,20 @@ def Final_Energy_by_Sector__Transportation(
     The current implementation returns a dummy value of ``0.0 MWh`` for the
     year 2020 so that the end-to-end workflow can be tested.
     """
-    # Dummy placeholder – to be replaced with the actual pypsa statistics call.
-    # e.g.: n.statistics.energy_balance(comps=["Load"], carrier="transport")
-
-    result = n.statistics.energy_balance(
-        components=["Load"],
-        carrier="agriculture electricity",
-        groupby=["country", "carrier", "unit"],
-    ).xs("AT", level="country")
+    # sum over all transportation-relevant sectors - 2 different units involved.
+    result = (
+        n.statistics.energy_balance(
+            carrier=[
+                "land transport EV",
+                "land transport fuel cell",
+                "kerosene for aviation",
+                "shipping methanol",
+            ],
+            components="Load",
+            groupby=["carrier", "unit", "country"],
+            direction="withdrawal",
+        )
+        .groupby(["country", "unit"])
+        .sum()
+    )
     return result
