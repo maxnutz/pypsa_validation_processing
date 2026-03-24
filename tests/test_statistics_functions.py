@@ -1,5 +1,7 @@
 """Tests for pypsa_validation_processing.statistics_functions."""
 
+from __future__ import annotations
+
 import pandas as pd
 import pytest
 
@@ -8,24 +10,7 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Sector__Transportation,
 )
 
-# ---------------------------------------------------------------------------
-# Shared fixture
-# ---------------------------------------------------------------------------
-
-REQUIRED_COLUMNS = {"variable", "unit", "year", "value"}
-
-
-class _DummyNetworkCollection:
-    """Minimal stand-in for pypsa.NetworkCollection used in unit tests.
-
-    The current statistics functions are placeholders and do not call any
-    methods on the network collection, so an empty class is sufficient.
-    """
-
-
-@pytest.fixture
-def dummy_network_collection():
-    return _DummyNetworkCollection()
+from conftest import MockPyPSANetwork, MockNetworkCollection
 
 
 # ---------------------------------------------------------------------------
@@ -34,22 +19,42 @@ def dummy_network_collection():
 
 
 class TestFinalEnergyByCarrierElectricity:
-    def test_returns_dataframe(self, dummy_network_collection):
-        result = Final_Energy_by_Carrier__Electricity(dummy_network_collection)
-        assert isinstance(result, pd.DataFrame)
+    """Test suite for Final_Energy_by_Carrier__Electricity function."""
 
-    def test_required_columns_present(self, dummy_network_collection):
-        result = Final_Energy_by_Carrier__Electricity(dummy_network_collection)
-        assert REQUIRED_COLUMNS.issubset(result.columns)
+    def test_returns_dataframe(self, mock_network: MockPyPSANetwork):
+        """Test that the function returns a pandas DataFrame or Series."""
+        result = Final_Energy_by_Carrier__Electricity(mock_network)
+        assert isinstance(result, (pd.DataFrame, pd.Series))
 
-    def test_variable_name(self, dummy_network_collection):
-        result = Final_Energy_by_Carrier__Electricity(dummy_network_collection)
-        expected = "Final Energy [by Carrier]|Electricity"
-        assert (result["variable"] == expected).all()
+    def test_has_country_and_unit_index(self, mock_network: MockPyPSANetwork):
+        """Test that result has country and unit in the index."""
+        result = Final_Energy_by_Carrier__Electricity(mock_network)
+        assert "country" in result.index.names
+        assert "unit" in result.index.names
 
-    def test_not_empty(self, dummy_network_collection):
-        result = Final_Energy_by_Carrier__Electricity(dummy_network_collection)
+    def test_not_empty(self, mock_network: MockPyPSANetwork):
+        """Test that result is not empty."""
+        result = Final_Energy_by_Carrier__Electricity(mock_network)
         assert len(result) > 0
+
+    def test_numeric_values(self, mock_network: MockPyPSANetwork):
+        """Test that result values are numeric."""
+        result = Final_Energy_by_Carrier__Electricity(mock_network)
+        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
+            result.dtype
+        )
+
+    def test_contains_austria(self, mock_network: MockPyPSANetwork):
+        """Test that result contains Austria (AT) data."""
+        result = Final_Energy_by_Carrier__Electricity(mock_network)
+        assert "AT" in result.index.get_level_values("country")
+
+    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
+        """Test processing multiple networks from collection."""
+        for network in mock_network_collection:
+            result = Final_Energy_by_Carrier__Electricity(network)
+            assert isinstance(result, (pd.DataFrame, pd.Series))
+            assert len(result) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +63,39 @@ class TestFinalEnergyByCarrierElectricity:
 
 
 class TestFinalEnergyBySectorTransportation:
-    def test_returns_dataframe(self, dummy_network_collection):
-        result = Final_Energy_by_Sector__Transportation(dummy_network_collection)
-        assert isinstance(result, pd.DataFrame)
+    """Test suite for Final_Energy_by_Sector__Transportation function."""
 
-    def test_required_columns_present(self, dummy_network_collection):
-        result = Final_Energy_by_Sector__Transportation(dummy_network_collection)
-        assert REQUIRED_COLUMNS.issubset(result.columns)
+    def test_returns_dataframe(self, mock_network: MockPyPSANetwork):
+        """Test that the function returns a pandas DataFrame or Series."""
+        result = Final_Energy_by_Sector__Transportation(mock_network)
+        assert isinstance(result, (pd.DataFrame, pd.Series))
 
-    def test_variable_name(self, dummy_network_collection):
-        result = Final_Energy_by_Sector__Transportation(dummy_network_collection)
-        expected = "Final Energy [by Sector]|Transportation"
-        assert (result["variable"] == expected).all()
+    def test_has_country_and_unit_index(self, mock_network: MockPyPSANetwork):
+        """Test that result has country and unit in the index."""
+        result = Final_Energy_by_Sector__Transportation(mock_network)
+        assert "country" in result.index.names
+        assert "unit" in result.index.names
 
-    def test_not_empty(self, dummy_network_collection):
-        result = Final_Energy_by_Sector__Transportation(dummy_network_collection)
+    def test_not_empty(self, mock_network: MockPyPSANetwork):
+        """Test that result is not empty."""
+        result = Final_Energy_by_Sector__Transportation(mock_network)
         assert len(result) > 0
+
+    def test_numeric_values(self, mock_network: MockPyPSANetwork):
+        """Test that result values are numeric."""
+        result = Final_Energy_by_Sector__Transportation(mock_network)
+        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
+            result.dtype
+        )
+
+    def test_contains_austria(self, mock_network: MockPyPSANetwork):
+        """Test that result contains Austria (AT) data."""
+        result = Final_Energy_by_Sector__Transportation(mock_network)
+        assert "AT" in result.index.get_level_values("country")
+
+    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
+        """Test processing multiple networks from collection."""
+        for network in mock_network_collection:
+            result = Final_Energy_by_Sector__Transportation(network)
+            assert isinstance(result, (pd.DataFrame, pd.Series))
+            assert len(result) > 0
