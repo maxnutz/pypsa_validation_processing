@@ -4,67 +4,89 @@
 This repository implements a reusable Python module (`pypsa_validation_processing`) that:
 - Takes a definitions folder holding IAMC-formatted variable definitions
 - Executes the corresponding function (if available) to extract the value of the respective variable from a given PyPSA NetworkCollection
-- Returns the results as a `pyam.IamDataFrame`
+- Saves the result as IAMC-formatted xlsx-file.
 
 ## Code Structure
 
 ```mermaid
 classDiagram
-    class workflow.py{
-        config_path: pathlib.Path
-        build_parser()
+    class Network_Processor {
+        +path_config: pathlib_Path
+        +config: dict
+        +country: str
+        +definition_path: pathlib_Path
+        +mapping_path: pathlib_Path
+        +output_path: pathlib_Path
+        +network_results_path: pathlib_Path
+        +model_name: str
+        +scenario_name: str
+        +network_collection: pypsa_NetworkCollection
+        +dsd: nomenclature_DataStructureDefinition
+        +functions_dict: dict
+        +dsd_with_values: pyam_IamDataFrame
+        +path_dsd_with_values: pathlib_Path
+        +__init__(path_config: pathlib_Path)
+        +_read_config() dict
+        +_read_mappings() dict
+        +_read_pypsa_network_collection() pypsa_NetworkCollection
+        +read_definitions() nomenclature_DataStructureDefinition
+        +_execute_function_for_variable(variable: str, n: pypsa_Network) pd_Series
+        +_postprocess_statistics_result(variable: str, result: pd_Series) pd_DataFrame
+        +structure_pyam_from_pandas(df: pd_DataFrame) pyam_IamDataFrame
+        +calculate_variables_values() None
+        +write_output_to_xlsx() None
     }
 
-    class statistics_functions.py{
-        one function per variable
+    class statistics_functions_py {
+        +Final_Energy_by_Carrier__Electricity(n: pypsa_Network) pd_DataFrame
+        +Final_Energy_by_Sector__Transportation(n: pypsa_Network) pd_DataFrame
     }
 
-    class utils.py{
-        EU27_COUNTRY_CODES: dict
+    class utils_py {
+        +EU27_COUNTRY_CODES: dict~str,str~
+        +UNITS_MAPPING: dict~str,str~
     }
 
-    class mapping.yaml{
-        mapping variables to function names
+    class config_default_yaml {
+        +country: str
+        +definitions_path: str
+        +output_path: str
+        +network_results_path: str
+        +model_name: str
+        +scenario_name: str
     }
 
-    class config.yaml{
-        user configuration
+    class mapping_default_yaml {
+        +Final_Energy_by_Carrier__Electricity: str
+        +Final_Energy_by_Sector__Transportation: str
     }
 
-    Network_Processor <-- workflow.py : executes
-    statistics_functions.py <-- Network_Processor : executes
-    utils.py <-- Network_Processor : imports
-    mapping.yaml <|-- Network_Processor : includes
-    config.yaml <|-- Network_Processor : includes
-
-    class Network_Processor{
-        config_path: pathlib.Path
-        config: dict
-        network_results_path: pathlib.Path
-        definitions_path: pathlib.Path
-        mappings_path: pathlib.Path
-        country: str
-        model_name: str
-        scenario_name: str
-        network_collection: pypsa.NetworkCollection
-        dsd: nomenclature.DataStructureDefinition
-        functions_dict: dict
-        dsd_with_values: pyam.IamDataFrame | None
-        path_dsd_with_values: pathlib.Path
-
-        __init__()
-        __repr__()
-        _read_config()
-        _read_mappings()
-        _read_pypsa_network_collection()
-        read_definitions()
-        _execute_function_for_variable()
-        _postprocess_statistics_result()
-        structure_pyam_from_pandas()
-        calculate_variables_values()
-        write_output_to_xlsx()
+    class pypsa_NetworkCollection
+    class pypsa_Network {
+        +name: str
+        +statistics: pypsa_StatisticsAccessor
     }
-    note for Network_Processor "in class_definitions.py"
+    class pypsa_StatisticsAccessor {
+        +energy_balance(components: list, carrier: str, groupby: list) pd_Series
+    }
+
+    class nomenclature_DataStructureDefinition {
+        +variable: pd_Series
+    }
+
+    class pyam_IamDataFrame
+    class pd_DataFrame
+    class pd_Series
+
+    Network_Processor --> pypsa_NetworkCollection : owns
+    Network_Processor --> nomenclature_DataStructureDefinition : uses
+    Network_Processor --> pyam_IamDataFrame : creates
+    Network_Processor --> statistics_functions_py : calls
+    Network_Processor --> utils_py : imports
+    Network_Processor --> config_default_yaml : reads
+    Network_Processor --> mapping_default_yaml : reads
+    pypsa_NetworkCollection --> pypsa_Network : contains
+    pypsa_Network --> pypsa_StatisticsAccessor : has
 ```
 
 ## Folder Structure
@@ -97,6 +119,7 @@ classDiagram
 - `mapping.default.yaml` (or another mapping-file provided by the config-file) holds the mapping of IAMC variable to the respective function in `pypsa_validation_processing/statistics_functions.py`
 - The package workflow entrypoint is `pypsa_validation_processing/workflow.py`; the root `workflow.py` is a thin compatibility wrapper
 - Default configs are packaged inside `pypsa_validation_processing/configs/`
+- Pixi is used as environment package manager. Use `pixi run` before your statement in cli to use the intended pixi-environment.
 - The `resources/` directory holds non-versioned resources
 - The `sister_packages/` directory holds related packages for background information
 - The `tests/` directory holds unit and integration tests
@@ -109,7 +132,7 @@ A task is complete when:
 - Changes are integrated into existing folder structure.
 - A short summary of changes is provided.
 - In chat mode: the user has reviewed the changes and given approval.
-- For a pull-request: the user has to be reviewer of the pull request to give approval.
+- For a pull-request: the user is reviewer of the pull request to give approval.
 
 ## Forbidden Actions
 - Do NOT invent datasets, files, or APIs.
