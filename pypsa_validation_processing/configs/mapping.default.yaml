@@ -4,3 +4,6 @@
 #
 # Example:
 # Primary Energy|Coal: primary_energy_coal
+
+Final Energy [by Carrier]|Electricity: Final_Energy_by_Carrier__Electricity
+Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation

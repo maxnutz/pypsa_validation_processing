@@ -1,0 +1,40 @@
+"""Static information and general utility functions for pypsa_validation_processing."""
+
+EU27_COUNTRY_CODES: dict[str, str] = {
+    "AT": "Austria",
+    "BE": "Belgium",
+    "BG": "Bulgaria",
+    "CY": "Cyprus",
+    "CZ": "Czechia",
+    "DE": "Germany",
+    "DK": "Denmark",
+    "EE": "Estonia",
+    "ES": "Spain",
+    "FI": "Finland",
+    "FR": "France",
+    "GR": "Greece",
+    "HR": "Croatia",
+    "HU": "Hungary",
+    "IE": "Ireland",
+    "IT": "Italy",
+    "LT": "Lithuania",
+    "LU": "Luxembourg",
+    "LV": "Latvia",
+    "MT": "Malta",
+    "NL": "Netherlands",
+    "PL": "Poland",
+    "PT": "Portugal",
+    "RO": "Romania",
+    "SE": "Sweden",
+    "SI": "Slovenia",
+    "SK": "Slovakia",
+    "EU27_{year}": "EU27",
+}
+
+UNITS_MAPPING = {
+    "MWh_el": "MWh",
+    "MWh_LHV": "MWh",
+    "MWh_th": "MWh",
+    "t_co2": "t",
+    "": "",
+}
