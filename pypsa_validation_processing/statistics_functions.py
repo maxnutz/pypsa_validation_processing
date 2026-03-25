@@ -96,7 +96,7 @@ def Final_Energy_by_Sector__Transportation(
         .groupby(["country", "unit"])
         .sum()
     )
-    return result
+    return res
 
 
 def Final_Energy_by_Sector__Industry(
@@ -133,7 +133,7 @@ def Final_Energy_by_Sector__Industry(
         "naphtha for industry",
         "low-temperature heat for industry",
     ]
-    result = (
+    res = (
         n.statistics.energy_balance(
             carrier=carriers,
             groupby=["carrier", "unit", "country"],
