@@ -91,17 +91,21 @@ def Final_Energy_by_Sector__Transportation(
     does not need to be evaluated, as evaluation is restricted to Load-Components only.
     """
     # sum over all transportation-relevant sectors - 2 different units involved.
-    res = n.statistics.energy_balance(
-        carrier=[
-            "land transport EV",
-            "land transport fuel cell",
-            "land transport oil",
-            "kerosene for aviation",
-            "shipping methanol",
-            "shipping oil",
-        ],
-        components="Load",
-        groupby=["carrier", "unit", "country"],
-        direction="withdrawal",
+    res = (
+        n.statistics.energy_balance(
+            carrier=[
+                "land transport EV",
+                "land transport fuel cell",
+                "land transport oil",
+                "kerosene for aviation",
+                "shipping methanol",
+                "shipping oil",
+            ],
+            components="Load",
+            groupby=["carrier", "unit", "country"],
+            direction="withdrawal",
+        )
+        .groupby(["country", "unit"])
+        .sum()
     )
     return res
