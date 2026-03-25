@@ -87,30 +87,21 @@ def Final_Energy_by_Sector__Transportation(
 
     Notes
     -----
-    The actual extraction of transportation final energy from the network
-    collection will be implemented by the user.  A typical call would be::
-
-        network_collection.statistics.energy_balance(
-            comps=["Load"], carrier="transport"
-        )
-
-    The current implementation returns a dummy value of ``0.0 MWh`` for the
-    year 2020 so that the end-to-end workflow can be tested.
+    Includes all transportation-relevant carriers for component Load. Vehicle to Grid
+    does not need to be evaluated, as evaluation is restricted to Load-Components only.
     """
     # sum over all transportation-relevant sectors - 2 different units involved.
-    result = (
-        n.statistics.energy_balance(
-            carrier=[
-                "land transport EV",
-                "land transport fuel cell",
-                "kerosene for aviation",
-                "shipping methanol",
-            ],
-            components="Load",
-            groupby=["carrier", "unit", "country"],
-            direction="withdrawal",
-        )
-        .groupby(["country", "unit"])
-        .sum()
+    res = n.statistics.energy_balance(
+        carrier=[
+            "land transport EV",
+            "land transport fuel cell",
+            "land transport oil",
+            "kerosene for aviation",
+            "shipping methanol",
+            "shipping oil",
+        ],
+        components="Load",
+        groupby=["carrier", "unit", "country"],
+        direction="withdrawal",
     )
-    return result
+    return res
