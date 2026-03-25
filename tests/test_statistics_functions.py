@@ -110,16 +110,16 @@ class TestFinalEnergyBySectorTransportation:
 class TestFinalEnergyBySectorIndustry:
     """Test suite for Final_Energy_by_Sector__Industry function."""
 
-    def test_returns_dataframe(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas DataFrame or Series."""
+    def test_returns_series(self, mock_network: MockPyPSANetwork):
+        """Test that the function returns a pandas Series."""
         result = Final_Energy_by_Sector__Industry(mock_network)
-        assert isinstance(result, (pd.DataFrame, pd.Series))
+        assert isinstance(result, pd.Series)
 
-    def test_has_country_and_unit_index(self, mock_network: MockPyPSANetwork):
-        """Test that result has country and unit in the index."""
+    def test_has_country_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with country and unit levels."""
         result = Final_Energy_by_Sector__Industry(mock_network)
-        assert "country" in result.index.names
-        assert "unit" in result.index.names
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["country", "unit"]
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
@@ -142,5 +142,7 @@ class TestFinalEnergyBySectorIndustry:
         """Test processing multiple networks from collection."""
         for network in mock_network_collection:
             result = Final_Energy_by_Sector__Industry(network)
-            assert isinstance(result, (pd.DataFrame, pd.Series))
+            assert isinstance(result, pd.Series)
+            assert isinstance(result.index, pd.MultiIndex)
+            assert result.index.names == ["country", "unit"]
             assert len(result) > 0
