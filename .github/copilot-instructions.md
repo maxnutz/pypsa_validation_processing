@@ -145,6 +145,7 @@ A task is complete when:
 - Add or update tests when behavior changes.
 - Tests belong only in `/tests`.
 - Prefer minimal unit tests over integration tests.
+- all testing routines `test_statistics_functions.py` for functions in `statistics_functions.py` must test the output-format. The outputformat MUST be a pandas.Series with Multiindex of ``country`` and ``unit``. It CAN include more levels in the Multiindex.
 
 ## Background Information
 > [!WARNING]
