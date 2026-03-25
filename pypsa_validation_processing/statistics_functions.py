@@ -75,11 +75,11 @@ def Final_Energy_by_Sector__Transportation(
 
     Notes
     -----
-    Includes all carriers directly connected to loads in the transportation sector.
-    TODO: Needs futher clarification for bidirectional EV usage!
+    Includes all transportation-relevant carriers for component Load. Vehicle to Grid
+    does not need to be evaluated, as evaluation is restricted to Load-Components only.
     """
     # sum over all transportation-relevant sectors - 2 different units involved.
-    result = (
+    res = (
         n.statistics.energy_balance(
             carrier=[
                 "land transport EV",
@@ -143,4 +143,4 @@ def Final_Energy_by_Sector__Industry(
         .groupby(["country", "unit"])
         .sum()
     )
-    return result
+    return res
