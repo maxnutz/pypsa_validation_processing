@@ -21,7 +21,7 @@ import pypsa
 
 def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
-) -> pd.DataFrame:
+) -> pd.Series:
     """Extract electricity final energy from a PyPSA Network.
 
     Returns the total electricity consumption (excluding transmission /
@@ -57,7 +57,7 @@ def Final_Energy_by_Carrier__Electricity(
 
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
-) -> pd.DataFrame:
+) -> pd.Series:
     """Extract transportation-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the transportation sector (excluding
@@ -102,9 +102,9 @@ def Final_Energy_by_Sector__Transportation(
 def Final_Energy_by_Sector__Industry(
     n: pypsa.Network,
 ) -> pd.DataFrame:
-    """Extract transportation-sector final energy from a PyPSA Network.
+    """Extract Industry-sector final energy from a PyPSA Network.
 
-    Returns the total energy consumed by the transportation sector (excluding
+    Returns the total energy consumed by the Industry sector (excluding
     transmission / distribution losses)
 
     Parameters
