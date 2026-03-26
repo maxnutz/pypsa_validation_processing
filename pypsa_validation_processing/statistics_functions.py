@@ -109,3 +109,45 @@ def Final_Energy_by_Sector__Transportation(
         .sum()
     )
     return res
+
+
+def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
+    """Extract agriculture-sector final energy from a PyPSA Network.
+
+    Returns the total energy consumed by the transportation sector (excluding
+    transmission / distribution losses) across the pypsa-network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+
+    Returns
+    -------
+    pd.Series
+        Pandas Series with Multiindex of ``country`` and ``unit``
+
+    Notes
+    -----
+    Includes carriers ['agriculture electricity','agriculture heat','agriculture machinery electric',
+    'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
+    of Links and Buses, as Demand is assumed fixed. _Time series of Agriculture demand are assumed
+    to be constant in PyPSA-EUR._
+    """
+    carriers = [
+        "agriculture electricity",
+        "agriculture heat",
+        "agriculture machinery electric",
+        "agriculture machinery oil",
+    ]
+    res = (
+        n.statistics.energy_balance(
+            carrier=carriers,
+            groupby=["carrier", "unit", "country"],
+            components="Load",
+            direction="withdrawal",  # for positive values
+        )
+        .groupby(["country", "unit"])
+        .sum()
+    )
+    return res
