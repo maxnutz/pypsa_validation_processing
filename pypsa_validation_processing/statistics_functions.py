@@ -130,8 +130,8 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     Notes
     -----
     Includes carriers ['agriculture electricity','agriculture heat','agriculture machinery electric',
-    'agriculture machinery oil'] executed on Load-Components. agriculture machinery oil is also carrier
-    of Links and Buses, as Demand is assued fixed. _Timeseries of Agriculture demand are assumed
+    'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
+    of Links and Buses, as Demand is assumed fixed. _Time series of Agriculture demand are assumed
     to be constant in PyPSA-EUR._
     """
     carriers = [
