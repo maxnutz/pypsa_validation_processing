@@ -35,6 +35,7 @@ UNITS_MAPPING = {
     "MWh_el": "MWh",
     "MWh_LHV": "MWh",
     "MWh_th": "MWh",
+    "land transport": "MWh",
     "t_co2": "t",
     "": "",
 }
