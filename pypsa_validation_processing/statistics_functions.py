@@ -132,8 +132,13 @@ def Final_Energy_by_Sector__Transportation(
     v2g_in = n.statistics.energy_balance(
         carrier="V2G", components="Link", groupby=["country", "unit"], at_port=["bus0"]
     )
-    EV_charging_percentage = (charging_out + v2g_in) / charging_out
+    if not (no_v2g := v2g_in.empty):
+        EV_charging_percentage = (charging_out + v2g_in) / charging_out
     total_link_losses = charging_out + charging_in
-    EV_charging_losses = abs(total_link_losses * EV_charging_percentage)
+    EV_charging_losses = (
+        abs(total_link_losses)
+        if no_v2g
+        else abs(total_link_losses * EV_charging_percentage)
+    )
 
     return stat_transport.add(EV_charging_losses, fill_value=0)
