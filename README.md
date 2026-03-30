@@ -57,6 +57,8 @@ pypsa_validation_processing/
 
 This section describes the conventions for adding new variable statistics functions to `pypsa_validation_processing/statistics_functions.py`.
 
+**Each function in ``statistic_functions.py`` corresponds to one IAMC variable and extracts the relevant value from a given PyPSA Network.  The functions are looked up by name via the mapping defined in ``configs/mapping.default.yaml``.**
+
 ### Naming Convention
 
 Function names follow the IAMC variable name with these substitutions:
