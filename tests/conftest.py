@@ -27,6 +27,7 @@ class MockStatisticsAccessor:
         components: str | list[str] | None = None,
         groupby: list[str] | None = None,
         direction: str = "withdrawal",
+        at_port: list[str] | None = None,
     ) -> pd.Series:
         """Mock energy_balance method for PyPSA Network.statistics.
 
@@ -45,6 +46,8 @@ class MockStatisticsAccessor:
             Grouping keys for the result
         direction : str
             Direction of energy flow ("withdrawal" or "supply")
+        at_port : list[str] | None
+            Port filter (e.g., "bus0" or "bus1" for Links)
 
         Returns
         -------
@@ -110,6 +113,8 @@ class MockPyPSANetwork:
             "wildcards": {"planning_horizons": 2020},
         }
         self.statistics = MockStatisticsAccessor()
+        # Add carriers attribute with empty index by default
+        self.carriers = pd.DataFrame(index=[])
 
         # Set any additional attributes
         for key, value in kwargs.items():
