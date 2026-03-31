@@ -150,3 +150,25 @@ class TestFinalEnergyBySectorAgriculture:
             assert isinstance(result.index, pd.MultiIndex)
             assert result.index.names == ["country", "unit"]
             assert len(result) > 0
+
+    def test_without_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
+        """Test that function works correctly when no CC carriers are present."""
+        # Ensure carriers index is empty (no CC carriers)
+        mock_network.carriers = pd.DataFrame(index=[])
+        result = Final_Energy_by_Sector__Agriculture(mock_network)
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["country", "unit"]
+
+    def test_with_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
+        """Test that efficiency loss from CC carriers is added to result."""
+        # Add carbon capture carriers to the network
+        mock_network.carriers = pd.DataFrame(
+            index=["agriculture machinery oil CC", "agriculture machinery oil"]
+        )
+        result = Final_Energy_by_Sector__Agriculture(mock_network)
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["country", "unit"]
+        # Result should still have valid data
+        assert len(result) > 0

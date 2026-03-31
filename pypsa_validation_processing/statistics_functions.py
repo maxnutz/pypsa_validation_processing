@@ -133,6 +133,9 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
     of Links and Buses, as Demand is assumed fixed. _Time series of Agriculture demand are assumed
     to be constant in PyPSA-EUR._
+    Theoretically, machinery oil is a single bus with load and links for energy flow. This bus could be
+    sourced by a bus representing oil usage with carbon capture in agriculture. Therefore the "efficiency
+    loss" of this link must be added.
     """
     carriers = [
         "agriculture electricity",
@@ -140,6 +143,7 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
         "agriculture machinery electric",
         "agriculture machinery oil",
     ]
+    cc_carriers = ["agriculture machinery oil CC"]
     res = (
         n.statistics.energy_balance(
             carrier=carriers,
@@ -150,4 +154,21 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
         .groupby(["country", "unit"])
         .sum()
     )
+    if any(carrier in n.carriers.index for carrier in cc_carriers):
+        cc_in = n.statistics.energy_balance(
+            carrier=cc_carriers,
+            groupby=["carrier", "country", "unit"],
+            components="Link",
+            at_port=["bus0"],
+        )
+        cc_out = n.statistics.energy_balance(
+            carrier=cc_carriers,
+            groupby=["carrier", "country", "unit"],
+            components="Link",
+            at_port=["bus1"],
+        )
+        eff_loss = abs(cc_in - cc_out)
+        eff_loss = eff_loss.groupby(["country", "unit"]).sum()
+        res = res.add(eff_loss, fill_value=0)
+
     return res
