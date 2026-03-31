@@ -121,7 +121,8 @@ def Final_Energy_by_Sector__Industry(
     -----
     Includes all carriers directly connected to loads in the industry sector. Same Carrier
     names are also attached to some links, so components-grouping is needed!
-    Values are exogenously set, so output values are round numbers!
+    efficiency losses directly supplying industry loads for gas, biomass and coal carbon capture
+    are included extra.
     """
     carriers = [
         "coal for industry",
@@ -133,7 +134,13 @@ def Final_Energy_by_Sector__Industry(
         "naphtha for industry",
         "low-temperature heat for industry",
     ]
-    res = (
+    cc_carriers = [
+        "coal for industry CC",
+        "gas for industry CC",
+        "solid biomass for industry CC",
+    ]
+
+    load_statistics = (
         n.statistics.energy_balance(
             carrier=carriers,
             groupby=["carrier", "unit", "country"],
@@ -143,4 +150,20 @@ def Final_Energy_by_Sector__Industry(
         .groupby(["country", "unit"])
         .sum()
     )
+    # calculate efficiency losses for links with eff < 1
+    cc_in = n.statistics.energy_balance(
+        carrier=cc_carriers,
+        groupby=["carrier", "country", "unit"],
+        components="Link",
+        at_port=["bus0"],
+    )
+    cc_out = n.statistics.energy_balance(
+        carrier=cc_carriers,
+        groupby=["carrier", "country", "unit"],
+        components="Link",
+        at_port=["bus1"],
+    )
+    eff_loss = abs(cc_in - cc_out)
+    eff_loss = eff_loss.groupby(["country", "unit"]).sum()
+    res = load_statistics.add(eff_loss, fill_value=0)
     return res
