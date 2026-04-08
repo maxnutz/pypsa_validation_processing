@@ -21,35 +21,26 @@ import pypsa
 
 def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
-) -> pd.DataFrame:
-    """Extract electricity final energy from a PyPSA NetworkCollection.
+) -> pd.Series:
+    """Extract electricity final energy from a PyPSA Network.
 
     Returns the total electricity consumption (excluding transmission /
-    distribution losses) across all networks in *network_collection*.
+    distribution losses)
 
     Parameters
     ----------
-    network_collection : pypsa.NetworkCollection
-        Collection of PyPSA networks to process.
+    n : pypsa.Network
+        PyPSA network to process.
 
     Returns
     -------
-    pd.DataFrame
-        Long-format DataFrame with columns ``variable``, ``unit``, ``year``,
-        and ``value``.  The ``variable`` column contains
-        ``"Final Energy [by Carrier]|Electricity"`` for every row.
+    pd.Series
+        Pandas Series with Multiindex of ``country`` and ``unit``
 
     Notes
     -----
-    The actual extraction of electricity final energy from the network
-    collection will be implemented by the user.  A typical call would be::
-
-        network_collection.statistics.energy_balance(
-            comps=["Load"], bus_carrier="AC"
-        )
-
-    The current implementation returns a dummy value of ``0.0 MWh`` for the
-    year 2020 so that the end-to-end workflow can be tested.
+    Extracts all withdrawals from elec network. low_voltage is included in AC withdrawal.
+    Remove discharger afterwards, as battery-connecting links have different carrier names.
     """
     # withdrawal from electricity including low_voltage
     res = n.statistics.energy_balance(
@@ -66,24 +57,21 @@ def Final_Energy_by_Carrier__Electricity(
 
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
-) -> pd.DataFrame:
-    """Extract transportation-sector final energy from a PyPSA NetworkCollection.
+) -> pd.Series:
+    """Extract transportation-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the transportation sector (excluding
-    transmission / distribution losses) across all networks in
-    *network_collection*.
+    transmission / distribution losses)
 
     Parameters
     ----------
-    network_collection : pypsa.NetworkCollection
-        Collection of PyPSA networks to process.
+    n : pypsa.Network
+        PyPSA network to process.
 
     Returns
     -------
-    pd.DataFrame
-        Long-format DataFrame with columns ``variable``, ``unit``, ``year``,
-        and ``value``.  The ``variable`` column contains
-        ``"Final Energy [by Sector]|Transportation"`` for every row.
+    pd.Series
+        Pandas Series with Multiindex of ``country`` and ``unit``
 
     Notes
     -----
@@ -103,11 +91,81 @@ def Final_Energy_by_Sector__Transportation(
             ],
             components="Load",
             groupby=["carrier", "unit", "country"],
-            direction="withdrawal",
+            direction="withdrawal",  # for positive values
         )
         .groupby(["country", "unit"])
         .sum()
     )
+    return res
+
+
+def Final_Energy_by_Sector__Industry(
+    n: pypsa.Network,
+) -> pd.DataFrame:
+    """Extract Industry-sector final energy from a PyPSA Network.
+
+    Returns the total energy consumed by the Industry sector (excluding
+    transmission / distribution losses)
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+
+    Returns
+    -------
+    pd.Series
+        Pandas Series with Multiindex of ``country`` and ``unit``
+
+    Notes
+    -----
+    Includes all carriers directly connected to loads in the industry sector. Same Carrier
+    names are also attached to some links, so components-grouping is needed!
+    efficiency losses directly supplying industry loads for gas, biomass and coal carbon capture
+    are included extra.
+    """
+    carriers = [
+        "coal for industry",
+        "industry electricity",
+        "gas for industry",
+        "H2 for industry",
+        "solid biomass for industry",
+        "industry methanol",
+        "naphtha for industry",
+        "low-temperature heat for industry",
+    ]
+    cc_carriers = [
+        "coal for industry CC",
+        "gas for industry CC",
+        "solid biomass for industry CC",
+    ]
+
+    load_statistics = (
+        n.statistics.energy_balance(
+            carrier=carriers,
+            groupby=["carrier", "unit", "country"],
+            components="Load",
+            direction="withdrawal",  # for positive values
+        )
+        .groupby(["country", "unit"])
+        .sum()
+    )
+    # calculate efficiency losses for links with eff < 1
+    cc_in = n.statistics.energy_balance(
+        carrier=cc_carriers,
+        groupby=["carrier", "country", "unit"],
+        components="Link",
+        at_port=["bus0"],
+    )
+    cc_out = n.statistics.energy_balance(
+        carrier=cc_carriers,
+        groupby=["carrier", "country", "unit"],
+        components="Link",
+        at_port=["bus1"],
+    )
+    eff_loss = abs(cc_in - cc_out)
+    eff_loss = eff_loss.groupby(["country", "unit"]).sum()
+    res = load_statistics.add(eff_loss, fill_value=0)
     return res
 
 
