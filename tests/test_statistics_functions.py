@@ -28,11 +28,11 @@ class TestFinalEnergyByCarrierElectricity:
         result = Final_Energy_by_Carrier__Electricity(mock_network)
         assert isinstance(result, pd.Series)
 
-    def test_has_country_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with country and unit levels."""
+    def test_has_region_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with region and unit levels."""
         result = Final_Energy_by_Carrier__Electricity(mock_network)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
@@ -46,10 +46,12 @@ class TestFinalEnergyByCarrierElectricity:
             result.dtype
         )
 
-    def test_contains_austria(self, mock_network: MockPyPSANetwork):
-        """Test that result contains Austria (AT) data."""
+    def test_contains_multiple_regions(self, mock_network: MockPyPSANetwork):
+        """Test that result contains multiple regional data."""
         result = Final_Energy_by_Carrier__Electricity(mock_network)
-        assert "AT" in result.index.get_level_values("country")
+        regions = result.index.get_level_values("region").unique()
+        assert len(regions) > 1
+        assert all(r.startswith("AT") for r in regions)
 
     def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
         """Test processing multiple networks from collection."""
@@ -57,7 +59,7 @@ class TestFinalEnergyByCarrierElectricity:
             result = Final_Energy_by_Carrier__Electricity(network)
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["country", "unit"]
+            assert result.index.names == ["region", "unit"]
             assert len(result) > 0
 
 
@@ -74,11 +76,11 @@ class TestFinalEnergyBySectorTransportation:
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert isinstance(result, pd.Series)
 
-    def test_has_country_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with country and unit levels."""
+    def test_has_region_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with region and unit levels."""
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
@@ -92,10 +94,12 @@ class TestFinalEnergyBySectorTransportation:
             result.dtype
         )
 
-    def test_contains_austria(self, mock_network: MockPyPSANetwork):
-        """Test that result contains Austria (AT) data."""
+    def test_contains_multiple_regions(self, mock_network: MockPyPSANetwork):
+        """Test that result contains multiple regional data."""
         result = Final_Energy_by_Sector__Transportation(mock_network)
-        assert "AT" in result.index.get_level_values("country")
+        regions = result.index.get_level_values("region").unique()
+        assert len(regions) > 1
+        assert all(r.startswith("AT") for r in regions)
 
     def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
         """Test processing multiple networks from collection."""
@@ -103,7 +107,7 @@ class TestFinalEnergyBySectorTransportation:
             result = Final_Energy_by_Sector__Transportation(network)
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["country", "unit"]
+            assert result.index.names == ["region", "unit"]
             assert len(result) > 0
 
 
@@ -120,11 +124,11 @@ class TestFinalEnergyBySectorAgriculture:
         result = Final_Energy_by_Sector__Agriculture(mock_network)
         assert isinstance(result, pd.Series)
 
-    def test_has_country_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with country and unit levels."""
+    def test_has_region_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with region and unit levels."""
         result = Final_Energy_by_Sector__Agriculture(mock_network)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
@@ -138,10 +142,12 @@ class TestFinalEnergyBySectorAgriculture:
             result.dtype
         )
 
-    def test_contains_austria(self, mock_network: MockPyPSANetwork):
-        """Test that result contains Austria (AT) data."""
+    def test_contains_multiple_regions(self, mock_network: MockPyPSANetwork):
+        """Test that result contains multiple regional data."""
         result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert "AT" in result.index.get_level_values("country")
+        regions = result.index.get_level_values("region").unique()
+        assert len(regions) > 1
+        assert all(r.startswith("AT") for r in regions)
 
     def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
         """Test processing multiple networks from collection."""
@@ -149,7 +155,7 @@ class TestFinalEnergyBySectorAgriculture:
             result = Final_Energy_by_Sector__Agriculture(network)
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["country", "unit"]
+            assert result.index.names == ["region", "unit"]
             assert len(result) > 0
 
     def test_without_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
@@ -159,7 +165,7 @@ class TestFinalEnergyBySectorAgriculture:
         result = Final_Energy_by_Sector__Agriculture(mock_network)
         assert isinstance(result, pd.Series)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
 
     def test_with_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
         """Test that efficiency loss from CC carriers is added to result."""
@@ -170,7 +176,7 @@ class TestFinalEnergyBySectorAgriculture:
         result = Final_Energy_by_Sector__Agriculture(mock_network)
         assert isinstance(result, pd.Series)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
         # Result should still have valid data
         assert len(result) > 0
 
@@ -211,7 +217,7 @@ class TestFinalEnergyBySectorIndustry:
             )
 
             if groupby is None:
-                groupby = ["carrier", "country", "unit"]
+                groupby = ["carrier", "region", "unit"]
 
             carriers = carrier if isinstance(carrier, list) else [carrier or "default"]
             index_tuples = []
@@ -220,7 +226,7 @@ class TestFinalEnergyBySectorIndustry:
             for c in carriers:
                 idx_dict = {
                     "carrier": c,
-                    "country": "AT",
+                    "region": "AT1",
                     "unit": "MWh_th",
                 }
                 index_tuples.append(tuple(idx_dict[key] for key in groupby))
@@ -255,11 +261,11 @@ class TestFinalEnergyBySectorIndustry:
         result = Final_Energy_by_Sector__Industry(self._industry_network())
         assert isinstance(result, pd.Series)
 
-    def test_has_country_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with country and unit levels."""
+    def test_has_region_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with region and unit levels."""
         result = Final_Energy_by_Sector__Industry(self._industry_network())
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["country", "unit"]
+        assert result.index.names == ["region", "unit"]
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
@@ -273,16 +279,16 @@ class TestFinalEnergyBySectorIndustry:
             result.dtype
         )
 
-    def test_contains_austria(self, mock_network: MockPyPSANetwork):
-        """Test that result contains Austria (AT) data."""
+    def test_contains_at1_region(self, mock_network: MockPyPSANetwork):
+        """Test that result contains AT1 regional data."""
         result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert "AT" in result.index.get_level_values("country")
+        assert "AT1" in result.index.get_level_values("region")
 
     def test_adds_cc_efficiency_losses(self):
         """Test that CC link losses are added to load statistics."""
         result = Final_Energy_by_Sector__Industry(self._industry_network())
         # 8 load carriers at 100 each + 3 CC losses at (10-7) each = 809
-        assert result.loc[("AT", "MWh_th")] == 809.0
+        assert result.loc[("AT1", "MWh_th")] == 809.0
 
     def test_uses_both_link_ports_for_cc_losses(self):
         """Test that CC losses are computed from bus0 and bus1 link balances."""
@@ -303,5 +309,5 @@ class TestFinalEnergyBySectorIndustry:
             result = Final_Energy_by_Sector__Industry(self._industry_network())
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["country", "unit"]
+            assert result.index.names == ["region", "unit"]
             assert len(result) > 0

@@ -3,6 +3,7 @@ country: AT               # ISO 3166-1 alpha-2 country code, e.g. AT
 definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
 output_path: resources            # path the outputfile should be written to
+aggregation_level: "country"      # Options: "country" or "region-wise"
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
