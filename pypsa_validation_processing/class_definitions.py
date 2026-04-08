@@ -224,6 +224,34 @@ class Network_Processor:
 
         return dsd
 
+    def _get_network_config(self, investment_year):
+        # Load network-results config for this investment year
+        config_pattern = str(
+            self.network_results_path / "configs" / f"config*{investment_year}.yaml"
+        )
+        matching_files = glob.glob(config_pattern)
+        network_config: dict | None = None
+        if matching_files:
+            selected_config_file = matching_files[0]
+            if len(matching_files) > 1:
+                print(
+                    f"INFO: Multiple config files found for investment year {investment_year}; "
+                    f"using '{selected_config_file}'"
+                )
+            try:
+                with open(selected_config_file, "r") as f:
+                    network_config = yaml.safe_load(f)
+            except Exception as exc:
+                print(
+                    f"WARNING: Could not load config file '{selected_config_file}': {exc}"
+                )
+        else:
+            print(
+                f"WARNING: No config file found for investment year {investment_year} "
+                f"at pattern '{config_pattern}'"
+            )
+        return network_config
+
     def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
 
@@ -241,32 +269,7 @@ class Network_Processor:
         for i in range(0, self.network_collection.__len__()):
             n = self.network_collection[i]
             investment_year = n.meta["wildcards"]["planning_horizons"]
-
-            # Load network-results config for this investment year
-            config_pattern = str(
-                self.network_results_path / "config" / f"config*{investment_year}.yaml"
-            )
-            matching_files = glob.glob(config_pattern)
-            network_config: dict | None = None
-            if matching_files:
-                selected_config_file = matching_files[0]
-                if len(matching_files) > 1:
-                    print(
-                        f"INFO: Multiple config files found for investment year {investment_year}; "
-                        f"using '{selected_config_file}'"
-                    )
-                try:
-                    with open(selected_config_file, "r") as f:
-                        network_config = yaml.safe_load(f)
-                except Exception as exc:
-                    print(
-                        f"WARNING: Could not load config file '{selected_config_file}': {exc}"
-                    )
-            else:
-                print(
-                    f"WARNING: No config file found for investment year {investment_year} "
-                    f"at pattern '{config_pattern}'"
-                )
+            network_config = self._get_network_config(investment_year)
 
             results = []
             for variable in self.dsd.variable.to_pandas()["variable"]:
