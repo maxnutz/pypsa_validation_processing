@@ -192,6 +192,82 @@ class TestNetworkProcessorFunctionExecution:
                 )
                 assert result is None
 
+    def test_execute_function_passes_config_when_accepted(self, mock_config_file: Path):
+        """Test that config is passed to functions that accept it."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {
+                    "Test Variable": "mock_func_with_config"
+                }
+
+                # Create a mock function that accepts config
+                received_config = {}
+
+                def mock_func_with_config(n, config=None):
+                    received_config["value"] = config
+                    return pd.Series(
+                        [1.0],
+                        index=pd.MultiIndex.from_tuples([("AT", "MWh_el")], names=["country", "unit"]),
+                    )
+
+                with patch(
+                    "pypsa_validation_processing.class_definitions.importlib.import_module"
+                ) as mock_import:
+                    mock_module = MagicMock()
+                    mock_module.mock_func_with_config = mock_func_with_config
+                    mock_import.return_value = mock_module
+
+                    mock_network = MockPyPSANetwork()
+                    test_config = {"some_key": "some_value"}
+                    processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config=test_config
+                    )
+                    assert received_config["value"] == test_config
+
+    def test_execute_function_does_not_pass_config_when_not_accepted(
+        self, mock_config_file: Path
+    ):
+        """Test that config is NOT passed to functions that don't accept it."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {
+                    "Test Variable": "mock_func_without_config"
+                }
+
+                call_kwargs = {}
+
+                def mock_func_without_config(n):
+                    call_kwargs["called_with_config"] = False
+                    return pd.Series(
+                        [1.0],
+                        index=pd.MultiIndex.from_tuples([("AT", "MWh_el")], names=["country", "unit"]),
+                    )
+
+                with patch(
+                    "pypsa_validation_processing.class_definitions.importlib.import_module"
+                ) as mock_import:
+                    mock_module = MagicMock()
+                    mock_module.mock_func_without_config = mock_func_without_config
+                    mock_import.return_value = mock_module
+
+                    mock_network = MockPyPSANetwork()
+                    # Should not raise even though config is provided
+                    result = processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config={"ignored": True}
+                    )
+                    assert isinstance(result, pd.Series)
+                    assert call_kwargs.get("called_with_config") is False
+
 
 # ---------------------------------------------------------------------------
 # Tests for output generation

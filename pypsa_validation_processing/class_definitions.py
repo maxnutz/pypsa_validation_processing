@@ -1,4 +1,7 @@
 from __future__ import annotations
+import glob
+import importlib
+import inspect
 import os
 from pathlib import Path
 import yaml
@@ -124,7 +127,7 @@ class Network_Processor:
         return dsd
 
     def _execute_function_for_variable(
-        self, variable: str, n: pypsa.Network
+        self, variable: str, n: pypsa.Network, config: dict | None = None
     ) -> pd.Series | None:
         """Look up and execute the statistics function for a single variable.
 
@@ -136,6 +139,13 @@ class Network_Processor:
         ----------
         variable : str
             IAMC variable name to process.
+        n : pypsa.Network
+            PyPSA network to process.
+        config : dict | None, optional
+            Configuration dictionary loaded from the network results config file
+            for the corresponding investment year. Passed to the statistics
+            function only if the function's signature includes a ``config``
+            parameter.
 
         Returns
         -------
@@ -143,8 +153,6 @@ class Network_Processor:
             Computed values for the variable, or ``None`` if no function
             is registered for it.
         """
-        import importlib
-
         func_name = self.functions_dict.get(variable)
         if func_name is None:
             return None
@@ -155,9 +163,12 @@ class Network_Processor:
         func = getattr(stats_module, func_name, None)
         if func is None:
             print(
-                f"WARNING: Variable {variable}: No function '{func_name}' not found in statistics_functions.py"
+                f"WARNING: Variable {variable}: Function '{func_name}' not found in statistics_functions.py"
             )
             return None
+
+        if "config" in inspect.signature(func).parameters:
+            return func(n, config=config)
         return func(n)
 
     def _postprocess_statistics_result(
@@ -213,6 +224,34 @@ class Network_Processor:
 
         return dsd
 
+    def _get_network_config(self, investment_year):
+        # Load network-results config for this investment year
+        config_pattern = str(
+            self.network_results_path / "configs" / f"config*{investment_year}.yaml"
+        )
+        matching_files = glob.glob(config_pattern)
+        network_config: dict | None = None
+        if matching_files:
+            selected_config_file = matching_files[0]
+            if len(matching_files) > 1:
+                print(
+                    f"INFO: Multiple config files found for investment year {investment_year}; "
+                    f"using '{selected_config_file}'"
+                )
+            try:
+                with open(selected_config_file, "r") as f:
+                    network_config = yaml.safe_load(f)
+            except Exception as exc:
+                print(
+                    f"WARNING: Could not load config file '{selected_config_file}': {exc}"
+                )
+        else:
+            print(
+                f"WARNING: No config file found for investment year {investment_year} "
+                f"at pattern '{config_pattern}'"
+            )
+        return network_config
+
     def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
 
@@ -230,9 +269,11 @@ class Network_Processor:
         for i in range(0, self.network_collection.__len__()):
             n = self.network_collection[i]
             investment_year = n.meta["wildcards"]["planning_horizons"]
+            network_config = self._get_network_config(investment_year)
+
             results = []
             for variable in self.dsd.variable.to_pandas()["variable"]:
-                result = self._execute_function_for_variable(variable, n)
+                result = self._execute_function_for_variable(variable, n, config=network_config)
                 if result is not None:
                     results.append(
                         self._postprocess_statistics_result(variable, result)

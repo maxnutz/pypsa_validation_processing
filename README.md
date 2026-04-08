@@ -76,10 +76,11 @@ Examples:
 
 ### Function Signature (fixed)
 
-Every function receives exactly one argument – a single `pypsa.Network` object representing one investment year – and returns a `pandas.Series`:
+For statistics-functions, there is one fixed argument: `n = pypsa.Network` representing the network of one investment year. If needed, add `config = dict` as second argument to the function and the corresponding config-file is added as dict to your statistics-function. _Config-Argument is optional. If not needed, just do not add the argument to your function definition.
+Every function returns a `pandas.Series`:
 
 ```python
-def <function_name>(n: pypsa.Network) -> pd.Series:
+def <function_name>(n: pypsa.Network, <config: dict>) -> pd.Series:
     ...
 ```
 
