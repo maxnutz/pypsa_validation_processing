@@ -362,9 +362,11 @@ output_path: {tmp_path / 'output.xlsx'}
                 processor = Network_Processor(config_path=config_file)
                 assert processor.aggregation_level == "country"
 
-    def test_aggregation_level_from_config_regionwise(self, tmp_path: Path):
-        """Test that aggregation_level='region-wise' is read from config."""
-        config_file = self._make_config_file(tmp_path, extra='aggregation_level: "region-wise"')
+    def test_aggregation_level_from_config_locationwise(self, tmp_path: Path):
+        """Test that aggregation_level='region' is read from config."""
+        config_file = self._make_config_file(
+            tmp_path, extra='aggregation_level: "region"'
+        )
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -372,7 +374,7 @@ output_path: {tmp_path / 'output.xlsx'}
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=config_file)
-                assert processor.aggregation_level == "region-wise"
+                assert processor.aggregation_level == "region"
 
     def test_aggregation_level_validation_invalid(self, tmp_path: Path):
         """Test that invalid aggregation_level raises ValueError."""
