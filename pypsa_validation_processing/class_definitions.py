@@ -183,7 +183,7 @@ class Network_Processor:
         Parameters
         ----------
         result : pd.Series
-            Series with MultiIndex containing at least ``region`` and ``unit``
+            Series with MultiIndex containing at least ``location`` and ``unit``
             levels, as returned by statistics functions.
 
         Returns
@@ -206,13 +206,13 @@ class Network_Processor:
         Parameters
         ----------
         result : pd.Series
-            Series with MultiIndex containing at least ``region`` and ``unit``
+            Series with MultiIndex containing at least ``location`` and ``unit``
             levels, as returned by statistics functions.
 
         Returns
         -------
         pd.Series
-            Series with MultiIndex containing levels ``region`` and ``unit``."""
+            Series with MultiIndex containing levels ``location`` and ``unit``."""
 
         mask = result.index.get_level_values("location").isin(
             [
@@ -233,20 +233,20 @@ class Network_Processor:
         - ``"country"``: sums all regions via :meth:`_aggregate_to_country`,
           then returns a DataFrame grouped by ``["variable", "unit"]``.
         - ``"region"``: keeps all regions, returns a DataFrame grouped
-          by ``["variable", "region", "unit"]``.
+          by ``["variable", "location", "unit"]``.
 
         Parameters
         ----------
         variable : str
             IAMC variable name.
         result : pd.Series
-            Series with MultiIndex ``["region", "unit"]`` (plus possible extra
+            Series with MultiIndex ``["location", "unit"]`` (plus possible extra
             levels) as returned by statistics functions.
 
         Returns
         -------
         pd.DataFrame
-            DataFrame with ``variable``, ``unit`` (and ``region`` when
+            DataFrame with ``variable``, ``unit`` (and ``location`` when
             ``aggregation_level="region"``), and ``value`` columns,
             grouped accordingly.
         """
@@ -295,7 +295,7 @@ class Network_Processor:
         -----
         When ``aggregation_level="country"``, the region is set to the full
         country name from :data:`EU27_COUNTRY_CODES`.  When
-        ``aggregation_level="region"``, the ``region`` column in *df*
+        ``aggregation_level="region"``, the ``location`` column in *df*
         is used directly.
         """
         # add 'variable' and 'unit' columns

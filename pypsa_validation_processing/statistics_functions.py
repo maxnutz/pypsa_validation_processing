@@ -10,13 +10,13 @@ All functions share the same signature::
         ...
 
 Each function returns a :class:`pandas.Series` with MultiIndex, holding at
-least the indexes ``region`` and ``unit``.
+least the indexes ``location`` and ``unit``.
 
 **Region Level:**
 Regions in the returned Series correspond to the network's bus regions
 (e.g., "AT1", "AT2", "AT3" for pypsa-at). The postprocessing layer in
 Network_Processor handles aggregation to country level or keeps regions
-based on the ``aggregation_level`` configuration.
+based on the ``aggregation_level`` configuration by the name of the entries of ``location``. All regions starting with the given country-entry are grouped together.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def Final_Energy_by_Carrier__Electricity(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``region`` and ``unit``.
+        Pandas Series with Multiindex of ``location`` and ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -86,7 +86,7 @@ def Final_Energy_by_Sector__Transportation(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``region`` and ``unit``.
+        Pandas Series with Multiindex of ``location`` and ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -133,7 +133,7 @@ def Final_Energy_by_Sector__Industry(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``region`` and ``unit``.
+        Pandas Series with Multiindex of ``location`` and ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -204,7 +204,7 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``region`` and ``unit``.
+        Pandas Series with Multiindex of ``location`` and ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
