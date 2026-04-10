@@ -236,15 +236,15 @@ class Network_Processor:
             # region-wise: preserve regional granularity
             df = pd.DataFrame(
                 {
-                    "variable": [variable] * len(result),
-                    "region": list(result.index.get_level_values("region")),
+                    "variable": [variable] * len(filtered_df),
+                    "location": list(filtered_df.index.get_level_values("location")),
                     "unit": list(
                         result.index.get_level_values("unit").map(UNITS_MAPPING)
                     ),
                     "value": list(result.values),
                 }
             )
-            df = df.groupby(["variable", "region", "unit"]).sum()
+            df = df.groupby(["variable", "location", "unit"]).sum()
         return df
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
@@ -289,12 +289,12 @@ class Network_Processor:
                 unit="unit_pypsa",
             )
         else:
-            # region-wise: "region" column is already present in df
+            # region: "region" column is already present in df
             dsd = pyam.IamDataFrame(
                 data=df.drop_duplicates(),
                 model=self.model_name,
                 scenario=self.scenario_name,
-                region="region",
+                region="location",
                 variable="variable_name",
                 unit="unit_pypsa",
             )
@@ -347,7 +347,7 @@ class Network_Processor:
         merge_keys = (
             ["variable", "unit"]
             if self.aggregation_level == "country"
-            else ["variable", "region", "unit"]
+            else ["variable", "location", "unit"]
         )
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):

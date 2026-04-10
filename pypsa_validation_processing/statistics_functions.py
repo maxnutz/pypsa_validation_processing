@@ -53,15 +53,21 @@ def Final_Energy_by_Carrier__Electricity(
     """
     # withdrawal from electricity including low_voltage
     res = n.statistics.energy_balance(
-        bus_carrier="AC", groupby=["carrier", "region", "unit"], direction="withdrawal"
+        bus_carrier="AC",
+        groupby=["carrier", "location", "unit"],
+        direction="withdrawal",
     )
     # as battery is Store, discharger-link needs to be evaluated separately.
     res_storage = n.statistics.energy_balance(
         bus_carrier="AC",
-        groupby=["carrier", "region", "unit"],
+        groupby=["carrier", "location", "unit"],
         carrier=["battery discharger"],
     )
-    return pd.concat([res, res_storage], axis=0).groupby(["region", "unit"]).sum()
+    return (
+        pd.concat([res, res_storage.mul(-1)], axis=0)
+        .groupby(["location", "unit"])
+        .sum()
+    )
 
 
 def Final_Energy_by_Sector__Transportation(
@@ -102,10 +108,10 @@ def Final_Energy_by_Sector__Transportation(
                 "shipping oil",
             ],
             components="Load",
-            groupby=["carrier", "unit", "region"],
+            groupby=["carrier", "unit", "location"],
             direction="withdrawal",  # for positive values
         )
-        .groupby(["region", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     return res
@@ -158,28 +164,28 @@ def Final_Energy_by_Sector__Industry(
     load_statistics = (
         n.statistics.energy_balance(
             carrier=carriers,
-            groupby=["carrier", "unit", "region"],
+            groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
         )
-        .groupby(["region", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     # calculate efficiency losses for links with eff < 1
     cc_in = n.statistics.energy_balance(
         carrier=cc_carriers,
-        groupby=["carrier", "region", "unit"],
+        groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus0"],
     )
     cc_out = n.statistics.energy_balance(
         carrier=cc_carriers,
-        groupby=["carrier", "region", "unit"],
+        groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus1"],
     )
     eff_loss = abs(cc_in - cc_out)
-    eff_loss = eff_loss.groupby(["region", "unit"]).sum()
+    eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
     return res
 
@@ -223,28 +229,28 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     res = (
         n.statistics.energy_balance(
             carrier=carriers,
-            groupby=["carrier", "unit", "region"],
+            groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
         )
-        .groupby(["region", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     if any(carrier in n.carriers.index for carrier in cc_carriers):
         cc_in = n.statistics.energy_balance(
             carrier=cc_carriers,
-            groupby=["carrier", "region", "unit"],
+            groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus0"],
         )
         cc_out = n.statistics.energy_balance(
             carrier=cc_carriers,
-            groupby=["carrier", "region", "unit"],
+            groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus1"],
         )
         eff_loss = abs(cc_in - cc_out)
-        eff_loss = eff_loss.groupby(["region", "unit"]).sum()
+        eff_loss = eff_loss.groupby(["location", "unit"]).sum()
         res = res.add(eff_loss, fill_value=0)
 
     return res
