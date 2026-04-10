@@ -191,7 +191,37 @@ class Network_Processor:
         pd.Series
             Series with MultiIndex containing only the ``unit`` level.
         """
-        return result.groupby(level="unit").sum()
+        mask = result.index.get_level_values("location").isin(
+            [
+                reg
+                for reg in result.index.get_level_values("location")
+                if reg.startswith(self.country)
+            ]
+        )
+        return result.loc[mask].groupby("unit").sum()
+
+    def _filter_to_regions(self, result: pd.Series) -> pd.Series:
+        """Filter a regional Series to the all regions of the given country.
+
+        Parameters
+        ----------
+        result : pd.Series
+            Series with MultiIndex containing at least ``region`` and ``unit``
+            levels, as returned by statistics functions.
+
+        Returns
+        -------
+        pd.Series
+            Series with MultiIndex containing levels ``region`` and ``unit``."""
+
+        mask = result.index.get_level_values("location").isin(
+            [
+                reg
+                for reg in result.index.get_level_values("location")
+                if reg.startswith(self.country)
+            ]
+        )
+        return result.loc[mask]
 
     def _postprocess_statistics_result(
         self, variable: str, result: pd.Series
@@ -221,14 +251,14 @@ class Network_Processor:
             grouped accordingly.
         """
         if self.aggregation_level == "country":
-            aggregated = self._aggregate_to_country(result)
+            aggregated_df = self._aggregate_to_country(result)
             df = pd.DataFrame(
                 {
-                    "variable": [variable] * len(aggregated),
+                    "variable": [variable] * len(aggregated_df),
                     "unit": list(
-                        aggregated.index.get_level_values("unit").map(UNITS_MAPPING)
+                        aggregated_df.index.get_level_values("unit").map(UNITS_MAPPING)
                     ),
-                    "value": list(aggregated.values),
+                    "value": list(aggregated_df.values),
                 }
             )
             df = df.groupby(["variable", "unit"]).sum()
@@ -240,9 +270,9 @@ class Network_Processor:
                     "variable": [variable] * len(filtered_df),
                     "location": list(filtered_df.index.get_level_values("location")),
                     "unit": list(
-                        result.index.get_level_values("unit").map(UNITS_MAPPING)
+                        filtered_df.index.get_level_values("unit").map(UNITS_MAPPING)
                     ),
-                    "value": list(result.values),
+                    "value": list(filtered_df.values),
                 }
             )
             df = df.groupby(["variable", "location", "unit"]).sum()
