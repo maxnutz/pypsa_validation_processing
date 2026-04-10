@@ -23,6 +23,23 @@ This package processes a PyPSA network for a given set of defined IAMC-Variables
 ```bash
 pip install .
 ```
+### Set the config parameter
+the file `config.default.yaml` includes a guideline to the 2 config-sections. 
+```yaml
+# General section
+country: AT               # ISO 3166-1 alpha-2 country code, e.g. AT
+definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder
+# mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
+output_path: resources            # path the outputfile should be written to
+aggregation_level: "region"      # Options: "country" or "region"
+
+# Network
+network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
+model_name: pypsa-at            # name of the PyPSA model
+scenario_name: KN2040test        # name of the PyPSA scenario
+```
+personalized config-files need to be specified when running the workflow with inline-parameter `--config <path-to-config-file>`
+
 ### Run the workflow
 Run the workflow with 
 ```bash
@@ -84,7 +101,9 @@ def <function_name>(n: pypsa.Network, <config: dict>) -> pd.Series:
     ...
 ```
 
-**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` and `"variable"`, so that the post-processing step can extract the unit information. It is possible to return multiple values with different units. Units are then converted to IAMC-valid units and summed over. Do not mix energy- and emissions- units in one statement!
+**The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` and `"location"`.
+- The post-processing step extracts the unit information. It is possible to return multiple values with different units. Units are then converted to IAMC-valid units and summed over. Do not mix energy- and emissions- units in one statement!
+- Depending on the config value of `aggregation_level`, the post-processing step groups results by country or region. Statistics function output can always include all available regions of the network.
 
 #### Example output
 

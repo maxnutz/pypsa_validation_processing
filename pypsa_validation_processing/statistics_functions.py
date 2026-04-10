@@ -6,11 +6,17 @@ looked up by name via the mapping defined in ``configs/mapping.default.yaml``.
 
 All functions share the same signature::
 
-    def <function_name>(network_collection: pypsa.Network) -> pd.Series:
+    def <function_name>(network: pypsa.Network) -> pd.Series:
         ...
 
-Each function returns a :class:`pandas.Series`  with Multiindex, holding at
-least the indexes ``variable`` and ``unit``.
+Each function returns a :class:`pandas.Series` with MultiIndex, holding at
+least the indexes ``location`` and ``unit``.
+
+**Region Level:**
+Regions in the returned Series correspond to the network's bus regions
+(e.g., "AT1", "AT2", "AT3" for pypsa-at). The postprocessing layer in
+Network_Processor handles aggregation to country level or keeps regions
+based on the ``aggregation_level`` configuration by the name of the entries of ``location``. All regions starting with the given country-entry are grouped together.
 """
 
 from __future__ import annotations
@@ -35,7 +41,10 @@ def Final_Energy_by_Carrier__Electricity(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``country`` and ``unit``
+        Pandas Series with Multiindex of ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
 
     Notes
     -----
@@ -44,15 +53,21 @@ def Final_Energy_by_Carrier__Electricity(
     """
     # withdrawal from electricity including low_voltage
     res = n.statistics.energy_balance(
-        bus_carrier="AC", groupby=["carrier", "country", "unit"], direction="withdrawal"
+        bus_carrier="AC",
+        groupby=["carrier", "location", "unit"],
+        direction="withdrawal",
     )
     # as battery is Store, discharger-link needs to be evaluated separately.
     res_storage = n.statistics.energy_balance(
         bus_carrier="AC",
-        groupby=["carrier", "country", "unit"],
+        groupby=["carrier", "location", "unit"],
         carrier=["battery discharger"],
     )
-    return pd.concat([res, res_storage], axis=0).groupby(["country", "unit"]).sum()
+    return (
+        pd.concat([res, res_storage.mul(-1)], axis=0)
+        .groupby(["location", "unit"])
+        .sum()
+    )
 
 
 def Final_Energy_by_Sector__Transportation(
@@ -71,7 +86,10 @@ def Final_Energy_by_Sector__Transportation(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``country`` and ``unit``
+        Pandas Series with Multiindex of ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
 
     Notes
     -----
@@ -90,10 +108,10 @@ def Final_Energy_by_Sector__Transportation(
                 "shipping oil",
             ],
             components="Load",
-            groupby=["carrier", "unit", "country"],
+            groupby=["carrier", "unit", "location"],
             direction="withdrawal",  # for positive values
         )
-        .groupby(["country", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     return res
@@ -101,7 +119,7 @@ def Final_Energy_by_Sector__Transportation(
 
 def Final_Energy_by_Sector__Industry(
     n: pypsa.Network,
-) -> pd.DataFrame:
+) -> pd.Series:
     """Extract Industry-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the Industry sector (excluding
@@ -115,7 +133,10 @@ def Final_Energy_by_Sector__Industry(
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``country`` and ``unit``
+        Pandas Series with Multiindex of ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
 
     Notes
     -----
@@ -143,28 +164,28 @@ def Final_Energy_by_Sector__Industry(
     load_statistics = (
         n.statistics.energy_balance(
             carrier=carriers,
-            groupby=["carrier", "unit", "country"],
+            groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
         )
-        .groupby(["country", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     # calculate efficiency losses for links with eff < 1
     cc_in = n.statistics.energy_balance(
         carrier=cc_carriers,
-        groupby=["carrier", "country", "unit"],
+        groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus0"],
     )
     cc_out = n.statistics.energy_balance(
         carrier=cc_carriers,
-        groupby=["carrier", "country", "unit"],
+        groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus1"],
     )
     eff_loss = abs(cc_in - cc_out)
-    eff_loss = eff_loss.groupby(["country", "unit"]).sum()
+    eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
     return res
 
@@ -183,7 +204,10 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     Returns
     -------
     pd.Series
-        Pandas Series with Multiindex of ``country`` and ``unit``
+        Pandas Series with Multiindex of ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
 
     Notes
     -----
@@ -205,28 +229,28 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     res = (
         n.statistics.energy_balance(
             carrier=carriers,
-            groupby=["carrier", "unit", "country"],
+            groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
         )
-        .groupby(["country", "unit"])
+        .groupby(["location", "unit"])
         .sum()
     )
     if any(carrier in n.carriers.index for carrier in cc_carriers):
         cc_in = n.statistics.energy_balance(
             carrier=cc_carriers,
-            groupby=["carrier", "country", "unit"],
+            groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus0"],
         )
         cc_out = n.statistics.energy_balance(
             carrier=cc_carriers,
-            groupby=["carrier", "country", "unit"],
+            groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus1"],
         )
         eff_loss = abs(cc_in - cc_out)
-        eff_loss = eff_loss.groupby(["country", "unit"]).sum()
+        eff_loss = eff_loss.groupby(["location", "unit"]).sum()
         res = res.add(eff_loss, fill_value=0)
 
     return res

@@ -71,6 +71,12 @@ class Network_Processor:
         self.network_collection = self._read_pypsa_network_collection()
         self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
         self.functions_dict: dict[str, str | list] = self._read_mappings()
+        self.aggregation_level: str = self.config.get("aggregation_level", "country")
+        if self.aggregation_level not in ["country", "region"]:
+            raise ValueError(
+                f"Invalid aggregation_level: '{self.aggregation_level}'. "
+                f"Must be 'country' or 'region'."
+            )
         self.dsd_with_values: pyam.IamDataFrame | None = None
         default_path_dsd_with_values = (
             Path(__file__).resolve().parent
@@ -171,19 +177,105 @@ class Network_Processor:
             return func(n, config=config)
         return func(n)
 
+    def _aggregate_to_country(self, result: pd.Series) -> pd.Series:
+        """Aggregate a regional Series to country level by summing all regions.
+
+        Parameters
+        ----------
+        result : pd.Series
+            Series with MultiIndex containing at least ``location`` and ``unit``
+            levels, as returned by statistics functions.
+
+        Returns
+        -------
+        pd.Series
+            Series with MultiIndex containing only the ``unit`` level.
+        """
+        mask = result.index.get_level_values("location").isin(
+            [
+                reg
+                for reg in result.index.get_level_values("location")
+                if reg.startswith(self.country)
+            ]
+        )
+        return result.loc[mask].groupby("unit").sum()
+
+    def _filter_to_regions(self, result: pd.Series) -> pd.Series:
+        """Filter a regional Series to the all regions of the given country.
+
+        Parameters
+        ----------
+        result : pd.Series
+            Series with MultiIndex containing at least ``location`` and ``unit``
+            levels, as returned by statistics functions.
+
+        Returns
+        -------
+        pd.Series
+            Series with MultiIndex containing levels ``location`` and ``unit``."""
+
+        mask = result.index.get_level_values("location").isin(
+            [
+                reg
+                for reg in result.index.get_level_values("location")
+                if reg.startswith(self.country)
+            ]
+        )
+        return result.loc[mask]
+
     def _postprocess_statistics_result(
         self, variable: str, result: pd.Series
     ) -> pd.DataFrame:
-        """Formatting and creating a pandas dataframe from results Series and variable_name"""
-        result = result.xs(self.country, level="country")
-        df = pd.DataFrame(
-            {
-                "variable": [variable] * len(list(result.values)),
-                "unit": list(result.index.get_level_values("unit").map(UNITS_MAPPING)),
-                "value": list(result.values),
-            }
-        )
-        df = df.groupby(["variable", "unit"]).sum()
+        """Format a statistics-function result into a DataFrame.
+
+        Applies aggregation based on ``self.aggregation_level``:
+
+        - ``"country"``: sums all regions via :meth:`_aggregate_to_country`,
+          then returns a DataFrame grouped by ``["variable", "unit"]``.
+        - ``"region"``: keeps all regions, returns a DataFrame grouped
+          by ``["variable", "location", "unit"]``.
+
+        Parameters
+        ----------
+        variable : str
+            IAMC variable name.
+        result : pd.Series
+            Series with MultiIndex ``["location", "unit"]`` (plus possible extra
+            levels) as returned by statistics functions.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with ``variable``, ``unit`` (and ``location`` when
+            ``aggregation_level="region"``), and ``value`` columns,
+            grouped accordingly.
+        """
+        if self.aggregation_level == "country":
+            aggregated_df = self._aggregate_to_country(result)
+            df = pd.DataFrame(
+                {
+                    "variable": [variable] * len(aggregated_df),
+                    "unit": list(
+                        aggregated_df.index.get_level_values("unit").map(UNITS_MAPPING)
+                    ),
+                    "value": list(aggregated_df.values),
+                }
+            )
+            df = df.groupby(["variable", "unit"]).sum()
+        else:
+            # region: preserve regional granularity
+            filtered_df = self._filter_to_regions(result)
+            df = pd.DataFrame(
+                {
+                    "variable": [variable] * len(filtered_df),
+                    "location": list(filtered_df.index.get_level_values("location")),
+                    "unit": list(
+                        filtered_df.index.get_level_values("unit").map(UNITS_MAPPING)
+                    ),
+                    "value": list(filtered_df.values),
+                }
+            )
+            df = df.groupby(["variable", "location", "unit"]).sum()
         return df
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
@@ -198,6 +290,13 @@ class Network_Processor:
         -------
         pyam.IamDataFrame
             A pyam.IamDataFrame with IAMC variables as columns and years as index.
+
+        Notes
+        -----
+        When ``aggregation_level="country"``, the region is set to the full
+        country name from :data:`EU27_COUNTRY_CODES`.  When
+        ``aggregation_level="region"``, the ``location`` column in *df*
+        is used directly.
         """
         # add 'variable' and 'unit' columns
         df = df.reset_index()
@@ -209,17 +308,27 @@ class Network_Processor:
         df = df.rename(
             columns={k: v for k, v in col_renaming_dict.items() if k in df.columns}
         )
-        # drop columns not needed
 
-        # initialize pyam.IamDataFrame
-        dsd = pyam.IamDataFrame(
-            data=df.drop_duplicates(),
-            model=self.model_name,
-            scenario=self.scenario_name,
-            region=EU27_COUNTRY_CODES.get(self.country, self.country),
-            variable="variable_name",
-            unit="unit_pypsa",
-        )
+        if self.aggregation_level == "country":
+            region = EU27_COUNTRY_CODES.get(self.country, self.country)
+            dsd = pyam.IamDataFrame(
+                data=df.drop_duplicates(),
+                model=self.model_name,
+                scenario=self.scenario_name,
+                region=region,
+                variable="variable_name",
+                unit="unit_pypsa",
+            )
+        else:
+            # region: use column "location" for pyams region-variable 
+            dsd = pyam.IamDataFrame(
+                data=df.drop_duplicates(),
+                model=self.model_name,
+                scenario=self.scenario_name,
+                region="location",
+                variable="variable_name",
+                unit="unit_pypsa",
+            )
         # perform unit conversion
 
         return dsd
@@ -258,13 +367,19 @@ class Network_Processor:
         Iterates over all variables in ``self.dsd``, calls
         :meth:`_execute_function_for_variable` for each one, and assembles
         the results into a single :class:`pyam.IamDataFrame` stored in
-        ``self.dsd_with_values``.
+        ``self.dsd_with_values``. Applies aggregation based on
+        ``self.aggregation_level`` config.
 
         Returns
         -------
         pyam.IamDataFrame
             Combined results for all variables that have a registered function.
         """
+        merge_keys = (
+            ["variable", "unit"]
+            if self.aggregation_level == "country"
+            else ["variable", "location", "unit"]
+        )
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):
             n = self.network_collection[i]
@@ -288,7 +403,7 @@ class Network_Processor:
         if len(container_investment_years) > 1:
             for year_df in container_investment_years[1:]:
                 ds_with_values = ds_with_values.merge(
-                    year_df, on=["variable", "unit"], how="outer"
+                    year_df, on=merge_keys, how="outer"
                 )
 
         self.dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)

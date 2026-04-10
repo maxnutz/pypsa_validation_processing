@@ -31,7 +31,7 @@ class MockStatisticsAccessor:
     ) -> pd.Series:
         """Mock energy_balance method for PyPSA Network.statistics.
 
-        Returns a pandas Series with MultiIndex including 'country' and 'unit'
+        Returns a pandas Series with MultiIndex including 'location' and 'unit'
         to match the expected output structure.
 
         Parameters
@@ -52,11 +52,11 @@ class MockStatisticsAccessor:
         Returns
         -------
         pd.Series
-            Series with MultiIndex containing 'country' and 'unit' levels
+            Series with MultiIndex containing 'location' and 'unit' levels
         """
         # Default groupby if not specified
         if groupby is None:
-            groupby = ["carrier", "country", "unit"]
+            groupby = ["carrier", "location", "unit"]
 
         # Create mock data structure based on groupby
         index_tuples = []
@@ -73,12 +73,12 @@ class MockStatisticsAccessor:
             carriers = ["electricity"]
 
         for c in carriers:
-            for country in ["AT", "DE"]:
+            for location in ["AT1", "AT2", "AT3"]:
                 for unit in ["MWh_el", "MWh_th"]:
                     # Create index tuple based on groupby keys
                     idx_dict = {
                         "carrier": c,
-                        "country": country,
+                        "location": location,
                         "unit": unit,
                     }
                     idx_tuple = tuple(idx_dict[key] for key in groupby)

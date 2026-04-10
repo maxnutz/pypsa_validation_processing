@@ -309,3 +309,81 @@ class TestNetworkProcessorOutputGeneration:
                 assert result_path == output_path
                 # Verify to_excel was called
                 mock_iam_df.to_excel.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for aggregation configuration
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorAggregation:
+    """Test aggregation configuration and execution."""
+
+    def _make_config_file(self, tmp_path: Path, extra: str = "") -> Path:
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+{extra}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+        return config_file
+
+    def test_aggregation_level_defaults_to_country(self, tmp_path: Path):
+        """Test that aggregation_level defaults to 'country' if not specified."""
+        config_file = self._make_config_file(tmp_path)
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.aggregation_level == "country"
+
+    def test_aggregation_level_from_config_country(self, tmp_path: Path):
+        """Test that aggregation_level='country' is read from config."""
+        config_file = self._make_config_file(tmp_path, extra='aggregation_level: "country"')
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.aggregation_level == "country"
+
+    def test_aggregation_level_from_config_locationwise(self, tmp_path: Path):
+        """Test that aggregation_level='region' is read from config."""
+        config_file = self._make_config_file(
+            tmp_path, extra='aggregation_level: "region"'
+        )
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.aggregation_level == "region"
+
+    def test_aggregation_level_validation_invalid(self, tmp_path: Path):
+        """Test that invalid aggregation_level raises ValueError."""
+        config_file = self._make_config_file(tmp_path, extra='aggregation_level: "invalid"')
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(ValueError, match="Invalid aggregation_level"):
+                    Network_Processor(config_path=config_file)
