@@ -320,7 +320,7 @@ class Network_Processor:
                 unit="unit_pypsa",
             )
         else:
-            # region: "region" column is already present in df
+            # region: use column "location" for pyams region-variable 
             dsd = pyam.IamDataFrame(
                 data=df.drop_duplicates(),
                 model=self.model_name,
