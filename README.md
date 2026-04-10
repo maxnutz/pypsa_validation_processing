@@ -103,7 +103,7 @@ def <function_name>(n: pypsa.Network, <config: dict>) -> pd.Series:
 
 **The returned `Series` is of the structure of the direct outcome of a `pypsa.statistics` - Function.** It therefore must have a multi-level index that includes a level named `"unit"` and `"location"`.
 - The post-processing step extracts the unit information. It is possible to return multiple values with different units. Units are then converted to IAMC-valid units and summed over. Do not mix energy- and emissions- units in one statement!
-- Depending on the config-value of `aggregation_level`, the post-processing steps groups by country or region. Statistics-Functions output can always include ALL available regions of the network.
+- Depending on the config value of `aggregation_level`, the post-processing step groups results by country or region. Statistics function output can always include all available regions of the network.
 
 #### Example output
 
