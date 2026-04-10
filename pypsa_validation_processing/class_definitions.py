@@ -72,10 +72,10 @@ class Network_Processor:
         self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
         self.functions_dict: dict[str, str | list] = self._read_mappings()
         self.aggregation_level: str = self.config.get("aggregation_level", "country")
-        if self.aggregation_level not in ["country", "region-wise"]:
+        if self.aggregation_level not in ["country", "region"]:
             raise ValueError(
                 f"Invalid aggregation_level: '{self.aggregation_level}'. "
-                f"Must be 'country' or 'region-wise'."
+                f"Must be 'country' or 'region'."
             )
         self.dsd_with_values: pyam.IamDataFrame | None = None
         default_path_dsd_with_values = (
@@ -202,7 +202,7 @@ class Network_Processor:
 
         - ``"country"``: sums all regions via :meth:`_aggregate_to_country`,
           then returns a DataFrame grouped by ``["variable", "unit"]``.
-        - ``"region-wise"``: keeps all regions, returns a DataFrame grouped
+        - ``"region"``: keeps all regions, returns a DataFrame grouped
           by ``["variable", "region", "unit"]``.
 
         Parameters
@@ -217,7 +217,7 @@ class Network_Processor:
         -------
         pd.DataFrame
             DataFrame with ``variable``, ``unit`` (and ``region`` when
-            ``aggregation_level="region-wise"``), and ``value`` columns,
+            ``aggregation_level="region"``), and ``value`` columns,
             grouped accordingly.
         """
         if self.aggregation_level == "country":
@@ -233,7 +233,8 @@ class Network_Processor:
             )
             df = df.groupby(["variable", "unit"]).sum()
         else:
-            # region-wise: preserve regional granularity
+            # region: preserve regional granularity
+            filtered_df = self._filter_to_regions(result)
             df = pd.DataFrame(
                 {
                     "variable": [variable] * len(filtered_df),
@@ -264,7 +265,7 @@ class Network_Processor:
         -----
         When ``aggregation_level="country"``, the region is set to the full
         country name from :data:`EU27_COUNTRY_CODES`.  When
-        ``aggregation_level="region-wise"``, the ``region`` column in *df*
+        ``aggregation_level="region"``, the ``region`` column in *df*
         is used directly.
         """
         # add 'variable' and 'unit' columns
