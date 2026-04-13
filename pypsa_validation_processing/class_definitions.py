@@ -267,7 +267,7 @@ class Network_Processor:
             ``aggregation_level="region"``), and ``value`` column or snapshot
             columns, grouped accordingly.
         """
-        if isinstance(result, pd.Series):
+        if self.aggregate_per_year == True:
             # aggregate_per_year=True: existing behaviour unchanged
             if self.aggregation_level == "country":
                 aggregated_df = self._aggregate_to_country(result)
@@ -358,7 +358,7 @@ class Network_Processor:
                 unit="unit_pypsa",
             )
         else:
-            # region: use column "location" for pyams region-variable 
+            # region: use column "location" for pyams region-variable
             dsd = pyam.IamDataFrame(
                 data=df.drop_duplicates(),
                 model=self.model_name,
@@ -457,18 +457,15 @@ class Network_Processor:
         else:
             self.dsd_with_values = container_investment_years
 
-    def write_output_to_xlsx(self, output_path: str | Path | None = None) -> Path:
+    def write_output_to_xlsx(self) -> Path:
         """Write the computed IAMC data to an Excel file (or files).
 
         Parameters
         ----------
-        output_path : str | Path | None, optional
-            Base output directory.  If ``None``, ``"resources"`` is used.
-
             - When ``aggregate_per_year=True``: writes a single file
-              ``<output_path>/PYPSA_{model}_{scenario}_{country}.xlsx``.
+              ``<self.path_dsd_with_values>/PYPSA_{model}_{scenario}_{country}.xlsx``.
             - When ``aggregate_per_year=False``: creates a sub-folder
-              ``<output_path>/PYPSA_timeseries_{model}_{scenario}_{country}/``
+              ``<self.path_dsd_with_values>/PYPSA_timeseries_{model}_{scenario}_{country}/``
               and writes one file per investment year named
               ``PYPSA_{model}_{scenario}_{country}_{year}.xlsx``.
 
@@ -488,7 +485,7 @@ class Network_Processor:
                 "No data available. Call calculate_variables_values() first."
             )
 
-        base_dir = Path(output_path) if output_path is not None else Path("resources")
+        base_dir = self.path_dsd_with_values
         base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
 
         if self.aggregate_per_year:
