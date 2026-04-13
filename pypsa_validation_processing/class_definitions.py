@@ -445,7 +445,7 @@ class Network_Processor:
                     # Replace the year component of each snapshot timestamp with
                     # the investment year so that e.g. 2019-01-01 becomes 2050-01-01.
                     year_df.columns = year_df.columns.map(
-                        lambda ts: ts.replace(year=investment_year)
+                        lambda ts: ts.replace(year=int(investment_year))
                     )
                     iam_df = self.structure_pyam_from_pandas(year_df)
                     container_investment_years.append((investment_year, iam_df))
