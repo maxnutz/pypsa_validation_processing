@@ -341,6 +341,48 @@ class TestNetworkProcessorOutputGeneration:
                     expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
                 )
 
+    def test_timeseries_column_year_matches_investment_year(
+        self, mock_config_file: Path, tmp_path: Path
+    ):
+        """Snapshot columns of timeseries DataFrames must use the investment year."""
+        import pandas as pd
+        from pypsa_validation_processing import statistics_functions as sf
+
+        investment_year = 2050
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.aggregate_per_year = False
+
+                # Build a minimal timeseries DataFrame as a statistics function would return.
+                # Columns are 2019 timestamps (mock default); processor must replace the year.
+                ts_2019 = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                index = pd.MultiIndex.from_tuples(
+                    [("AT1", "EJ/yr")], names=["location", "unit"]
+                )
+                raw_df = pd.DataFrame(
+                    {ts: [1.0] for ts in ts_2019}, index=index, dtype=float
+                )
+
+                # Simulate what _postprocess_statistics_result produces for region mode.
+                variable = "Test Variable"
+                processor.aggregation_level = "region"
+                # Inject the variable-level MultiIndex manually.
+                processed = pd.concat({variable: raw_df}, names=["variable"])
+                processed = processed.groupby(["variable", "location", "unit"]).sum()
+
+                # Now simulate calculate_variables_values year-column replacement.
+                processed.columns = processed.columns.map(
+                    lambda ts: ts.replace(year=investment_year)
+                )
+
+                assert all(ts.year == investment_year for ts in processed.columns)
+
 
 # ---------------------------------------------------------------------------
 # Tests for aggregation configuration
