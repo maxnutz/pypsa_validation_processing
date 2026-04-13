@@ -212,7 +212,7 @@ def Final_Energy_by_Sector__Industry(
         at_port=["bus1"],
         groupby_time=aggregate_per_year,
     )
-    eff_loss = abs(abs(cc_in) - cc_out)
+    eff_loss = abs(cc_in) - abs(cc_out)
     eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
     return res
