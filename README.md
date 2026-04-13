@@ -37,7 +37,7 @@ aggregate_per_year: false          # true: one value per investment year; false:
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
 model_name: pypsa-at            # name of the PyPSA model
-scenario_name: KN2040-6H        # name of the PyPSA scenario
+scenario_name: KN2040test        # name of the PyPSA scenario
 ```
 Personalized config files need to be specified when running the workflow with inline parameter `--config <path-to-config-file>`.
 
@@ -102,6 +102,7 @@ Each function therefore follows this signature:
 def <function_name>(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    <config: dict>,
 ) -> pd.Series | pd.DataFrame:
     ...
 ```

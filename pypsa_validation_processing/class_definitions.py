@@ -83,6 +83,7 @@ class Network_Processor:
                 f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
                 f"Must be true or false."
             )
+        self._function_parameter_cache: dict[object, set[str]] = {}
         self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
         default_path_dsd_with_values = (
             Path(__file__).resolve().parent
@@ -179,7 +180,10 @@ class Network_Processor:
             )
             return None
 
-        params = inspect.signature(func).parameters
+        params = self._function_parameter_cache.get(func)
+        if params is None:
+            params = set(inspect.signature(func).parameters)
+            self._function_parameter_cache[func] = params
         kwargs: dict = {}
         if "config" in params:
             kwargs["config"] = config
@@ -233,6 +237,34 @@ class Network_Processor:
         )
         return result.loc[mask]
 
+    def _select_aggregation_result(
+        self, result: pd.Series | pd.DataFrame
+    ) -> pd.Series | pd.DataFrame:
+        """Return result at configured aggregation level (country or region)."""
+        if self.aggregation_level == "country":
+            return self._aggregate_to_country(result)
+        return self._filter_to_regions(result)
+
+    def _map_unit_level(
+        self, data: pd.Series | pd.DataFrame
+    ) -> pd.Series | pd.DataFrame:
+        """Map the ``unit`` index level using ``UNITS_MAPPING``."""
+        if isinstance(data.index, pd.MultiIndex):
+            idx_frame = data.index.to_frame(index=False)
+            idx_frame["unit"] = idx_frame["unit"].map(UNITS_MAPPING)
+            data.index = pd.MultiIndex.from_frame(idx_frame)
+            return data
+
+        data.index = data.index.map(UNITS_MAPPING)
+        data.index.name = "unit"
+        return data
+
+    def _postprocess_group_levels(self) -> list[str]:
+        """Return grouping levels based on configured aggregation granularity."""
+        if self.aggregation_level == "country":
+            return ["variable", "unit"]
+        return ["variable", "location", "unit"]
+
     def _postprocess_statistics_result(
         self, variable: str, result: pd.Series | pd.DataFrame
     ) -> pd.DataFrame:
@@ -267,54 +299,14 @@ class Network_Processor:
             ``aggregation_level="region"``), and ``value`` column or snapshot
             columns, grouped accordingly.
         """
-        if self.aggregate_per_year == True:
-            # aggregate_per_year=True: existing behaviour unchanged
-            if self.aggregation_level == "country":
-                aggregated_df = self._aggregate_to_country(result)
-                df = pd.DataFrame(
-                    {
-                        "variable": [variable] * len(aggregated_df),
-                        "unit": list(
-                            aggregated_df.index.get_level_values("unit").map(UNITS_MAPPING)
-                        ),
-                        "value": list(aggregated_df.values),
-                    }
-                )
-                df = df.groupby(["variable", "unit"]).sum()
-            else:
-                # region: preserve regional granularity
-                filtered_df = self._filter_to_regions(result)
-                df = pd.DataFrame(
-                    {
-                        "variable": [variable] * len(filtered_df),
-                        "location": list(filtered_df.index.get_level_values("location")),
-                        "unit": list(
-                            filtered_df.index.get_level_values("unit").map(UNITS_MAPPING)
-                        ),
-                        "value": list(filtered_df.values),
-                    }
-                )
-                df = df.groupby(["variable", "location", "unit"]).sum()
-        else:
-            # aggregate_per_year=False: result is a DataFrame with snapshot columns
-            if self.aggregation_level == "country":
-                aggregated_df = self._aggregate_to_country(result)
-                # aggregated_df has index "unit" and snapshot columns — map unit names
-                aggregated_df.index = aggregated_df.index.map(UNITS_MAPPING)
-                aggregated_df.index.name = "unit"
-                # prepend variable as outer MultiIndex level
-                df = pd.concat({variable: aggregated_df}, names=["variable"])
-                df = df.groupby(["variable", "unit"]).sum()
-            else:
-                filtered_df = self._filter_to_regions(result)
-                # map unit level in the MultiIndex
-                idx_frame = filtered_df.index.to_frame(index=False)
-                idx_frame["unit"] = idx_frame["unit"].map(UNITS_MAPPING)
-                filtered_df.index = pd.MultiIndex.from_frame(idx_frame)
-                # prepend variable as outer MultiIndex level
-                df = pd.concat({variable: filtered_df}, names=["variable"])
-                df = df.groupby(["variable", "location", "unit"]).sum()
-        return df
+        processed = self._select_aggregation_result(result)
+        processed = self._map_unit_level(processed)
+
+        if self.aggregate_per_year:
+            processed = processed.to_frame("value")
+
+        df = pd.concat({variable: processed}, names=["variable"])
+        return df.groupby(self._postprocess_group_levels()).sum()
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
         """Creates a pyam.IamDataFrame from a pandas DataFrame.
