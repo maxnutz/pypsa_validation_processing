@@ -83,7 +83,7 @@ class Network_Processor:
                 f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
                 f"Must be true or false."
             )
-        self.dsd_with_values: pyam.IamDataFrame | list[tuple] | None = None
+        self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
         default_path_dsd_with_values = (
             Path(__file__).resolve().parent
             / "resources"

@@ -217,7 +217,10 @@ def Final_Energy_by_Sector__Industry(
     return res
 
 
-def Final_Energy_by_Sector__Agriculture(n: pypsa.Network, aggregate_per_year: bool = True) -> pd.Series | pd.DataFrame:
+def Final_Energy_by_Sector__Agriculture(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
     """Extract agriculture-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the transportation sector (excluding

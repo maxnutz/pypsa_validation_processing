@@ -311,6 +311,36 @@ class TestNetworkProcessorOutputGeneration:
                 # Verify to_excel was called
                 mock_iam_df.to_excel.assert_called_once()
 
+    def test_write_output_timeseries_creates_folder_and_per_year_files(
+        self, mock_config_file: Path, tmp_path: Path
+    ):
+        """Test that write_output with aggregate_per_year=False creates one file per year."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.aggregate_per_year = False
+
+                mock_iam_2020 = MagicMock()
+                mock_iam_2030 = MagicMock()
+                processor.dsd_with_values = [(2020, mock_iam_2020), (2030, mock_iam_2030)]
+
+                output_dir = tmp_path / "out"
+                result_path = processor.write_output_to_xlsx(output_path=output_dir)
+
+                expected_folder = output_dir / "PYPSA_timeseries_AT_KN2040_test_scenario_AT"
+                assert result_path == expected_folder
+                assert result_path.is_dir()
+                mock_iam_2020.to_excel.assert_called_once_with(
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2020.xlsx"
+                )
+                mock_iam_2030.to_excel.assert_called_once_with(
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
+                )
+
 
 # ---------------------------------------------------------------------------
 # Tests for aggregation configuration
