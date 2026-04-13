@@ -28,11 +28,13 @@ class MockStatisticsAccessor:
         groupby: list[str] | None = None,
         direction: str = "withdrawal",
         at_port: list[str] | None = None,
-    ) -> pd.Series:
+        groupby_time: bool = True,
+    ) -> pd.Series | pd.DataFrame:
         """Mock energy_balance method for PyPSA Network.statistics.
 
-        Returns a pandas Series with MultiIndex including 'location' and 'unit'
-        to match the expected output structure.
+        Returns a pandas Series (when ``groupby_time=True``) or DataFrame with
+        timestamp columns (when ``groupby_time=False``) with MultiIndex
+        including 'location' and 'unit' to match the expected output structure.
 
         Parameters
         ----------
@@ -48,11 +50,15 @@ class MockStatisticsAccessor:
             Direction of energy flow ("withdrawal" or "supply")
         at_port : list[str] | None
             Port filter (e.g., "bus0" or "bus1" for Links)
+        groupby_time : bool
+            If ``True`` (default) return an aggregated Series.
+            If ``False`` return a DataFrame with 4 hourly timestamps as columns.
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing 'location' and 'unit' levels
+        pd.Series | pd.DataFrame
+            Series (``groupby_time=True``) or DataFrame (``groupby_time=False``)
+            with MultiIndex containing 'location' and 'unit' levels.
         """
         # Default groupby if not specified
         if groupby is None:
@@ -86,9 +92,19 @@ class MockStatisticsAccessor:
                     # Mock value: roughly realistic energy value
                     values.append(1000.0)
 
-        # Create MultiIndex Series
+        # Create MultiIndex
         index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-        return pd.Series(values, index=index, dtype=float)
+
+        if groupby_time:
+            return pd.Series(values, index=index, dtype=float)
+        else:
+            # Return DataFrame with 4 hourly timestamps as columns
+            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+            return pd.DataFrame(
+                {ts: values for ts in timestamps},
+                index=index,
+                dtype=float,
+            )
 
 
 class MockPyPSANetwork:

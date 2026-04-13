@@ -167,12 +167,12 @@ class TestNetworkProcessorFunctionExecution:
                 processor.functions_dict = {
                     "Final Energy [by Carrier]|Electricity": "Final_Energy_by_Carrier__Electricity"
                 }
-                
+
                 mock_network = MockPyPSANetwork()
                 result = processor._execute_function_for_variable(
                     "Final Energy [by Carrier]|Electricity", mock_network
                 )
-                
+
                 assert isinstance(result, (pd.DataFrame, pd.Series)) or result is None
 
     def test_execute_function_not_found(self, mock_config_file: Path):
@@ -185,7 +185,7 @@ class TestNetworkProcessorFunctionExecution:
             ):
                 processor = Network_Processor(config_path=mock_config_file)
                 processor.functions_dict = {}
-                
+
                 mock_network = MockPyPSANetwork()
                 result = processor._execute_function_for_variable(
                     "Nonexistent Variable", mock_network
@@ -268,6 +268,51 @@ class TestNetworkProcessorFunctionExecution:
                     assert isinstance(result, pd.Series)
                     assert call_kwargs.get("called_with_config") is False
 
+    def test_execute_function_caches_signature_parameters(self, mock_config_file: Path):
+        """Test that function signature inspection is cached per function."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {"Test Variable": "mock_func_with_config"}
+
+                def mock_func_with_config(n, config=None):
+                    return pd.Series(
+                        [1.0],
+                        index=pd.MultiIndex.from_tuples(
+                            [("AT", "MWh_el")], names=["country", "unit"]
+                        ),
+                    )
+
+                with patch(
+                    "pypsa_validation_processing.class_definitions.importlib.import_module"
+                ) as mock_import:
+                    mock_module = MagicMock()
+                    mock_module.mock_func_with_config = mock_func_with_config
+                    mock_import.return_value = mock_module
+
+                    mock_network = MockPyPSANetwork()
+                    processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config={"a": 1}
+                    )
+                    assert len(processor._function_parameter_cache) == 1
+
+                    cache_keys_before = tuple(
+                        processor._function_parameter_cache.keys()
+                    )
+                    processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config={"b": 2}
+                    )
+
+                    assert len(processor._function_parameter_cache) == 1
+                    assert (
+                        tuple(processor._function_parameter_cache.keys())
+                        == cache_keys_before
+                    )
+
 
 # ---------------------------------------------------------------------------
 # Tests for output generation
@@ -290,7 +335,7 @@ class TestNetworkProcessorOutputGeneration:
                     processor.write_output_to_xlsx()
 
     def test_write_output_creates_file(self, mock_config_file: Path, tmp_path: Path):
-        """Test that write_output creates an Excel file."""
+        """Test that write_output creates an Excel file in the given directory."""
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -298,17 +343,106 @@ class TestNetworkProcessorOutputGeneration:
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=mock_config_file)
-                
-                # Mock the dsd_with_values
+
+                # Mock the dsd_with_values (aggregate_per_year=True by default)
                 mock_iam_df = MagicMock()
                 processor.dsd_with_values = mock_iam_df
-                
-                output_path = tmp_path / "test_output.xlsx"
-                result_path = processor.write_output_to_xlsx(output_path=output_path)
-                
-                assert result_path == output_path
+
+                result_path = processor.write_output_to_xlsx()
+
+                expected_path = (
+                    processor.path_dsd_with_values
+                    / "PYPSA_AT_KN2040_test_scenario_AT.xlsx"
+                )
+                assert result_path == expected_path
                 # Verify to_excel was called
                 mock_iam_df.to_excel.assert_called_once()
+
+    def test_write_output_timeseries_creates_folder_and_per_year_files(
+        self, mock_config_file: Path, tmp_path: Path
+    ):
+        """Test that write_output with aggregate_per_year=False creates one file per year."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.aggregate_per_year = False
+
+                mock_iam_2020 = MagicMock()
+                mock_iam_2030 = MagicMock()
+                processor.dsd_with_values = [(2020, mock_iam_2020), (2030, mock_iam_2030)]
+
+                result_path = processor.write_output_to_xlsx()
+
+                expected_folder = (
+                    processor.path_dsd_with_values
+                    / "PYPSA_timeseries_AT_KN2040_test_scenario_AT"
+                )
+                assert result_path == expected_folder
+                assert result_path.is_dir()
+                mock_iam_2020.to_excel.assert_called_once_with(
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2020.xlsx"
+                )
+                mock_iam_2030.to_excel.assert_called_once_with(
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
+                )
+
+    def test_timeseries_column_year_matches_investment_year(
+        self, mock_config_file: Path, tmp_path: Path
+    ):
+        """calculate_variables_values rewrites snapshot years to the investment year."""
+        investment_year = 2050
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.aggregate_per_year = False
+                processor.aggregation_level = "region"
+
+                network = MockPyPSANetwork()
+                network.meta["wildcards"]["planning_horizons"] = investment_year
+                processor.network_collection = MockNetworkCollection([network])
+
+                processor.dsd = MagicMock()
+                processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
+                    {"variable": ["Test Variable"]}
+                )
+
+                ts_2019 = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                raw_df = pd.DataFrame(
+                    {ts: [1.0] for ts in ts_2019},
+                    index=pd.MultiIndex.from_tuples(
+                        [("AT1", "MWh_el")], names=["location", "unit"]
+                    ),
+                    dtype=float,
+                )
+
+                with patch.object(
+                    processor,
+                    "_execute_function_for_variable",
+                    return_value=raw_df,
+                ):
+                    with patch.object(
+                        processor,
+                        "structure_pyam_from_pandas",
+                        side_effect=lambda df: df,
+                    ):
+                        processor.calculate_variables_values()
+
+                assert len(processor.dsd_with_values) == 1
+                year, timeseries_df = processor.dsd_with_values[0]
+                assert year == investment_year
+                assert all(ts.year == investment_year for ts in timeseries_df.columns)
+                assert list(timeseries_df.columns) == [
+                    ts.replace(year=investment_year) for ts in ts_2019
+                ]
 
 
 # ---------------------------------------------------------------------------

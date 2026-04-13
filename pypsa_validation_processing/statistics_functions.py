@@ -27,7 +27,8 @@ import pypsa
 
 def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
-) -> pd.Series:
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
     """Extract electricity final energy from a PyPSA Network.
 
     Returns the total electricity consumption (excluding transmission /
@@ -37,11 +38,17 @@ def Final_Energy_by_Carrier__Electricity(
     ----------
     n : pypsa.Network
         PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
     -------
-    pd.Series
-        Pandas Series with Multiindex of ``location`` and ``unit``.
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -52,16 +59,19 @@ def Final_Energy_by_Carrier__Electricity(
     Remove discharger afterwards, as battery-connecting links have different carrier names.
     """
     # withdrawal from electricity including low_voltage
-    res = n.statistics.energy_balance(
-        bus_carrier="AC",
-        groupby=["carrier", "location", "unit"],
-        direction="withdrawal",
+    res = abs(
+        n.statistics.energy_balance(
+            bus_carrier="AC",
+            groupby=["carrier", "location", "unit"],
+            groupby_time=aggregate_per_year,
+        )
     )
     # as battery is Store, discharger-link needs to be evaluated separately.
     res_storage = n.statistics.energy_balance(
         bus_carrier="AC",
         groupby=["carrier", "location", "unit"],
         carrier=["battery discharger"],
+        groupby_time=aggregate_per_year,
     )
     return (
         pd.concat([res, res_storage.mul(-1)], axis=0)
@@ -72,7 +82,8 @@ def Final_Energy_by_Carrier__Electricity(
 
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
-) -> pd.Series:
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
     """Extract transportation-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the transportation sector (excluding
@@ -82,11 +93,17 @@ def Final_Energy_by_Sector__Transportation(
     ----------
     n : pypsa.Network
         PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
     -------
-    pd.Series
-        Pandas Series with Multiindex of ``location`` and ``unit``.
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -110,6 +127,7 @@ def Final_Energy_by_Sector__Transportation(
             components="Load",
             groupby=["carrier", "unit", "location"],
             direction="withdrawal",  # for positive values
+            groupby_time=aggregate_per_year,
         )
         .groupby(["location", "unit"])
         .sum()
@@ -119,7 +137,8 @@ def Final_Energy_by_Sector__Transportation(
 
 def Final_Energy_by_Sector__Industry(
     n: pypsa.Network,
-) -> pd.Series:
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
     """Extract Industry-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the Industry sector (excluding
@@ -129,11 +148,17 @@ def Final_Energy_by_Sector__Industry(
     ----------
     n : pypsa.Network
         PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
     -------
-    pd.Series
-        Pandas Series with Multiindex of ``location`` and ``unit``.
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -167,6 +192,7 @@ def Final_Energy_by_Sector__Industry(
             groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
+            groupby_time=aggregate_per_year,
         )
         .groupby(["location", "unit"])
         .sum()
@@ -177,20 +203,25 @@ def Final_Energy_by_Sector__Industry(
         groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus0"],
+        groupby_time=aggregate_per_year,
     )
     cc_out = n.statistics.energy_balance(
         carrier=cc_carriers,
         groupby=["carrier", "location", "unit"],
         components="Link",
         at_port=["bus1"],
+        groupby_time=aggregate_per_year,
     )
-    eff_loss = abs(cc_in - cc_out)
+    eff_loss = abs(cc_in) - abs(cc_out)
     eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
     return res
 
 
-def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
+def Final_Energy_by_Sector__Agriculture(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
     """Extract agriculture-sector final energy from a PyPSA Network.
 
     Returns the total energy consumed by the transportation sector (excluding
@@ -200,11 +231,17 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
     ----------
     n : pypsa.Network
         PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
     -------
-    pd.Series
-        Pandas Series with Multiindex of ``location`` and ``unit``.
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
         Returns data at regional level as provided by the PyPSA network.
         Country-level aggregation is handled by
         Network_Processor._aggregate_to_country() if configured.
@@ -232,6 +269,7 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
             groupby=["carrier", "unit", "location"],
             components="Load",
             direction="withdrawal",  # for positive values
+            groupby_time=aggregate_per_year,
         )
         .groupby(["location", "unit"])
         .sum()
@@ -242,12 +280,14 @@ def Final_Energy_by_Sector__Agriculture(n: pypsa.Network) -> pd.Series:
             groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus0"],
+            groupby_time=aggregate_per_year,
         )
         cc_out = n.statistics.energy_balance(
             carrier=cc_carriers,
             groupby=["carrier", "location", "unit"],
             components="Link",
             at_port=["bus1"],
+            groupby_time=aggregate_per_year,
         )
         eff_loss = abs(cc_in - cc_out)
         eff_loss = eff_loss.groupby(["location", "unit"]).sum()

@@ -26,6 +26,22 @@ def _make_locational_series(
     return pd.Series([value] * len(tuples), index=index, dtype=float)
 
 
+def _make_locational_timeseries(
+    locations=("AT1", "AT2", "AT3"),
+    units=("MWh_el",),
+    values=(10.0, 20.0),
+):
+    """Build a minimal pd.DataFrame with ['location', 'unit'] MultiIndex index."""
+    tuples = [(r, u) for r in locations for u in units]
+    index = pd.MultiIndex.from_tuples(tuples, names=["location", "unit"])
+    snapshots = pd.date_range(
+        "2020-01-01", periods=len(values), freq="6h", name="snapshot"
+    )
+    return pd.DataFrame(
+        {ts: [v] * len(tuples) for ts, v in zip(snapshots, values)}, index=index
+    )
+
+
 def _make_processor(tmp_path: Path, aggregation_level: str = "country") -> Network_Processor:
     """Create a Network_Processor with mocked heavy dependencies."""
     defs_path = tmp_path / "definitions"
@@ -161,3 +177,38 @@ class TestPostprocesslocationWiseMode:
         assert df.loc[df["location"] == "AT1", "value"].values[0] == pytest.approx(
             999.0
         )
+
+
+# ---------------------------------------------------------------------------
+# Tests for _postprocess_statistics_result – timeseries mode
+# ---------------------------------------------------------------------------
+
+
+class TestPostprocessTimeseriesMode:
+    """Tests for _postprocess_statistics_result with aggregate_per_year=False."""
+
+    def test_country_mode_sums_and_maps_unit(self, tmp_path: Path):
+        processor = _make_processor(tmp_path, aggregation_level="country")
+        processor.aggregate_per_year = False
+        ts_df = _make_locational_timeseries(locations=("AT1", "AT2"), values=(1.0, 2.0))
+
+        df = processor._postprocess_statistics_result("Test|Variable", ts_df)
+        df = df.reset_index()
+
+        assert "location" not in df.columns
+        assert set(df["unit"]) == {"MWh"}
+        value_columns = [c for c in df.columns if c not in ["variable", "unit"]]
+        assert df.loc[df["unit"] == "MWh", value_columns].sum(axis=1).iloc[
+            0
+        ] == pytest.approx(6.0)
+
+    def test_region_mode_preserves_locations_and_maps_unit(self, tmp_path: Path):
+        processor = _make_processor(tmp_path, aggregation_level="region")
+        processor.aggregate_per_year = False
+        ts_df = _make_locational_timeseries(locations=("AT1", "AT2"), values=(1.0, 2.0))
+
+        df = processor._postprocess_statistics_result("Test|Variable", ts_df)
+        df = df.reset_index()
+
+        assert set(df["location"]) == {"AT1", "AT2"}
+        assert set(df["unit"]) == {"MWh"}

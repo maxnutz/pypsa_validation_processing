@@ -203,7 +203,8 @@ class TestFinalEnergyBySectorIndustry:
             groupby: list[str] | None = None,
             direction: str = "withdrawal",
             at_port: list[str] | None = None,
-        ) -> pd.Series:
+            groupby_time: bool = True,
+        ) -> pd.Series | pd.DataFrame:
             """Return deterministic Series matching the requested grouping."""
             self.calls.append(
                 {
@@ -213,6 +214,7 @@ class TestFinalEnergyBySectorIndustry:
                     "groupby": groupby,
                     "direction": direction,
                     "at_port": at_port,
+                    "groupby_time": groupby_time,
                 }
             )
 
@@ -239,11 +241,16 @@ class TestFinalEnergyBySectorIndustry:
                 else:
                     values.append(0.0)
 
-            return pd.Series(
-                values,
-                index=pd.MultiIndex.from_tuples(index_tuples, names=groupby),
-                dtype=float,
-            )
+            index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
+            if groupby_time:
+                return pd.Series(values, index=index, dtype=float)
+            else:
+                timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                return pd.DataFrame(
+                    {ts: values for ts in timestamps},
+                    index=index,
+                    dtype=float,
+                )
 
     class _IndustryNetwork:
         """Minimal network object exposing an industry-specific statistics accessor."""
@@ -311,3 +318,77 @@ class TestFinalEnergyBySectorIndustry:
             assert isinstance(result.index, pd.MultiIndex)
             assert result.index.names == ["location", "unit"]
             assert len(result) > 0
+
+
+# ---------------------------------------------------------------------------
+# Tests for aggregate_per_year=False (timeseries output)
+# ---------------------------------------------------------------------------
+
+
+class TestAggregatePerYearFalse:
+    """Tests verifying that all statistics functions return a DataFrame with
+    snapshot columns when called with ``aggregate_per_year=False``."""
+
+    _FUNCTIONS = [
+        Final_Energy_by_Carrier__Electricity,
+        Final_Energy_by_Sector__Transportation,
+        Final_Energy_by_Sector__Agriculture,
+    ]
+
+    @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_returns_dataframe(self, mock_network: MockPyPSANetwork, func):
+        """Function returns a DataFrame (not a Series) when aggregate_per_year=False."""
+        result = func(mock_network, aggregate_per_year=False)
+        assert isinstance(result, pd.DataFrame)
+
+    @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork, func):
+        """DataFrame has MultiIndex with location and unit levels."""
+        result = func(mock_network, aggregate_per_year=False)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
+
+    @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_columns_are_timestamps(self, mock_network: MockPyPSANetwork, func):
+        """DataFrame columns are a DatetimeIndex (snapshot timestamps)."""
+        result = func(mock_network, aggregate_per_year=False)
+        assert isinstance(result.columns, pd.DatetimeIndex)
+
+    @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_not_empty(self, mock_network: MockPyPSANetwork, func):
+        """DataFrame is not empty."""
+        result = func(mock_network, aggregate_per_year=False)
+        assert not result.empty
+
+    def test_industry_returns_dataframe(self):
+        """Final_Energy_by_Sector__Industry returns DataFrame for aggregate_per_year=False."""
+
+        class _TS_IndustryStatisticsAccessor:
+            def energy_balance(self, **kwargs):
+                groupby = kwargs.get("groupby", ["carrier", "location", "unit"])
+                carriers = kwargs.get("carrier") or ["default"]
+                if isinstance(carriers, str):
+                    carriers = [carriers]
+                index_tuples = [
+                    tuple({"carrier": c, "location": "AT1", "unit": "MWh_th"}[k] for k in groupby)
+                    for c in carriers
+                ]
+                values = [10.0] * len(index_tuples)
+                index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
+                groupby_time = kwargs.get("groupby_time", True)
+                if groupby_time:
+                    return pd.Series(values, index=index, dtype=float)
+                timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                return pd.DataFrame({ts: values for ts in timestamps}, index=index, dtype=float)
+
+        class _TS_IndustryNetwork:
+            def __init__(self):
+                self.statistics = _TS_IndustryStatisticsAccessor()
+
+        result = Final_Energy_by_Sector__Industry(_TS_IndustryNetwork(), aggregate_per_year=False)
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
+        assert isinstance(result.columns, pd.DatetimeIndex)
