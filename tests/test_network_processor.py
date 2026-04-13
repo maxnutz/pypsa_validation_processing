@@ -167,12 +167,12 @@ class TestNetworkProcessorFunctionExecution:
                 processor.functions_dict = {
                     "Final Energy [by Carrier]|Electricity": "Final_Energy_by_Carrier__Electricity"
                 }
-                
+
                 mock_network = MockPyPSANetwork()
                 result = processor._execute_function_for_variable(
                     "Final Energy [by Carrier]|Electricity", mock_network
                 )
-                
+
                 assert isinstance(result, (pd.DataFrame, pd.Series)) or result is None
 
     def test_execute_function_not_found(self, mock_config_file: Path):
@@ -185,7 +185,7 @@ class TestNetworkProcessorFunctionExecution:
             ):
                 processor = Network_Processor(config_path=mock_config_file)
                 processor.functions_dict = {}
-                
+
                 mock_network = MockPyPSANetwork()
                 result = processor._execute_function_for_variable(
                     "Nonexistent Variable", mock_network
@@ -268,6 +268,51 @@ class TestNetworkProcessorFunctionExecution:
                     assert isinstance(result, pd.Series)
                     assert call_kwargs.get("called_with_config") is False
 
+    def test_execute_function_caches_signature_parameters(self, mock_config_file: Path):
+        """Test that function signature inspection is cached per function."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {"Test Variable": "mock_func_with_config"}
+
+                def mock_func_with_config(n, config=None):
+                    return pd.Series(
+                        [1.0],
+                        index=pd.MultiIndex.from_tuples(
+                            [("AT", "MWh_el")], names=["country", "unit"]
+                        ),
+                    )
+
+                with patch(
+                    "pypsa_validation_processing.class_definitions.importlib.import_module"
+                ) as mock_import:
+                    mock_module = MagicMock()
+                    mock_module.mock_func_with_config = mock_func_with_config
+                    mock_import.return_value = mock_module
+
+                    mock_network = MockPyPSANetwork()
+                    processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config={"a": 1}
+                    )
+                    assert len(processor._function_parameter_cache) == 1
+
+                    cache_keys_before = tuple(
+                        processor._function_parameter_cache.keys()
+                    )
+                    processor._execute_function_for_variable(
+                        "Test Variable", mock_network, config={"b": 2}
+                    )
+
+                    assert len(processor._function_parameter_cache) == 1
+                    assert (
+                        tuple(processor._function_parameter_cache.keys())
+                        == cache_keys_before
+                    )
+
 
 # ---------------------------------------------------------------------------
 # Tests for output generation
@@ -348,10 +393,7 @@ class TestNetworkProcessorOutputGeneration:
     def test_timeseries_column_year_matches_investment_year(
         self, mock_config_file: Path, tmp_path: Path
     ):
-        """Snapshot columns of timeseries DataFrames must use the investment year."""
-        import pandas as pd
-        from pypsa_validation_processing import statistics_functions as sf
-
+        """calculate_variables_values rewrites snapshot years to the investment year."""
         investment_year = 2050
 
         with patch(
@@ -362,30 +404,45 @@ class TestNetworkProcessorOutputGeneration:
             ):
                 processor = Network_Processor(config_path=mock_config_file)
                 processor.aggregate_per_year = False
-
-                # Build a minimal timeseries DataFrame as a statistics function would return.
-                # Columns are 2019 timestamps (mock default); processor must replace the year.
-                ts_2019 = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
-                index = pd.MultiIndex.from_tuples(
-                    [("AT1", "EJ/yr")], names=["location", "unit"]
-                )
-                raw_df = pd.DataFrame(
-                    {ts: [1.0] for ts in ts_2019}, index=index, dtype=float
-                )
-
-                # Simulate what _postprocess_statistics_result produces for region mode.
-                variable = "Test Variable"
                 processor.aggregation_level = "region"
-                # Inject the variable-level MultiIndex manually.
-                processed = pd.concat({variable: raw_df}, names=["variable"])
-                processed = processed.groupby(["variable", "location", "unit"]).sum()
 
-                # Now simulate calculate_variables_values year-column replacement.
-                processed.columns = processed.columns.map(
-                    lambda ts: ts.replace(year=investment_year)
+                network = MockPyPSANetwork()
+                network.meta["wildcards"]["planning_horizons"] = investment_year
+                processor.network_collection = MockNetworkCollection([network])
+
+                processor.dsd = MagicMock()
+                processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
+                    {"variable": ["Test Variable"]}
                 )
 
-                assert all(ts.year == investment_year for ts in processed.columns)
+                ts_2019 = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                raw_df = pd.DataFrame(
+                    {ts: [1.0] for ts in ts_2019},
+                    index=pd.MultiIndex.from_tuples(
+                        [("AT1", "MWh_el")], names=["location", "unit"]
+                    ),
+                    dtype=float,
+                )
+
+                with patch.object(
+                    processor,
+                    "_execute_function_for_variable",
+                    return_value=raw_df,
+                ):
+                    with patch.object(
+                        processor,
+                        "structure_pyam_from_pandas",
+                        side_effect=lambda df: df,
+                    ):
+                        processor.calculate_variables_values()
+
+                assert len(processor.dsd_with_values) == 1
+                year, timeseries_df = processor.dsd_with_values[0]
+                assert year == investment_year
+                assert all(ts.year == investment_year for ts in timeseries_df.columns)
+                assert list(timeseries_df.columns) == [
+                    ts.replace(year=investment_year) for ts in ts_2019
+                ]
 
 
 # ---------------------------------------------------------------------------
