@@ -4,6 +4,7 @@ definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
 output_path: resources            # path the outputfile should be written to
 aggregation_level: "region"      # Options: "country" or "region"
+aggregate_per_year: true          # true: one value per investment year; false: full time series per year
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results

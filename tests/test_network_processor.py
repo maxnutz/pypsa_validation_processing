@@ -290,7 +290,7 @@ class TestNetworkProcessorOutputGeneration:
                     processor.write_output_to_xlsx()
 
     def test_write_output_creates_file(self, mock_config_file: Path, tmp_path: Path):
-        """Test that write_output creates an Excel file."""
+        """Test that write_output creates an Excel file in the given directory."""
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -299,14 +299,15 @@ class TestNetworkProcessorOutputGeneration:
             ):
                 processor = Network_Processor(config_path=mock_config_file)
                 
-                # Mock the dsd_with_values
+                # Mock the dsd_with_values (aggregate_per_year=True by default)
                 mock_iam_df = MagicMock()
                 processor.dsd_with_values = mock_iam_df
                 
-                output_path = tmp_path / "test_output.xlsx"
-                result_path = processor.write_output_to_xlsx(output_path=output_path)
+                output_dir = tmp_path / "test_output_dir"
+                result_path = processor.write_output_to_xlsx(output_path=output_dir)
                 
-                assert result_path == output_path
+                expected_path = output_dir / "PYPSA_AT_KN2040_test_scenario_AT.xlsx"
+                assert result_path == expected_path
                 # Verify to_excel was called
                 mock_iam_df.to_excel.assert_called_once()
 

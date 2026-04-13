@@ -77,7 +77,13 @@ class Network_Processor:
                 f"Invalid aggregation_level: '{self.aggregation_level}'. "
                 f"Must be 'country' or 'region'."
             )
-        self.dsd_with_values: pyam.IamDataFrame | None = None
+        self.aggregate_per_year: bool = self.config.get("aggregate_per_year", True)
+        if not isinstance(self.aggregate_per_year, bool):
+            raise ValueError(
+                f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
+                f"Must be true or false."
+            )
+        self.dsd_with_values: pyam.IamDataFrame | list[tuple] | None = None
         default_path_dsd_with_values = (
             Path(__file__).resolve().parent
             / "resources"
@@ -173,9 +179,13 @@ class Network_Processor:
             )
             return None
 
-        if "config" in inspect.signature(func).parameters:
-            return func(n, config=config)
-        return func(n)
+        params = inspect.signature(func).parameters
+        kwargs: dict = {}
+        if "config" in params:
+            kwargs["config"] = config
+        if "aggregate_per_year" in params:
+            kwargs["aggregate_per_year"] = self.aggregate_per_year
+        return func(n, **kwargs)
 
     def _aggregate_to_country(self, result: pd.Series) -> pd.Series:
         """Aggregate a regional Series to country level by summing all regions.
@@ -224,7 +234,7 @@ class Network_Processor:
         return result.loc[mask]
 
     def _postprocess_statistics_result(
-        self, variable: str, result: pd.Series
+        self, variable: str, result: pd.Series | pd.DataFrame
     ) -> pd.DataFrame:
         """Format a statistics-function result into a DataFrame.
 
@@ -235,47 +245,75 @@ class Network_Processor:
         - ``"region"``: keeps all regions, returns a DataFrame grouped
           by ``["variable", "location", "unit"]``.
 
+        When ``self.aggregate_per_year`` is ``True`` the input *result* is a
+        :class:`pandas.Series` and a ``"value"`` column is produced.
+        When ``False`` the input is a :class:`pandas.DataFrame` with snapshot
+        timestamps as columns, which are preserved in the output.
+
         Parameters
         ----------
         variable : str
             IAMC variable name.
-        result : pd.Series
-            Series with MultiIndex ``["location", "unit"]`` (plus possible extra
-            levels) as returned by statistics functions.
+        result : pd.Series | pd.DataFrame
+            Series (``aggregate_per_year=True``) or DataFrame
+            (``aggregate_per_year=False``) with MultiIndex
+            ``["location", "unit"]`` (plus possible extra levels) as returned
+            by statistics functions.
 
         Returns
         -------
         pd.DataFrame
             DataFrame with ``variable``, ``unit`` (and ``location`` when
-            ``aggregation_level="region"``), and ``value`` columns,
-            grouped accordingly.
+            ``aggregation_level="region"``), and ``value`` column or snapshot
+            columns, grouped accordingly.
         """
-        if self.aggregation_level == "country":
-            aggregated_df = self._aggregate_to_country(result)
-            df = pd.DataFrame(
-                {
-                    "variable": [variable] * len(aggregated_df),
-                    "unit": list(
-                        aggregated_df.index.get_level_values("unit").map(UNITS_MAPPING)
-                    ),
-                    "value": list(aggregated_df.values),
-                }
-            )
-            df = df.groupby(["variable", "unit"]).sum()
+        if isinstance(result, pd.Series):
+            # aggregate_per_year=True: existing behaviour unchanged
+            if self.aggregation_level == "country":
+                aggregated_df = self._aggregate_to_country(result)
+                df = pd.DataFrame(
+                    {
+                        "variable": [variable] * len(aggregated_df),
+                        "unit": list(
+                            aggregated_df.index.get_level_values("unit").map(UNITS_MAPPING)
+                        ),
+                        "value": list(aggregated_df.values),
+                    }
+                )
+                df = df.groupby(["variable", "unit"]).sum()
+            else:
+                # region: preserve regional granularity
+                filtered_df = self._filter_to_regions(result)
+                df = pd.DataFrame(
+                    {
+                        "variable": [variable] * len(filtered_df),
+                        "location": list(filtered_df.index.get_level_values("location")),
+                        "unit": list(
+                            filtered_df.index.get_level_values("unit").map(UNITS_MAPPING)
+                        ),
+                        "value": list(filtered_df.values),
+                    }
+                )
+                df = df.groupby(["variable", "location", "unit"]).sum()
         else:
-            # region: preserve regional granularity
-            filtered_df = self._filter_to_regions(result)
-            df = pd.DataFrame(
-                {
-                    "variable": [variable] * len(filtered_df),
-                    "location": list(filtered_df.index.get_level_values("location")),
-                    "unit": list(
-                        filtered_df.index.get_level_values("unit").map(UNITS_MAPPING)
-                    ),
-                    "value": list(filtered_df.values),
-                }
-            )
-            df = df.groupby(["variable", "location", "unit"]).sum()
+            # aggregate_per_year=False: result is a DataFrame with snapshot columns
+            if self.aggregation_level == "country":
+                aggregated_df = self._aggregate_to_country(result)
+                # aggregated_df has index "unit" and snapshot columns — map unit names
+                aggregated_df.index = aggregated_df.index.map(UNITS_MAPPING)
+                aggregated_df.index.name = "unit"
+                # prepend variable as outer MultiIndex level
+                df = pd.concat({variable: aggregated_df}, names=["variable"])
+                df = df.groupby(["variable", "unit"]).sum()
+            else:
+                filtered_df = self._filter_to_regions(result)
+                # map unit level in the MultiIndex
+                idx_frame = filtered_df.index.to_frame(index=False)
+                idx_frame["unit"] = idx_frame["unit"].map(UNITS_MAPPING)
+                filtered_df.index = pd.MultiIndex.from_frame(idx_frame)
+                # prepend variable as outer MultiIndex level
+                df = pd.concat({variable: filtered_df}, names=["variable"])
+                df = df.groupby(["variable", "location", "unit"]).sum()
         return df
 
     def structure_pyam_from_pandas(self, df: pd.DataFrame) -> pyam.IamDataFrame:
@@ -366,14 +404,18 @@ class Network_Processor:
 
         Iterates over all variables in ``self.dsd``, calls
         :meth:`_execute_function_for_variable` for each one, and assembles
-        the results into a single :class:`pyam.IamDataFrame` stored in
-        ``self.dsd_with_values``. Applies aggregation based on
-        ``self.aggregation_level`` config.
+        the results.
 
-        Returns
-        -------
-        pyam.IamDataFrame
-            Combined results for all variables that have a registered function.
+        When ``self.aggregate_per_year`` is ``True`` (default), assembles a
+        single :class:`pyam.IamDataFrame` with one column per investment year
+        and stores it in ``self.dsd_with_values``.
+
+        When ``self.aggregate_per_year`` is ``False``, stores a
+        ``list[tuple[int, pyam.IamDataFrame]]`` in ``self.dsd_with_values``,
+        one entry per investment year.  Each :class:`pyam.IamDataFrame`
+        contains the full time-series for that year.
+
+        Applies aggregation based on ``self.aggregation_level`` config.
         """
         merge_keys = (
             ["variable", "unit"]
@@ -396,31 +438,45 @@ class Network_Processor:
 
             if results:
                 year_df = pd.concat(results, ignore_index=False)
-                year_df.rename(columns={"value": str(investment_year)}, inplace=True)
-                container_investment_years.append(year_df)
-        if len(container_investment_years) > 0:
-            ds_with_values = container_investment_years[0]
-        if len(container_investment_years) > 1:
-            for year_df in container_investment_years[1:]:
-                ds_with_values = ds_with_values.merge(
-                    year_df, on=merge_keys, how="outer"
-                )
+                if self.aggregate_per_year:
+                    year_df.rename(columns={"value": str(investment_year)}, inplace=True)
+                    container_investment_years.append(year_df)
+                else:
+                    iam_df = self.structure_pyam_from_pandas(year_df)
+                    container_investment_years.append((investment_year, iam_df))
 
-        self.dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
+        if self.aggregate_per_year:
+            if len(container_investment_years) > 0:
+                ds_with_values = container_investment_years[0]
+            if len(container_investment_years) > 1:
+                for year_df in container_investment_years[1:]:
+                    ds_with_values = ds_with_values.merge(
+                        year_df, on=merge_keys, how="outer"
+                    )
+            self.dsd_with_values = self.structure_pyam_from_pandas(ds_with_values)
+        else:
+            self.dsd_with_values = container_investment_years
 
     def write_output_to_xlsx(self, output_path: str | Path | None = None) -> Path:
-        """Write the computed IAMC data to an Excel file.
+        """Write the computed IAMC data to an Excel file (or files).
 
         Parameters
         ----------
         output_path : str | Path | None, optional
-            Destination file path. If ``None``, a default path inside
-            ``resources/`` is used.
+            Base output directory.  If ``None``, ``"resources"`` is used.
+
+            - When ``aggregate_per_year=True``: writes a single file
+              ``<output_path>/PYPSA_{model}_{scenario}_{country}.xlsx``.
+            - When ``aggregate_per_year=False``: creates a sub-folder
+              ``<output_path>/PYPSA_timeseries_{model}_{scenario}_{country}/``
+              and writes one file per investment year named
+              ``PYPSA_{model}_{scenario}_{country}_{year}.xlsx``.
 
         Returns
         -------
         Path
-            Path to the written Excel file.
+            Path to the written file (``aggregate_per_year=True``) or to the
+            folder containing all per-year files (``aggregate_per_year=False``).
 
         Raises
         ------
@@ -432,11 +488,19 @@ class Network_Processor:
                 "No data available. Call calculate_variables_values() first."
             )
 
-        if output_path is None:
-            output_path = Path("resources") / f"pypsa_validation_{self.country}.xlsx"
-        else:
-            output_path = Path(output_path)
+        base_dir = Path(output_path) if output_path is not None else Path("resources")
+        base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        self.dsd_with_values.to_excel(output_path)
-        return output_path
+        if self.aggregate_per_year:
+            file_path = base_dir / f"{base_filename}.xlsx"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            self.dsd_with_values.to_excel(file_path)
+            return file_path
+        else:
+            folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
+            folder_path = base_dir / folder_name
+            folder_path.mkdir(parents=True, exist_ok=True)
+            for investment_year, iam_df in self.dsd_with_values:
+                file_name = f"{base_filename}_{investment_year}.xlsx"
+                iam_df.to_excel(folder_path / file_name)
+            return folder_path
