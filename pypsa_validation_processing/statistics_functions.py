@@ -59,11 +59,12 @@ def Final_Energy_by_Carrier__Electricity(
     Remove discharger afterwards, as battery-connecting links have different carrier names.
     """
     # withdrawal from electricity including low_voltage
-    res = n.statistics.energy_balance(
-        bus_carrier="AC",
-        groupby=["carrier", "location", "unit"],
-        direction="withdrawal",
-        groupby_time=aggregate_per_year,
+    res = abs(
+        n.statistics.energy_balance(
+            bus_carrier="AC",
+            groupby=["carrier", "location", "unit"],
+            groupby_time=aggregate_per_year,
+        )
     )
     # as battery is Store, discharger-link needs to be evaluated separately.
     res_storage = n.statistics.energy_balance(
@@ -211,7 +212,7 @@ def Final_Energy_by_Sector__Industry(
         at_port=["bus1"],
         groupby_time=aggregate_per_year,
     )
-    eff_loss = abs(cc_in - cc_out)
+    eff_loss = abs(abs(cc_in) - cc_out)
     eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
     return res
