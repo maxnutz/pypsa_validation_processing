@@ -60,8 +60,10 @@ class Network_Processor:
         )
 
         self.country: str = self.config.get("country", None)
-        if self.country == None:
-            raise ValueError(f"'country' not set in config at {self.config_path}")
+        if self.country is None or not self._is_valid_country_identifier(self.country):
+            raise ValueError(
+                f"'country' must be an ISO 3166-1 alpha-2 code or 'all', got: {self.country!r}"
+            )
         self.model_name: str = self.config["model_name"]
         self.scenario_name: str = self.config["scenario_name"]
         if self.model_name == None or self.scenario_name == None:
@@ -85,11 +87,18 @@ class Network_Processor:
             )
         self._function_parameter_cache: dict[object, set[str]] = {}
         self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
-        default_path_dsd_with_values = (
-            Path(__file__).resolve().parent
-            / "resources"
-            / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
-        )
+        if self.country == "all":
+            default_path_dsd_with_values = (
+                Path(__file__).resolve().parent
+                / "resources"
+                / f"PYPSA_{self.model_name}_{self.scenario_name}.xlsx"
+            )
+        else:
+            default_path_dsd_with_values = (
+                Path(__file__).resolve().parent
+                / "resources"
+                / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
+            )
         self.path_dsd_with_values: Path = (
             Path(self.config["output_path"])
             if "output_path" in self.config
@@ -100,9 +109,14 @@ class Network_Processor:
         return (
             f"Network_Processor\n"
             f"  country: {self.country}\n"
+            f"  aggregation_level: {self.aggregation_level}\n"
             f"  network_results_path: {self.network_results_path}\n"
             f"  definitions_path: {self.definitions_path}\n"
         )
+
+    def _is_valid_country_identifier(self, country: str) -> bool:
+        """Check if country is a valid ISO code or the special value 'all'."""
+        return country == "all" or country in EU27_COUNTRY_CODES
 
     def _read_config(self) -> dict:
         """Read and return the YAML configuration file."""
@@ -204,7 +218,15 @@ class Network_Processor:
         -------
         pd.Series
             Series with MultiIndex containing only the ``unit`` level.
+
+        Notes
+        -----
+        When ``self.country == "all"``, all regions are summed regardless of
+        their location prefix.  When a specific country code is configured,
+        only regions whose location starts with that code are included.
         """
+        if self.country == "all":
+            return result.groupby("unit").sum()
         mask = result.index.get_level_values("location").isin(
             [
                 reg
@@ -226,8 +248,16 @@ class Network_Processor:
         Returns
         -------
         pd.Series
-            Series with MultiIndex containing levels ``location`` and ``unit``."""
+            Series with MultiIndex containing levels ``location`` and ``unit``.
 
+        Notes
+        -----
+        When ``self.country == "all"``, all regions are returned without
+        filtering.  When a specific country code is configured, only regions
+        whose location starts with that code are returned.
+        """
+        if self.country == "all":
+            return result
         mask = result.index.get_level_values("location").isin(
             [
                 reg
@@ -340,7 +370,10 @@ class Network_Processor:
         )
 
         if self.aggregation_level == "country":
-            region = EU27_COUNTRY_CODES.get(self.country, self.country)
+            if self.country == "all":
+                region = "World"
+            else:
+                region = EU27_COUNTRY_CODES.get(self.country, self.country)
             dsd = pyam.IamDataFrame(
                 data=df.drop_duplicates(),
                 model=self.model_name,
@@ -483,7 +516,10 @@ class Network_Processor:
             )
 
         base_dir = self.path_dsd_with_values
-        base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
+        if self.country == "all":
+            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}"
+        else:
+            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
 
         if self.aggregate_per_year:
             file_path = base_dir / f"{base_filename}.xlsx"
@@ -491,7 +527,10 @@ class Network_Processor:
             self.dsd_with_values.to_excel(file_path)
             return file_path
         else:
-            folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
+            if self.country == "all":
+                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}"
+            else:
+                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
             folder_path = base_dir / folder_name
             folder_path.mkdir(parents=True, exist_ok=True)
             for investment_year, iam_df in self.dsd_with_values:

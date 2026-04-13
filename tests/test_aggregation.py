@@ -42,7 +42,7 @@ def _make_locational_timeseries(
     )
 
 
-def _make_processor(tmp_path: Path, aggregation_level: str = "country") -> Network_Processor:
+def _make_processor(tmp_path: Path, aggregation_level: str = "country", country: str = "AT") -> Network_Processor:
     """Create a Network_Processor with mocked heavy dependencies."""
     defs_path = tmp_path / "definitions"
     defs_path.mkdir()
@@ -51,7 +51,7 @@ def _make_processor(tmp_path: Path, aggregation_level: str = "country") -> Netwo
     (nw_path / "dummy.nc").touch()
 
     config_text = f"""
-country: AT
+country: {country}
 model_name: test_model
 scenario_name: test_scenario
 definitions_path: {defs_path}
@@ -212,3 +212,195 @@ class TestPostprocessTimeseriesMode:
 
         assert set(df["location"]) == {"AT1", "AT2"}
         assert set(df["unit"]) == {"MWh"}
+
+
+# ---------------------------------------------------------------------------
+# Tests for all-countries aggregation mode
+# ---------------------------------------------------------------------------
+
+
+class TestAggregationAllCountries:
+    """Tests for Network_Processor with country='all'."""
+
+    def test_aggregate_to_country_with_all_countries(self, tmp_path: Path):
+        """When country='all', all regions must be summed regardless of prefix."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        series = _make_locational_series(
+            locations=("AT1", "DE1", "DE2", "FR1"), value=100.0
+        )
+        result = processor._aggregate_to_country(series)
+        assert result.loc["MWh_el"] == pytest.approx(400.0)
+
+    def test_aggregate_to_country_all_returns_unit_index(self, tmp_path: Path):
+        """Result from all-countries aggregate must still be indexed only by 'unit'."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        series = _make_locational_series(
+            locations=("AT1", "DE1", "FR1"), value=50.0
+        )
+        result = processor._aggregate_to_country(series)
+        assert isinstance(result, pd.Series)
+        assert list(result.index.names) == ["unit"]
+
+    def test_filter_to_regions_with_all_countries(self, tmp_path: Path):
+        """When country='all', all regions must be preserved without filtering."""
+        processor = _make_processor(tmp_path, aggregation_level="region", country="all")
+        series = _make_locational_series(
+            locations=("AT1", "DE1", "DE2", "FR1"), value=100.0
+        )
+        result = processor._filter_to_regions(series)
+        assert len(result) == 4
+
+
+# ---------------------------------------------------------------------------
+# Tests for output filename with country='all'
+# ---------------------------------------------------------------------------
+
+
+class TestOutputFilenameAllCountries:
+    """Tests for output path when country='all'."""
+
+    def test_output_filename_all_countries_aggregate(self, tmp_path: Path):
+        """When country='all', output path must not contain a country suffix."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        # The output_path in config points to tmp_path / 'out.xlsx'
+        # so path_dsd_with_values is exactly that path (no country suffix)
+        assert "all" not in processor.path_dsd_with_values.name
+
+    def test_output_path_country_code_includes_country(self, tmp_path: Path):
+        """When country='AT', output path must include 'AT'."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="AT")
+        # With output_path set explicitly the path itself is used as-is;
+        # the default path (no output_path) would contain the country.
+        # Test the default path by removing output_path from config.
+        defs_path = tmp_path / "definitions2"
+        defs_path.mkdir()
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_text = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+aggregation_level: "country"
+"""
+        config_file = tmp_path / "config_no_output.yaml"
+        config_file.write_text(config_text)
+        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                proc = Network_Processor(config_path=config_file)
+        assert "AT" in proc.path_dsd_with_values.name
+
+    def test_default_output_path_all_omits_country(self, tmp_path: Path):
+        """Default output path with country='all' must not include country suffix."""
+        defs_path = tmp_path / "definitions3"
+        defs_path.mkdir()
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_text = f"""
+country: all
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+aggregation_level: "country"
+"""
+        config_file = tmp_path / "config_all_no_output.yaml"
+        config_file.write_text(config_text)
+        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                proc = Network_Processor(config_path=config_file)
+        assert proc.path_dsd_with_values.name == "PYPSA_test_model_test_scenario.xlsx"
+
+
+# ---------------------------------------------------------------------------
+# Tests for pyam structuring with country='all'
+# ---------------------------------------------------------------------------
+
+
+class TestPyamStructuringAllCountries:
+    """Tests for structure_pyam_from_pandas() with country='all'."""
+
+    def test_region_world_when_all_countries_aggregate(self, tmp_path: Path):
+        """country='all' + aggregation_level='country' must produce region='World'."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        # Build a DataFrame with the same MultiIndex structure that
+        # _postprocess_statistics_result produces in country mode.
+        idx = pd.MultiIndex.from_tuples(
+            [("Test|Var", "MWh")], names=["variable", "unit"]
+        )
+        df = pd.DataFrame({2020: [100.0]}, index=idx)
+        iam_df = processor.structure_pyam_from_pandas(df)
+        assert iam_df.region == ["World"]
+
+    def test_preserves_locations_when_all_countries_region(self, tmp_path: Path):
+        """country='all' + aggregation_level='region' must use location as region."""
+        processor = _make_processor(tmp_path, aggregation_level="region", country="all")
+        # Build a DataFrame with the same MultiIndex structure that
+        # _postprocess_statistics_result produces in region mode.
+        idx = pd.MultiIndex.from_tuples(
+            [("Test|Var", "AT1", "MWh"), ("Test|Var", "DE1", "MWh")],
+            names=["variable", "location", "unit"],
+        )
+        df = pd.DataFrame({2020: [100.0, 200.0]}, index=idx)
+        iam_df = processor.structure_pyam_from_pandas(df)
+        assert set(iam_df.region) == {"AT1", "DE1"}
+
+
+# ---------------------------------------------------------------------------
+# Tests for backward compatibility
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardCompatibilityCountryFilter:
+    """Tests that single-country mode still works after all-regions changes."""
+
+    def test_single_country_aggregate_filters_correctly(self, tmp_path: Path):
+        """country='AT' must only sum AT-prefixed regions."""
+        processor = _make_processor(tmp_path, aggregation_level="country", country="AT")
+        series = _make_locational_series(
+            locations=("AT1", "AT2", "DE1"), value=100.0
+        )
+        result = processor._aggregate_to_country(series)
+        assert result.loc["MWh_el"] == pytest.approx(200.0)
+
+    def test_single_country_filter_excludes_others(self, tmp_path: Path):
+        """country='AT' must exclude non-AT regions in region mode."""
+        processor = _make_processor(tmp_path, aggregation_level="region", country="AT")
+        series = _make_locational_series(
+            locations=("AT1", "AT2", "DE1"), value=100.0
+        )
+        result = processor._filter_to_regions(series)
+        locations = result.index.get_level_values("location").unique().tolist()
+        assert "DE1" not in locations
+        assert set(locations) == {"AT1", "AT2"}
+
+    def test_invalid_country_raises_value_error(self, tmp_path: Path):
+        """An unknown country code must raise ValueError."""
+        defs_path = tmp_path / "definitions_inv"
+        defs_path.mkdir()
+        nw_path = tmp_path / "networks_inv"
+        nw_path.mkdir(parents=True)
+        (nw_path / "dummy.nc").touch()
+        config_text = f"""
+country: XX
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+aggregation_level: "country"
+"""
+        config_file = tmp_path / "config_inv.yaml"
+        config_file.write_text(config_text)
+        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(ValueError, match="'country' must be"):
+                    Network_Processor(config_path=config_file)

@@ -521,3 +521,69 @@ output_path: {tmp_path / 'output.xlsx'}
             ):
                 with pytest.raises(ValueError, match="Invalid aggregation_level"):
                     Network_Processor(config_path=config_file)
+
+
+# ---------------------------------------------------------------------------
+# Tests for country="all" initialization
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorCountryAll:
+    """Tests for Network_Processor with country='all'."""
+
+    def _make_config_file(self, tmp_path: Path, country: str = "all", extra: str = "") -> Path:
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: {country}
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+{extra}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+        return config_file
+
+    def test_country_all_accepted(self, tmp_path: Path):
+        """country='all' must be accepted without raising ValueError."""
+        config_file = self._make_config_file(tmp_path, country="all")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.country == "all"
+
+    def test_country_invalid_code_raises(self, tmp_path: Path):
+        """An unrecognised country code must raise ValueError."""
+        config_file = self._make_config_file(tmp_path, country="XX")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(ValueError, match="'country' must be"):
+                    Network_Processor(config_path=config_file)
+
+    def test_repr_includes_aggregation_level(self, tmp_path: Path):
+        """__repr__ must include the aggregation_level field."""
+        config_file = self._make_config_file(tmp_path, country="AT", extra='aggregation_level: "region"')
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                repr_str = repr(processor)
+                assert "aggregation_level" in repr_str
+                assert "region" in repr_str
