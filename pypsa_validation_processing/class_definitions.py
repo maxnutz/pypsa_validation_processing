@@ -205,28 +205,39 @@ class Network_Processor:
             kwargs["aggregate_per_year"] = self.aggregate_per_year
         return func(n, **kwargs)
 
-    def _aggregate_to_country(self, result: pd.Series) -> pd.Series:
-        """Aggregate a regional Series to country level by summing all regions.
+    def _aggregate_to_country(self, result: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
+        """Aggregate a regional Series/DataFrame to country level by summing regions.
 
         Parameters
         ----------
-        result : pd.Series
-            Series with MultiIndex containing at least ``location`` and ``unit``
-            levels, as returned by statistics functions.
+        result : pd.Series | pd.DataFrame
+            Series or DataFrame with MultiIndex containing at least ``location``
+            and ``unit`` levels, as returned by statistics functions.
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing only the ``unit`` level.
+        pd.Series | pd.DataFrame
+            When ``self.country`` is a specific code: Series/DataFrame with
+            MultiIndex containing only the ``unit`` level (regions filtered to
+            the configured country and summed).
 
-        Notes
-        -----
-        When ``self.country == "all"``, all regions are summed regardless of
-        their location prefix.  When a specific country code is configured,
-        only regions whose location starts with that code are included.
+            When ``self.country == "all"``: Series/DataFrame with MultiIndex
+            ``["country", "unit"]`` where each country's regions are summed
+            independently (country derived from the first two characters of the
+            location identifier).
         """
         if self.country == "all":
-            return result.groupby("unit").sum()
+            # Derive 2-letter country code from location prefix, then group by
+            # (country, unit) so each country is summed independently.
+            locations = result.index.get_level_values("location")
+            countries = pd.Index([loc[:2] for loc in locations], name="country")
+            units = result.index.get_level_values("unit")
+            new_index = pd.MultiIndex.from_arrays([countries, units], names=["country", "unit"])
+            if isinstance(result, pd.DataFrame):
+                result = pd.DataFrame(result.values, index=new_index, columns=result.columns)
+            else:
+                result = pd.Series(result.values, index=new_index)
+            return result.groupby(["country", "unit"]).sum()
         mask = result.index.get_level_values("location").isin(
             [
                 reg
@@ -292,6 +303,8 @@ class Network_Processor:
     def _postprocess_group_levels(self) -> list[str]:
         """Return grouping levels based on configured aggregation granularity."""
         if self.aggregation_level == "country":
+            if self.country == "all":
+                return ["variable", "country", "unit"]
             return ["variable", "unit"]
         return ["variable", "location", "unit"]
 
@@ -353,10 +366,13 @@ class Network_Processor:
 
         Notes
         -----
-        When ``aggregation_level="country"``, the region is set to the full
-        country name from :data:`EU27_COUNTRY_CODES`.  When
-        ``aggregation_level="region"``, the ``location`` column in *df*
-        is used directly.
+        When ``aggregation_level="country"`` and ``country`` is a specific ISO
+        code, the region is set to the full country name from
+        :data:`EU27_COUNTRY_CODES`.  When ``country="all"``, the ``country``
+        column in *df* (populated by :meth:`_aggregate_to_country`) is mapped
+        to full country names and used as the region dimension, so each country
+        appears as a separate row.  When ``aggregation_level="region"``, the
+        ``location`` column in *df* is used directly.
         """
         # add 'variable' and 'unit' columns
         df = df.reset_index()
@@ -371,17 +387,29 @@ class Network_Processor:
 
         if self.aggregation_level == "country":
             if self.country == "all":
-                region = "World"
+                # Map 2-letter country codes in the "country" column to full
+                # country names so each country becomes its own pyam region.
+                df["country"] = df["country"].map(
+                    lambda c: EU27_COUNTRY_CODES.get(c, c)
+                )
+                dsd = pyam.IamDataFrame(
+                    data=df.drop_duplicates(),
+                    model=self.model_name,
+                    scenario=self.scenario_name,
+                    region="country",
+                    variable="variable_name",
+                    unit="unit_pypsa",
+                )
             else:
                 region = EU27_COUNTRY_CODES.get(self.country, self.country)
-            dsd = pyam.IamDataFrame(
-                data=df.drop_duplicates(),
-                model=self.model_name,
-                scenario=self.scenario_name,
-                region=region,
-                variable="variable_name",
-                unit="unit_pypsa",
-            )
+                dsd = pyam.IamDataFrame(
+                    data=df.drop_duplicates(),
+                    model=self.model_name,
+                    scenario=self.scenario_name,
+                    region=region,
+                    variable="variable_name",
+                    unit="unit_pypsa",
+                )
         else:
             # region: use column "location" for pyams region-variable
             dsd = pyam.IamDataFrame(
@@ -443,9 +471,13 @@ class Network_Processor:
         Applies aggregation based on ``self.aggregation_level`` config.
         """
         merge_keys = (
-            ["variable", "unit"]
-            if self.aggregation_level == "country"
-            else ["variable", "location", "unit"]
+            ["variable", "country", "unit"]
+            if (self.aggregation_level == "country" and self.country == "all")
+            else (
+                ["variable", "unit"]
+                if self.aggregation_level == "country"
+                else ["variable", "location", "unit"]
+            )
         )
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):

@@ -223,23 +223,26 @@ class TestAggregationAllCountries:
     """Tests for Network_Processor with country='all'."""
 
     def test_aggregate_to_country_with_all_countries(self, tmp_path: Path):
-        """When country='all', all regions must be summed regardless of prefix."""
+        """When country='all', regions must be grouped per country and summed."""
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
         series = _make_locational_series(
             locations=("AT1", "DE1", "DE2", "FR1"), value=100.0
         )
         result = processor._aggregate_to_country(series)
-        assert result.loc["MWh_el"] == pytest.approx(400.0)
+        # AT: 1 region × 100, DE: 2 regions × 100, FR: 1 region × 100
+        assert result.loc[("AT", "MWh_el")] == pytest.approx(100.0)
+        assert result.loc[("DE", "MWh_el")] == pytest.approx(200.0)
+        assert result.loc[("FR", "MWh_el")] == pytest.approx(100.0)
 
-    def test_aggregate_to_country_all_returns_unit_index(self, tmp_path: Path):
-        """Result from all-countries aggregate must still be indexed only by 'unit'."""
+    def test_aggregate_to_country_all_returns_country_unit_index(self, tmp_path: Path):
+        """Result from all-countries aggregate must be indexed by ['country', 'unit']."""
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
         series = _make_locational_series(
             locations=("AT1", "DE1", "FR1"), value=50.0
         )
         result = processor._aggregate_to_country(series)
         assert isinstance(result, pd.Series)
-        assert list(result.index.names) == ["unit"]
+        assert list(result.index.names) == ["country", "unit"]
 
     def test_filter_to_regions_with_all_countries(self, tmp_path: Path):
         """When country='all', all regions must be preserved without filtering."""
@@ -327,17 +330,20 @@ aggregation_level: "country"
 class TestPyamStructuringAllCountries:
     """Tests for structure_pyam_from_pandas() with country='all'."""
 
-    def test_region_world_when_all_countries_aggregate(self, tmp_path: Path):
-        """country='all' + aggregation_level='country' must produce region='World'."""
+    def test_per_country_regions_when_all_countries_aggregate(self, tmp_path: Path):
+        """country='all' + aggregation_level='country' must produce one region per country."""
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
         # Build a DataFrame with the same MultiIndex structure that
-        # _postprocess_statistics_result produces in country mode.
+        # _postprocess_statistics_result produces for country="all" in country mode
+        # (index: ["variable", "country", "unit"]).
         idx = pd.MultiIndex.from_tuples(
-            [("Test|Var", "MWh")], names=["variable", "unit"]
+            [("Test|Var", "AT", "MWh"), ("Test|Var", "DE", "MWh")],
+            names=["variable", "country", "unit"],
         )
-        df = pd.DataFrame({2020: [100.0]}, index=idx)
+        df = pd.DataFrame({2020: [100.0, 200.0]}, index=idx)
         iam_df = processor.structure_pyam_from_pandas(df)
-        assert iam_df.region == ["World"]
+        # Country codes must be mapped to full names
+        assert set(iam_df.region) == {"Austria", "Germany"}
 
     def test_preserves_locations_when_all_countries_region(self, tmp_path: Path):
         """country='all' + aggregation_level='region' must use location as region."""
