@@ -15,7 +15,7 @@ from pypsa_validation_processing.class_definitions import Network_Processor
 def _make_config(tmp_path: Path, extra: str = "") -> Path:
     defs_path = tmp_path / "definitions"
     defs_path.mkdir()
-    (defs_path / "variables.csv").write_text("Variable\nFinal Energy [by Carrier]|Electricity\n")
+    (defs_path / "variables.csv").write_text("variable\nFinal Energy [by Carrier]|Electricity\n")
 
     nw_path = tmp_path / "networks"
     nw_path.mkdir(parents=True)
@@ -70,16 +70,16 @@ class TestCommonDefinitionsConfiguration:
         config_path = _make_config(
             tmp_path, extra=f"common_definitions_path: {common_defs}\n"
         )
-        definitions_dsd = MagicMock()
         common_dsd = MagicMock()
+        definitions_dsd = MagicMock()
         with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition",
-                side_effect=[definitions_dsd, common_dsd],
+                side_effect=[common_dsd, definitions_dsd],
             ) as mock_dsd:
                 processor = Network_Processor(config_path=config_path)
         assert processor.common_definitions_path == common_defs
-        assert processor.common_dsd is definitions_dsd
+        assert processor.common_dsd is common_dsd
         assert mock_dsd.call_count == 2
 
 
@@ -207,3 +207,19 @@ class TestConvertUnitsToCommonDefinitions:
         ) as mock_convert:
             processor.structure_pyam_from_pandas(df)
         mock_convert.assert_called_once()
+
+    def test_structure_pyam_applies_conversion_with_common_definitions(
+        self, processor: Network_Processor
+    ):
+        processor.aggregation_level = "country"
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": ["TWh/yr"]}
+        )
+        df = pd.DataFrame(
+            {"2020": [1.0]},
+            index=pd.MultiIndex.from_tuples([("A", "EJ/yr")], names=["variable", "unit"]),
+        )
+
+        iam_df = processor.structure_pyam_from_pandas(df)
+        assert iam_df.unit == ["TWh/yr"]

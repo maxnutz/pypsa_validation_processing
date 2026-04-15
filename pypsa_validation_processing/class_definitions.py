@@ -419,10 +419,7 @@ class Network_Processor:
 
             converted_parts.append(var_df)
 
-        converted_df = converted_parts[0]
-        for part in converted_parts[1:]:
-            converted_df = converted_df.append(part)
-        return converted_df
+        return pyam.concat(converted_parts)
 
     def _get_unit_from_common_definitions(self, variable: str) -> str:
         """Return target unit from common definitions for a given variable."""
