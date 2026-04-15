@@ -1,9 +1,12 @@
 """Static information and general utility functions for pypsa_validation_processing."""
 
 EU27_COUNTRY_CODES: dict[str, str] = {
+    "AL": "Albania",
     "AT": "Austria",
+    "BA": "Bosnia and Herzegovina",
     "BE": "Belgium",
     "BG": "Bulgaria",
+    "CH": "Switzerland",
     "CY": "Cyprus",
     "CZ": "Czechia",
     "DE": "Germany",
@@ -20,14 +23,19 @@ EU27_COUNTRY_CODES: dict[str, str] = {
     "LT": "Lithuania",
     "LU": "Luxembourg",
     "LV": "Latvia",
+    "ME": "Montenegro",
+    "MK": "Republic of North Macedonia",
     "MT": "Malta",
     "NL": "Netherlands",
+    "NO": "Norway",
     "PL": "Poland",
     "PT": "Portugal",
     "RO": "Romania",
+    "RS": "Serbia",
     "SE": "Sweden",
     "SI": "Slovenia",
     "SK": "Slovakia",
+    "XK": "Kosovo",
     "EU27_{year}": "EU27",
 }
 
