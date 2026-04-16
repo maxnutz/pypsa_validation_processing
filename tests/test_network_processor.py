@@ -521,3 +521,635 @@ output_path: {tmp_path / 'output.xlsx'}
             ):
                 with pytest.raises(ValueError, match="Invalid aggregation_level"):
                     Network_Processor(config_path=config_file)
+
+
+# ---------------------------------------------------------------------------
+# Tests for country="all" initialization
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorCountryAll:
+    """Tests for Network_Processor with country='all'."""
+
+    def _make_config_file(self, tmp_path: Path, country: str = "all", extra: str = "") -> Path:
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: {country}
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+{extra}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+        return config_file
+
+    def test_country_all_accepted(self, tmp_path: Path):
+        """country='all' must be accepted without raising ValueError."""
+        config_file = self._make_config_file(tmp_path, country="all")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.country == "all"
+
+    def test_country_invalid_code_raises(self, tmp_path: Path):
+        """An unrecognised country code must raise ValueError."""
+        config_file = self._make_config_file(tmp_path, country="XX")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(ValueError, match="'country' must be"):
+                    Network_Processor(config_path=config_file)
+
+    def test_repr_includes_aggregation_level(self, tmp_path: Path):
+        """__repr__ must include the aggregation_level field."""
+        config_file = self._make_config_file(tmp_path, country="AT", extra='aggregation_level: "region"')
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                repr_str = repr(processor)
+                assert "aggregation_level" in repr_str
+                assert "region" in repr_str
+
+
+# ---------------------------------------------------------------------------
+# Tests for aggregation and filtering
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorAggregationAndFiltering:
+    """Test aggregation and filtering methods."""
+
+    def _setup_processor(
+        self, tmp_path: Path, country: str = "AT"
+    ) -> Network_Processor:
+        """Create a configured Network_Processor for testing."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: {country}
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                return Network_Processor(config_path=config_file)
+
+    def test_aggregate_to_country_specific_country(self, tmp_path: Path):
+        """Test _aggregate_to_country with specific country code."""
+        processor = self._setup_processor(tmp_path, country="AT")
+
+        # Create test data with locations starting with "AT"
+        data = pd.Series(
+            [100.0, 200.0, 150.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("AT2", "MWh_el"), ("AT1", "MWh_th")],
+                names=["location", "unit"],
+            ),
+        ).to_frame(name="value")
+
+        result = processor._aggregate_to_country(data)
+
+        # Should aggregate AT1 and AT2 rows by unit
+        assert "location" not in result.index.names
+        assert "unit" in result.index.names
+        assert result.index.get_level_values("unit").tolist() == ["MWh_el", "MWh_th"]
+        assert result.loc[("MWh_el",), "value"].item() == 300.0  # 100 + 200
+
+    def test_aggregate_to_country_all_countries(self, tmp_path: Path):
+        """Test _aggregate_to_country with country='all'."""
+        processor = self._setup_processor(tmp_path, country="all")
+
+        # Create test data with multiple country prefixes
+        data = pd.Series(
+            [100.0, 200.0, 50.0, 75.0],
+            index=pd.MultiIndex.from_tuples(
+                [
+                    ("AT1", "MWh_el"),
+                    ("AT2", "MWh_el"),
+                    ("DE1", "MWh_el"),
+                    ("AT1", "MWh_th"),
+                ],
+                names=["location", "unit"],
+            ),
+        ).to_frame(name="value")
+
+        result = processor._aggregate_to_country(data)
+
+        # Should create country index from location prefixes
+        assert "country" in result.index.names
+        assert "unit" in result.index.names
+        assert ("AT", "MWh_el") in result.index
+        assert ("DE", "MWh_el") in result.index
+
+    def test_filter_to_regions_specific_country(self, tmp_path: Path):
+        """Test _filter_to_regions filters to country prefix."""
+        processor = self._setup_processor(tmp_path, country="AT")
+
+        # Create test data with mixed country prefixes
+        data = pd.Series(
+            [100.0, 200.0, 150.0, 75.0],
+            index=pd.MultiIndex.from_tuples(
+                [
+                    ("AT1", "MWh_el"),
+                    ("AT2", "MWh_el"),
+                    ("DE1", "MWh_el"),
+                    ("AT1", "MWh_th"),
+                ],
+                names=["location", "unit"],
+            ),
+        )
+
+        result = processor._filter_to_regions(data)
+
+        # Should filter to only AT regions
+        locations = result.index.get_level_values("location")
+        assert all(loc.startswith("AT") for loc in locations)
+        assert "DE1" not in locations
+
+    def test_filter_to_regions_country_all(self, tmp_path: Path):
+        """Test _filter_to_regions doesn't filter when country='all'."""
+        processor = self._setup_processor(tmp_path, country="all")
+
+        # Create test data with mixed country prefixes
+        data = pd.Series(
+            [100.0, 200.0, 150.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("DE1", "MWh_el"), ("AT2", "MWh_th")],
+                names=["location", "unit"],
+            ),
+        )
+
+        result = processor._filter_to_regions(data)
+
+        # Should return all regions unchanaged
+        assert len(result) == len(data)
+        assert result.index.equals(data.index)
+
+    def test_select_aggregation_result_country_mode(self, tmp_path: Path):
+        """Test _select_aggregation_result aggregates in country mode."""
+        processor = self._setup_processor(tmp_path, country="AT")
+        processor.aggregation_level = "country"
+
+        data = pd.Series(
+            [100.0, 200.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("AT2", "MWh_el")],
+                names=["location", "unit"],
+            ),
+        ).to_frame(name="value")
+
+        result = processor._select_aggregation_result(data)
+
+        assert "location" not in result.index.names
+        assert "unit" in result.index.names
+
+    def test_select_aggregation_result_region_mode(self, tmp_path: Path):
+        """Test _select_aggregation_result preserves regions in region mode."""
+        processor = self._setup_processor(tmp_path, country="AT")
+        processor.aggregation_level = "region"
+
+        data = pd.Series(
+            [100.0, 200.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("AT2", "MWh_el")],
+                names=["location", "unit"],
+            ),
+        ).to_frame(name="value")
+
+        result = processor._select_aggregation_result(data)
+
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
+
+    def test_map_unit_level_with_multiindex(self, tmp_path: Path):
+        """Test _map_unit_level maps unit column with MultiIndex."""
+        processor = self._setup_processor(tmp_path)
+
+        # Create data with units that should be mapped
+        data = pd.DataFrame(
+            {"value": [100.0, 200.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("AT2", "MWh_th")],
+                names=["location", "unit"],
+            ),
+        )
+
+        result = processor._map_unit_level(data)
+
+        # MWh_el and MWh_th should be mapped according to UNITS_MAPPING
+        assert result.index.get_level_values("unit").tolist() != ["MWh_el", "MWh_th"]
+
+    def test_postprocess_group_levels_country_mode_specific_country(
+        self, tmp_path: Path
+    ):
+        """Test _postprocess_group_levels returns correct levels for country mode."""
+        processor = self._setup_processor(tmp_path, country="AT")
+        processor.aggregation_level = "country"
+
+        levels = processor._postprocess_group_levels()
+
+        assert levels == ["variable", "unit"]
+
+    def test_postprocess_group_levels_country_mode_all_countries(self, tmp_path: Path):
+        """Test _postprocess_group_levels includes country for country='all'."""
+        processor = self._setup_processor(tmp_path, country="all")
+        processor.aggregation_level = "country"
+
+        levels = processor._postprocess_group_levels()
+
+        assert levels == ["variable", "country", "unit"]
+
+    def test_postprocess_group_levels_region_mode(self, tmp_path: Path):
+        """Test _postprocess_group_levels includes location for region mode."""
+        processor = self._setup_processor(tmp_path, country="AT")
+        processor.aggregation_level = "region"
+
+        levels = processor._postprocess_group_levels()
+
+        assert levels == ["variable", "location", "unit"]
+
+
+# ---------------------------------------------------------------------------
+# Tests for data postprocessing
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorDataPostprocessing:
+    """Test data postprocessing methods."""
+
+    def _setup_processor(self, tmp_path: Path) -> Network_Processor:
+        """Create a configured Network_Processor."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                return Network_Processor(config_path=config_file)
+
+    def test_postprocess_statistics_result_series_to_dataframe(self, tmp_path: Path):
+        """Test _postprocess_statistics_result converts Series to DataFrame."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "country"
+        processor.aggregate_per_year = True
+
+        # Create a Series result as would be returned by a statistics function
+        result = pd.Series(
+            [100.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el")],
+                names=["location", "unit"],
+            ),
+        )
+
+        with patch.object(
+            processor,
+            "_select_aggregation_result",
+            return_value=result.to_frame(name="value"),
+        ):
+            with patch.object(
+                processor, "_map_unit_level", return_value=result.to_frame(name="value")
+            ):
+                output = processor._postprocess_statistics_result(
+                    "Final Energy|Electricity", result
+                )
+
+        assert isinstance(output, pd.DataFrame)
+        assert "variable" in output.index.names
+
+    def test_postprocess_statistics_result_with_region_aggregation(
+        self, tmp_path: Path
+    ):
+        """Test _postprocess_statistics_result preserves regions."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "region"
+
+        result = pd.Series(
+            [100.0, 200.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el"), ("AT2", "MWh_el")],
+                names=["location", "unit"],
+            ),
+        )
+
+        output = processor._postprocess_statistics_result("Test|Variable", result)
+
+        assert "location" in output.index.names
+        assert "variable" in output.index.names
+
+    def test_structure_pyam_from_pandas_country_specific(self, tmp_path: Path):
+        """Test structure_pyam_from_pandas with specific country."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "country"
+        processor.country = "AT"
+
+        df = pd.DataFrame(
+            {
+                "variable": ["Final Energy|Electricity"],
+                "unit": ["MWh_el"],
+                "value": [1000.0],
+                "year": [2020],
+            }
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+        ) as mock_iam:
+            mock_iam.return_value = MagicMock()
+            processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_called_once()
+
+    def test_structure_pyam_from_pandas_country_all(self, tmp_path: Path):
+        """Test structure_pyam_from_pandas with country='all'."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "country"
+        processor.country = "all"
+
+        df = pd.DataFrame(
+            {
+                "variable": ["Final Energy|Electricity", "Final Energy|Electricity"],
+                "country": ["AT", "DE"],
+                "unit": ["MWh_el", "MWh_el"],
+                "value": [1000.0, 2000.0],
+                "year": [2020, 2020],
+            }
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+        ) as mock_iam:
+            mock_iam.return_value = MagicMock()
+            processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_called_once()
+
+    def test_structure_pyam_from_pandas_region_mode(self, tmp_path: Path):
+        """Test structure_pyam_from_pandas with region aggregation level."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "region"
+
+        df = pd.DataFrame(
+            {
+                "variable": ["Final Energy|Electricity"],
+                "location": ["AT1"],
+                "unit": ["MWh_el"],
+                "value": [1000.0],
+                "year": [2020],
+            }
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+        ) as mock_iam:
+            mock_iam.return_value = MagicMock()
+            processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for file I/O and network loading
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkProcessorFileIO:
+    """Test file I/O and configuration loading methods."""
+
+    def test_read_definitions_returns_datastructuredefinition(self):
+        """Test read_definitions returns a DataStructureDefinition."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+        ) as mock_dsd_class:
+            mock_dsd = MagicMock()
+            mock_dsd_class.return_value = mock_dsd
+
+            with patch(
+                "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+            ):
+                with patch(
+                    "pypsa_validation_processing.class_definitions.Network_Processor._read_config"
+                ):
+                    with patch(
+                        "pypsa_validation_processing.class_definitions.Path.exists",
+                        return_value=True,
+                    ):
+                        with patch(
+                            "pypsa_validation_processing.class_definitions.os.listdir",
+                            return_value=["test.nc"],
+                        ):
+                            processor = MagicMock(spec=["definitions_path"])
+                            processor.definitions_path = Path("/tmp/definitions")
+
+                            result = Network_Processor.read_definitions(processor)
+
+                            assert result == mock_dsd
+
+    def test_read_mappings_missing_file(self, tmp_path: Path):
+        """Test _read_mappings raises FileNotFoundError if file missing."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                config_content = """
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: /tmp/definitions
+network_results_path: /tmp/networks
+mapping_path: /nonexistent/mapping.yaml
+"""
+                config_file = tmp_path / "config.yaml"
+                config_file.write_text(config_content)
+
+                # Create minimal required directories
+                defs_path = tmp_path / "definitions"
+                defs_path.mkdir(exist_ok=True)
+                nw_path = tmp_path / "networks"
+                nw_path.mkdir(parents=True, exist_ok=True)
+                (nw_path / "dummy.nc").touch()
+
+                # Update config with valid paths
+                config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+mapping_path: /nonexistent/mapping.yaml
+"""
+                config_file.write_text(config_content)
+
+                with pytest.raises(FileNotFoundError, match="Mapping file not found"):
+                    Network_Processor(config_path=config_file)
+
+    def test_aggregate_per_year_defaults_to_true(self, tmp_path: Path):
+        """Test aggregate_per_year defaults to True."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.aggregate_per_year is True
+
+    def test_aggregate_per_year_validation_non_bool(self, tmp_path: Path):
+        """Test aggregate_per_year validation rejects non-bool values."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+aggregate_per_year: "not_a_bool"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(ValueError, match="Invalid aggregate_per_year"):
+                    Network_Processor(config_path=config_file)
+
+    def test_write_output_creates_parent_directory(self, tmp_path: Path):
+        """Test write_output_to_xlsx creates parent directories."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        deep_output_path = tmp_path / "deep" / "nested" / "folder"
+
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {deep_output_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                mock_iam_df = MagicMock()
+                processor.dsd_with_values = mock_iam_df
+
+                processor.write_output_to_xlsx()
+
+                assert deep_output_path.exists()
+
+    def test_write_output_country_all_with_aggregation(self, tmp_path: Path):
+        """Test write_output with country='all' has correct filename."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: all
+model_name: MyModel
+scenario_name: MyScenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                mock_iam_df = MagicMock()
+                processor.dsd_with_values = mock_iam_df
+
+                result_path = processor.write_output_to_xlsx()
+
+                # For country="all", filename should not include country suffix
+                assert "PYPSA_MyModel_MyScenario.xlsx" in str(result_path)
+                assert "PYPSA_MyModel_MyScenario_all.xlsx" not in str(result_path)
