@@ -205,23 +205,23 @@ class Network_Processor:
             kwargs["aggregate_per_year"] = self.aggregate_per_year
         return func(n, **kwargs)
 
-    def _aggregate_to_country(self, result: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
+    def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
         """Aggregate a regional Series/DataFrame to country level by summing regions.
 
         Parameters
         ----------
-        result : pd.Series | pd.DataFrame
-            Series or DataFrame with MultiIndex containing at least ``location``
-            and ``unit`` levels, as returned by statistics functions.
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing at least ``location``
+            and ``unit`` levels
 
         Returns
         -------
-        pd.Series | pd.DataFrame
-            When ``self.country`` is a specific code: Series/DataFrame with
+        pd.DataFrame
+            When ``self.country`` is a specific code: DataFrame with
             MultiIndex containing only the ``unit`` level (regions filtered to
             the configured country and summed).
 
-            When ``self.country == "all"``: Series/DataFrame with MultiIndex
+            When ``self.country == "all"``: DataFrame with MultiIndex
             ``["country", "unit"]`` where each country's regions are summed
             independently (country derived from the first two characters of the
             location identifier).
@@ -232,11 +232,12 @@ class Network_Processor:
             locations = result.index.get_level_values("location")
             countries = pd.Index([loc[:2] for loc in locations], name="country")
             units = result.index.get_level_values("unit")
-            new_index = pd.MultiIndex.from_arrays([countries, units], names=["country", "unit"])
-            if isinstance(result, pd.DataFrame):
-                result = pd.DataFrame(result.values, index=new_index, columns=result.columns)
-            else:
-                result = pd.Series(result.values, index=new_index)
+            new_index = pd.MultiIndex.from_arrays(
+                [countries, units], names=["country", "unit"]
+            )
+            result = pd.DataFrame(
+                result.values, index=new_index, columns=result.columns
+            )
             return result.groupby(["country", "unit"]).sum()
         mask = result.index.get_level_values("location").isin(
             [
@@ -247,7 +248,7 @@ class Network_Processor:
         )
         return result.loc[mask].groupby("unit").sum()
 
-    def _filter_to_regions(self, result: pd.Series) -> pd.Series:
+    def _filter_to_regions(self, result: pd.Series) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
 
         Parameters
@@ -258,8 +259,8 @@ class Network_Processor:
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing levels ``location`` and ``unit``.
+        pd.DataFrame
+            Datafrme with MultiIndex containing levels ``location`` and ``unit``.
 
         Notes
         -----
@@ -280,15 +281,13 @@ class Network_Processor:
 
     def _select_aggregation_result(
         self, result: pd.Series | pd.DataFrame
-    ) -> pd.Series | pd.DataFrame:
+    ) -> pd.DataFrame:
         """Return result at configured aggregation level (country or region)."""
         if self.aggregation_level == "country":
             return self._aggregate_to_country(result)
         return self._filter_to_regions(result)
 
-    def _map_unit_level(
-        self, data: pd.Series | pd.DataFrame
-    ) -> pd.Series | pd.DataFrame:
+    def _map_unit_level(self, data: pd.DataFrame) -> pd.DataFrame:
         """Map the ``unit`` index level using ``UNITS_MAPPING``."""
         if isinstance(data.index, pd.MultiIndex):
             idx_frame = data.index.to_frame(index=False)
@@ -344,9 +343,6 @@ class Network_Processor:
         """
         processed = self._select_aggregation_result(result)
         processed = self._map_unit_level(processed)
-
-        if self.aggregate_per_year:
-            processed = processed.to_frame("value")
 
         df = pd.concat({variable: processed}, names=["variable"])
         return df.groupby(self._postprocess_group_levels()).sum()
@@ -489,6 +485,9 @@ class Network_Processor:
             for variable in self.dsd.variable.to_pandas()["variable"]:
                 result = self._execute_function_for_variable(variable, n, config=network_config)
                 if result is not None:
+                    # if aggregate_per_year, function returns a Series - convert to DataFrame.
+                    if self.aggregate_per_year == True:
+                        result = result.to_frame(name="value")
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
