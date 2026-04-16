@@ -1,6 +1,7 @@
 # General section
 country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all" for all regions/countries
-definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder
+definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder 
+convert_units: true # convert units from PyPSA to common definitions _optional, defaults to true_
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
 output_path: resources            # path the outputfile should be written to
 aggregation_level: "region"      # Options: "country" or "region"

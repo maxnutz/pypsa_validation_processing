@@ -19,6 +19,10 @@ class Network_Processor:
     Reads variable definitions from a definitions folder, executes the
     corresponding statistics functions to extract values from a given PyPSA
     NetworkCollection, and returns the results as a pyam.IamDataFrame.
+
+    Outputs are converted to the units of common definitions, set in the
+    definitions variable in ``definitions_path`` via
+    :meth:`pyam.IamDataFrame.convert_unit` if ``convert_units`` is ``True`` in config.
     """
 
     def __init__(
@@ -39,7 +43,7 @@ class Network_Processor:
                 f"Network results folder does not exist: {self.network_results_path}"
             )
 
-        definitions_path = self.config.get("definitions_path")
+        definitions_path = self.config.get("definitions_path", None)
         if definitions_path is None:
             raise ValueError(
                 f"'definition_path' not set in config at {self.config_path}"
@@ -48,6 +52,11 @@ class Network_Processor:
         if not self.definitions_path.exists():
             raise FileNotFoundError(
                 f"Definition folder does not exist: {self.definitions_path}"
+            )
+
+        if self.config.get("convert_units", True):
+            self.common_dsd: nomenclature.DataStructureDefinition | None = (
+                nomenclature.DataStructureDefinition(self.definitions_path)
             )
 
         default_mappings_path = (
@@ -416,9 +425,79 @@ class Network_Processor:
                 variable="variable_name",
                 unit="unit_pypsa",
             )
-        # perform unit conversion
+        dsd = self._convert_units_to_common_definitions(dsd)
 
         return dsd
+
+    def _convert_units_to_common_definitions(
+        self, iam_df: pyam.IamDataFrame
+    ) -> pyam.IamDataFrame:
+        """Convert variable units to units from ``self.common_dsd`` if configured."""
+        if self.common_dsd is None:
+            return iam_df
+
+        converted_parts: list[pyam.IamDataFrame] = []
+        for variable in dict.fromkeys(iam_df.variable):
+            var_df = iam_df.filter(variable=variable)
+            units = list(var_df.unit)
+            if not units:
+                raise ValueError(
+                    f"No unit found for variable '{variable}' in IamDataFrame."
+                )
+            if len(set(units)) != 1:
+                raise ValueError(
+                    f"Variable '{variable}' has multiple units in IamDataFrame: {sorted(set(units))}"
+                )
+
+            current_unit = units[0]
+            try:
+                target_unit = self._get_unit_from_common_definitions(variable)
+            except KeyError as exc:
+                raise RuntimeError(
+                    f"Variable '{variable}' not found in common definitions: {exc}"
+                ) from exc
+
+            if current_unit != target_unit:
+                try:
+                    var_df = var_df.convert_unit(current=current_unit, to=target_unit)
+                except (ValueError, pyam.IamDataError) as exc:
+                    raise ValueError(
+                        f"Failed to convert units for variable '{variable}' from "
+                        f"'{current_unit}' to '{target_unit}': {exc}"
+                    ) from exc
+
+            converted_parts.append(var_df)
+
+        return pyam.concat(converted_parts)
+
+    def _get_unit_from_common_definitions(self, variable: str) -> str:
+        """Return target unit from common definitions for a given variable."""
+        if self.common_dsd is None:
+            raise RuntimeError("Common definitions are not initialized.")
+
+        variables_df = self.common_dsd.variable.to_pandas()
+        variable_col = "variable" if "variable" in variables_df.columns else "Variable"
+        unit_col = "unit" if "unit" in variables_df.columns else "Unit"
+
+        if variable_col not in variables_df.columns:
+            raise KeyError("Variable column not found in common definitions.")
+        if unit_col not in variables_df.columns:
+            raise KeyError("Unit column not found in common definitions.")
+
+        match = variables_df.loc[variables_df[variable_col] == variable]
+        if match.empty:
+            raise KeyError(f"Variable '{variable}' not defined in common definitions.")
+        if len(match) > 1:
+            print(
+                f"WARNING: Multiple definitions found for variable '{variable}' in common definitions. Take first one: {match.iloc[0]}"
+            )
+
+        target_unit = match.iloc[0][unit_col]
+        if pd.isna(target_unit):
+            raise KeyError(
+                f"Unit information not found for variable '{variable}' in common definitions."
+            )
+        return str(target_unit)
 
     def _get_network_config(self, investment_year):
         # Load network-results config for this investment year

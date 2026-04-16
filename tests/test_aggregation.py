@@ -268,6 +268,7 @@ class TestPyamStructuringAllCountries:
     def test_per_country_regions_when_all_countries_aggregate(self, tmp_path: Path):
         """country='all' + aggregation_level='country' must produce one region per country."""
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        processor.common_dsd = None
         # Build a DataFrame with the same MultiIndex structure that
         # _postprocess_statistics_result produces for country="all" in country mode
         # (index: ["variable", "country", "unit"]).
@@ -283,6 +284,7 @@ class TestPyamStructuringAllCountries:
     def test_preserves_locations_when_all_countries_region(self, tmp_path: Path):
         """country='all' + aggregation_level='region' must use location as region."""
         processor = _make_processor(tmp_path, aggregation_level="region", country="all")
+        processor.common_dsd = None
         # Build a DataFrame with the same MultiIndex structure that
         # _postprocess_statistics_result produces in region mode.
         idx = pd.MultiIndex.from_tuples(
