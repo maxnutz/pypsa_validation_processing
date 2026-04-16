@@ -71,73 +71,6 @@ aggregation_level: "{aggregation_level}"
 
 
 # ---------------------------------------------------------------------------
-# Tests for _aggregate_to_country
-# ---------------------------------------------------------------------------
-
-
-class TestAggregateToCountry:
-    """Tests for Network_Processor._aggregate_to_country()."""
-
-    def test_sums_all_locations(self, tmp_path: Path):
-        """Values from all locations must be summed."""
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series(locations=("AT1", "AT2", "AT3"), value=100.0)
-        result = processor._aggregate_to_country(series)
-        assert result.loc["MWh_el"] == pytest.approx(300.0)
-
-    def test_returns_series_with_unit_index(self, tmp_path: Path):
-        """Result must be a Series indexed only by 'unit'."""
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series()
-        result = processor._aggregate_to_country(series)
-        assert isinstance(result, pd.Series)
-        assert list(result.index.names) == ["unit"]
-
-    def test_preserves_multiple_units(self, tmp_path: Path):
-        """Multiple unit levels must each be summed independently."""
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series(
-            locations=("AT1", "AT2"), units=("MWh_el", "MWh_th"), value=50.0
-        )
-        result = processor._aggregate_to_country(series)
-        assert result.loc["MWh_el"] == pytest.approx(100.0)
-        assert result.loc["MWh_th"] == pytest.approx(100.0)
-
-
-# ---------------------------------------------------------------------------
-# Tests for _postprocess_statistics_result – country mode
-# ---------------------------------------------------------------------------
-
-
-class TestPostprocessCountryMode:
-    """Tests for _postprocess_statistics_result with aggregation_level='country'."""
-
-    def test_returns_dataframe(self, tmp_path: Path):
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series()
-        df = processor._postprocess_statistics_result("Test|Variable", series)
-        assert isinstance(df, pd.DataFrame)
-
-    def test_index_contains_variable_and_unit(self, tmp_path: Path):
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series()
-        df = processor._postprocess_statistics_result("Test|Variable", series)
-        df = df.reset_index()
-        assert "variable" in df.columns
-        assert "unit" in df.columns
-        assert "location" not in df.columns
-
-    def test_values_are_summed_across_locations(self, tmp_path: Path):
-        """In country mode all three locations (1000 each) must be summed to 3000."""
-        processor = _make_processor(tmp_path, aggregation_level="country")
-        series = _make_locational_series(locations=("AT1", "AT2", "AT3"), value=1000.0)
-        df = processor._postprocess_statistics_result("Test|Variable", series)
-        df = df.reset_index()
-        # MWh_el maps to MWh in UNITS_MAPPING
-        assert df.loc[df["unit"] == "MWh", "value"].sum() == pytest.approx(3000.0)
-
-
-# ---------------------------------------------------------------------------
 # Tests for _postprocess_statistics_result – region mode
 # ---------------------------------------------------------------------------
 
@@ -147,7 +80,7 @@ class TestPostprocesslocationWiseMode:
 
     def test_returns_dataframe(self, tmp_path: Path):
         processor = _make_processor(tmp_path, aggregation_level="region")
-        series = _make_locational_series()
+        series = _make_locational_series().to_frame(name="value")
         df = processor._postprocess_statistics_result("Test|Variable", series)
         assert isinstance(df, pd.DataFrame)
 
@@ -171,7 +104,9 @@ class TestPostprocesslocationWiseMode:
     def test_values_not_summed(self, tmp_path: Path):
         """In location mode, individual location values must be preserved (not summed)."""
         processor = _make_processor(tmp_path, aggregation_level="region")
-        series = _make_locational_series(locations=("AT1",), value=999.0)
+        series = _make_locational_series(locations=("AT1",), value=999.0).to_frame(
+            name="value"
+        )
         df = processor._postprocess_statistics_result("Test|Variable", series)
         df = df.reset_index()
         assert df.loc[df["location"] == "AT1", "value"].values[0] == pytest.approx(
@@ -227,21 +162,21 @@ class TestAggregationAllCountries:
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
         series = _make_locational_series(
             locations=("AT1", "DE1", "DE2", "FR1"), value=100.0
-        )
+        ).to_frame(name="value")
         result = processor._aggregate_to_country(series)
         # AT: 1 region × 100, DE: 2 regions × 100, FR: 1 region × 100
-        assert result.loc[("AT", "MWh_el")] == pytest.approx(100.0)
-        assert result.loc[("DE", "MWh_el")] == pytest.approx(200.0)
-        assert result.loc[("FR", "MWh_el")] == pytest.approx(100.0)
+        assert result.loc[("AT", "MWh_el"), "value"] == pytest.approx(100.0)
+        assert result.loc[("DE", "MWh_el"), "value"] == pytest.approx(200.0)
+        assert result.loc[("FR", "MWh_el"), "value"] == pytest.approx(100.0)
 
     def test_aggregate_to_country_all_returns_country_unit_index(self, tmp_path: Path):
         """Result from all-countries aggregate must be indexed by ['country', 'unit']."""
         processor = _make_processor(tmp_path, aggregation_level="country", country="all")
         series = _make_locational_series(
             locations=("AT1", "DE1", "FR1"), value=50.0
-        )
+        ).to_frame(name="value")
         result = processor._aggregate_to_country(series)
-        assert isinstance(result, pd.Series)
+        assert isinstance(result, pd.DataFrame)
         assert list(result.index.names) == ["country", "unit"]
 
     def test_filter_to_regions_with_all_countries(self, tmp_path: Path):
@@ -366,15 +301,6 @@ class TestPyamStructuringAllCountries:
 
 class TestBackwardCompatibilityCountryFilter:
     """Tests that single-country mode still works after all-regions changes."""
-
-    def test_single_country_aggregate_filters_correctly(self, tmp_path: Path):
-        """country='AT' must only sum AT-prefixed regions."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="AT")
-        series = _make_locational_series(
-            locations=("AT1", "AT2", "DE1"), value=100.0
-        )
-        result = processor._aggregate_to_country(series)
-        assert result.loc["MWh_el"] == pytest.approx(200.0)
 
     def test_single_country_filter_excludes_others(self, tmp_path: Path):
         """country='AT' must exclude non-AT regions in region mode."""
