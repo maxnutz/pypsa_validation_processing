@@ -22,7 +22,7 @@ class Network_Processor:
 
     Outputs are converted to the units of common definitions, set in the
     definitions variable in ``definitions_path`` via
-    :meth:`pyam.IamDataFrame.convert_unit`.
+    :meth:`pyam.IamDataFrame.convert_unit` if ``convert_units`` is ``True`` in config.
     """
 
     def __init__(
@@ -54,8 +54,7 @@ class Network_Processor:
                 f"Definition folder does not exist: {self.definitions_path}"
             )
 
-        self.convert_units = self.config.get("convert_units", True)
-        if self.convert_units:
+        if self.config.get("convert_units", True):
             self.common_dsd: nomenclature.DataStructureDefinition | None = (
                 nomenclature.DataStructureDefinition(self.definitions_path)
             )
@@ -438,7 +437,7 @@ class Network_Processor:
             return iam_df
 
         converted_parts: list[pyam.IamDataFrame] = []
-        for variable in iam_df.variable:
+        for variable in dict.fromkeys(iam_df.variable):
             var_df = iam_df.filter(variable=variable)
             units = list(var_df.unit)
             if not units:
@@ -461,7 +460,7 @@ class Network_Processor:
             if current_unit != target_unit:
                 try:
                     var_df = var_df.convert_unit(current=current_unit, to=target_unit)
-                except Exception as exc:
+                except (ValueError, pyam.IamDataError) as exc:
                     raise ValueError(
                         f"Failed to convert units for variable '{variable}' from "
                         f"'{current_unit}' to '{target_unit}': {exc}"
@@ -489,8 +488,8 @@ class Network_Processor:
         if match.empty:
             raise KeyError(f"Variable '{variable}' not defined in common definitions.")
         if len(match) > 1:
-            raise KeyError(
-                f"Multiple definitions found for variable '{variable}' in common definitions. Take first one: {match.iloc[0]}"
+            print(
+                f"WARNING: Multiple definitions found for variable '{variable}' in common definitions. Take first one: {match.iloc[0]}"
             )
 
         target_unit = match.iloc[0][unit_col]

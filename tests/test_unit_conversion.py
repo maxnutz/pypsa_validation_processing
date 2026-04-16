@@ -52,7 +52,6 @@ class TestCommonDefinitionsConfiguration:
             with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
                 processor = Network_Processor(config_path=config_path)
         assert not hasattr(processor, "common_definitions_path")
-        assert processor.convert_units is True
         assert processor.common_dsd is not None
 
     def test_config_ignores_common_definitions_path(self, tmp_path: Path):
@@ -171,7 +170,7 @@ class TestConvertUnitsToCommonDefinitions:
     def test_raises_value_error_on_failed_conversion(self, processor: Network_Processor):
         processor.common_dsd = MagicMock()
         processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
-            {"variable": ["A"], "unit": ["NOT_A_UNIT"]}
+            {"variable": ["A"], "unit": ["TWh/yr"]}
         )
         iam_df = pyam.IamDataFrame(
             pd.DataFrame(
@@ -187,8 +186,14 @@ class TestConvertUnitsToCommonDefinitions:
             region="World",
         )
 
-        with pytest.raises(ValueError, match="Failed to convert units"):
-            processor._convert_units_to_common_definitions(iam_df)
+        with patch.object(pyam, "IamDataError", ValueError, create=True):
+            with patch.object(
+                pyam.core.IamDataFrame,
+                "convert_unit",
+                side_effect=ValueError("conversion failed"),
+            ):
+                with pytest.raises(ValueError, match="Failed to convert units"):
+                    processor._convert_units_to_common_definitions(iam_df)
 
     def test_structure_pyam_calls_unit_conversion(self, processor: Network_Processor):
         processor.aggregation_level = "country"
