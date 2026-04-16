@@ -889,6 +889,7 @@ output_path: {tmp_path / 'output.xlsx'}
         processor = self._setup_processor(tmp_path)
         processor.aggregation_level = "country"
         processor.country = "AT"
+        processor.common_dsd = None
 
         df = pd.DataFrame(
             {
@@ -911,6 +912,7 @@ output_path: {tmp_path / 'output.xlsx'}
         processor = self._setup_processor(tmp_path)
         processor.aggregation_level = "country"
         processor.country = "all"
+        processor.common_dsd = None
 
         df = pd.DataFrame(
             {
@@ -933,6 +935,7 @@ output_path: {tmp_path / 'output.xlsx'}
         """Test structure_pyam_from_pandas with region aggregation level."""
         processor = self._setup_processor(tmp_path)
         processor.aggregation_level = "region"
+        processor.common_dsd = None
 
         df = pd.DataFrame(
             {

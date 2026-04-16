@@ -44,32 +44,31 @@ def processor(tmp_path: Path) -> Network_Processor:
 
 
 class TestCommonDefinitionsConfiguration:
-    """Test common_definitions_path initialization."""
+    """Test unit-conversion configuration initialization."""
 
     def test_config_without_common_definitions_path(self, tmp_path: Path):
         config_path = _make_config(tmp_path)
         with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
             with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
                 processor = Network_Processor(config_path=config_path)
-        assert processor.common_definitions_path is None
-        assert processor.common_dsd is None
+        assert not hasattr(processor, "common_definitions_path")
+        assert processor.convert_units is True
+        assert processor.common_dsd is not None
 
-    def test_config_with_nonexistent_common_definitions_path(self, tmp_path: Path):
-        missing = tmp_path / "missing_common"
-        config_path = _make_config(
-            tmp_path, extra=f"common_definitions_path: {missing}\n"
-        )
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
-            with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
-                with pytest.raises(FileNotFoundError, match="Common definitions folder"):
-                    Network_Processor(config_path=config_path)
-
-    def test_common_dsd_initialized_correctly(self, tmp_path: Path):
+    def test_config_ignores_common_definitions_path(self, tmp_path: Path):
         common_defs = tmp_path / "common_defs"
         common_defs.mkdir()
         config_path = _make_config(
             tmp_path, extra=f"common_definitions_path: {common_defs}\n"
         )
+        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+            with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
+                processor = Network_Processor(config_path=config_path)
+        assert not hasattr(processor, "common_definitions_path")
+        assert processor.common_dsd is not None
+
+    def test_common_dsd_initialized_correctly(self, tmp_path: Path):
+        config_path = _make_config(tmp_path)
         common_dsd = MagicMock()
         definitions_dsd = MagicMock()
         with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
@@ -78,8 +77,9 @@ class TestCommonDefinitionsConfiguration:
                 side_effect=[common_dsd, definitions_dsd],
             ) as mock_dsd:
                 processor = Network_Processor(config_path=config_path)
-        assert processor.common_definitions_path == common_defs
+        assert not hasattr(processor, "common_definitions_path")
         assert processor.common_dsd is common_dsd
+        assert processor.dsd is definitions_dsd
         assert mock_dsd.call_count == 2
 
 
