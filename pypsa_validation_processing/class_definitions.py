@@ -248,13 +248,13 @@ class Network_Processor:
         )
         return result.loc[mask].groupby("unit").sum()
 
-    def _filter_to_regions(self, result: pd.Series) -> pd.DataFrame:
+    def _filter_to_regions(self, result: pd.DataFrame) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
 
         Parameters
         ----------
-        result : pd.Series
-            Series with MultiIndex containing at least ``location`` and ``unit``
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing at least ``location`` and ``unit``
             levels, as returned by statistics functions.
 
         Returns
