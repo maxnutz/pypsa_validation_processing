@@ -70,3 +70,6 @@ resources/
 sister_packages/
 *.xlsx
 *.csv
+pypsa_validation_processing/configs/*
+!pypsa_validation_processing/configs/config.default.yaml
+!pypsa_validation_processing/config/mapping.default.yaml
