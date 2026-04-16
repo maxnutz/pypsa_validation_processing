@@ -1,9 +1,11 @@
 from __future__ import annotations
+import datetime
 import glob
 import importlib
 import inspect
 import os
 from pathlib import Path
+import re
 import yaml
 import pandas as pd
 import pypsa
@@ -11,6 +13,58 @@ import nomenclature
 import pyam
 
 from pypsa_validation_processing.utils import EU27_COUNTRY_CODES, UNITS_MAPPING
+
+
+def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert timestamp-like columns to tz-aware pandas.Timestamp (+01:00)."""
+    fixed_tz = datetime.timezone(datetime.timedelta(hours=1))
+    cols = list(df.columns)
+    idx_name = df.columns.name
+    try:
+        parsed = pd.to_datetime(cols, errors="coerce", format="mixed")
+    except TypeError:
+        parsed = pd.to_datetime(cols, errors="coerce")
+
+    converted_list: list[object] = []
+    nat_list: list[object] = []
+
+    for i, col in enumerate(cols):
+        is_year_only = isinstance(col, str) and re.match(r"^\d{4}$", col) is not None
+        parsed_value = parsed[i]
+
+        if pd.isna(parsed_value) and not is_year_only:
+            continue
+
+        ts = (
+            parsed_value
+            if not pd.isna(parsed_value)
+            else pd.Timestamp(f"{col}-01-01 00:00:00")
+        )
+
+        if ts.tz is not None:
+            cols[i] = ts
+            converted_list.append(col)
+            continue
+
+        try:
+            ts_tz = ts.tz_localize(fixed_tz)
+        except Exception as exc:
+            print(
+                f"WARNING: format_timestamps: failed to localize column {col!r}: {exc}. "
+                "Setting label to pd.NaT"
+            )
+            ts_tz = pd.NaT
+            nat_list.append(col)
+
+        cols[i] = ts_tz
+        if not pd.isna(ts_tz):
+            converted_list.append(col)
+
+    df.columns = pd.Index(cols, name=idx_name)
+    print("format_timestamps: converted columns:", converted_list)
+    if nat_list:
+        print("format_timestamps: columns set to NaT:", nat_list)
+    return df
 
 
 class Network_Processor:
@@ -379,6 +433,7 @@ class Network_Processor:
         appears as a separate row.  When ``aggregation_level="region"``, the
         ``location`` column in *df* is used directly.
         """
+        df = format_timestamps(df)
         # add 'variable' and 'unit' columns
         df = df.reset_index()
         # rename columns if needed
