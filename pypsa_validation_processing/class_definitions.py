@@ -60,8 +60,10 @@ class Network_Processor:
         )
 
         self.country: str = self.config.get("country", None)
-        if self.country == None:
-            raise ValueError(f"'country' not set in config at {self.config_path}")
+        if self.country is None or not self._is_valid_country_identifier(self.country):
+            raise ValueError(
+                f"'country' must be an ISO 3166-1 alpha-2 code or 'all', got: {self.country!r}"
+            )
         self.model_name: str = self.config["model_name"]
         self.scenario_name: str = self.config["scenario_name"]
         if self.model_name == None or self.scenario_name == None:
@@ -85,11 +87,18 @@ class Network_Processor:
             )
         self._function_parameter_cache: dict[object, set[str]] = {}
         self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
-        default_path_dsd_with_values = (
-            Path(__file__).resolve().parent
-            / "resources"
-            / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
-        )
+        if self.country == "all":
+            default_path_dsd_with_values = (
+                Path(__file__).resolve().parent
+                / "resources"
+                / f"PYPSA_{self.model_name}_{self.scenario_name}.xlsx"
+            )
+        else:
+            default_path_dsd_with_values = (
+                Path(__file__).resolve().parent
+                / "resources"
+                / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
+            )
         self.path_dsd_with_values: Path = (
             Path(self.config["output_path"])
             if "output_path" in self.config
@@ -100,9 +109,14 @@ class Network_Processor:
         return (
             f"Network_Processor\n"
             f"  country: {self.country}\n"
+            f"  aggregation_level: {self.aggregation_level}\n"
             f"  network_results_path: {self.network_results_path}\n"
             f"  definitions_path: {self.definitions_path}\n"
         )
+
+    def _is_valid_country_identifier(self, country: str) -> bool:
+        """Check if country is a valid ISO code or the special value 'all'."""
+        return country == "all" or country in EU27_COUNTRY_CODES
 
     def _read_config(self) -> dict:
         """Read and return the YAML configuration file."""
@@ -191,20 +205,40 @@ class Network_Processor:
             kwargs["aggregate_per_year"] = self.aggregate_per_year
         return func(n, **kwargs)
 
-    def _aggregate_to_country(self, result: pd.Series) -> pd.Series:
-        """Aggregate a regional Series to country level by summing all regions.
+    def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
+        """Aggregate a regional Series/DataFrame to country level by summing regions.
 
         Parameters
         ----------
-        result : pd.Series
-            Series with MultiIndex containing at least ``location`` and ``unit``
-            levels, as returned by statistics functions.
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing at least ``location``
+            and ``unit`` levels
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing only the ``unit`` level.
+        pd.DataFrame
+            When ``self.country`` is a specific code: DataFrame with
+            MultiIndex containing only the ``unit`` level (regions filtered to
+            the configured country and summed).
+
+            When ``self.country == "all"``: DataFrame with MultiIndex
+            ``["country", "unit"]`` where each country's regions are summed
+            independently (country derived from the first two characters of the
+            location identifier).
         """
+        if self.country == "all":
+            # Derive 2-letter country code from location prefix, then group by
+            # (country, unit) so each country is summed independently.
+            locations = result.index.get_level_values("location")
+            countries = pd.Index([loc[:2] for loc in locations], name="country")
+            units = result.index.get_level_values("unit")
+            new_index = pd.MultiIndex.from_arrays(
+                [countries, units], names=["country", "unit"]
+            )
+            result = pd.DataFrame(
+                result.values, index=new_index, columns=result.columns
+            )
+            return result.groupby(["country", "unit"]).sum()
         mask = result.index.get_level_values("location").isin(
             [
                 reg
@@ -214,20 +248,28 @@ class Network_Processor:
         )
         return result.loc[mask].groupby("unit").sum()
 
-    def _filter_to_regions(self, result: pd.Series) -> pd.Series:
+    def _filter_to_regions(self, result: pd.DataFrame) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
 
         Parameters
         ----------
-        result : pd.Series
-            Series with MultiIndex containing at least ``location`` and ``unit``
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing at least ``location`` and ``unit``
             levels, as returned by statistics functions.
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing levels ``location`` and ``unit``."""
+        pd.DataFrame
+            Datafrme with MultiIndex containing levels ``location`` and ``unit``.
 
+        Notes
+        -----
+        When ``self.country == "all"``, all regions are returned without
+        filtering.  When a specific country code is configured, only regions
+        whose location starts with that code are returned.
+        """
+        if self.country == "all":
+            return result
         mask = result.index.get_level_values("location").isin(
             [
                 reg
@@ -239,15 +281,13 @@ class Network_Processor:
 
     def _select_aggregation_result(
         self, result: pd.Series | pd.DataFrame
-    ) -> pd.Series | pd.DataFrame:
+    ) -> pd.DataFrame:
         """Return result at configured aggregation level (country or region)."""
         if self.aggregation_level == "country":
             return self._aggregate_to_country(result)
         return self._filter_to_regions(result)
 
-    def _map_unit_level(
-        self, data: pd.Series | pd.DataFrame
-    ) -> pd.Series | pd.DataFrame:
+    def _map_unit_level(self, data: pd.DataFrame) -> pd.DataFrame:
         """Map the ``unit`` index level using ``UNITS_MAPPING``."""
         if isinstance(data.index, pd.MultiIndex):
             idx_frame = data.index.to_frame(index=False)
@@ -262,6 +302,8 @@ class Network_Processor:
     def _postprocess_group_levels(self) -> list[str]:
         """Return grouping levels based on configured aggregation granularity."""
         if self.aggregation_level == "country":
+            if self.country == "all":
+                return ["variable", "country", "unit"]
             return ["variable", "unit"]
         return ["variable", "location", "unit"]
 
@@ -302,9 +344,6 @@ class Network_Processor:
         processed = self._select_aggregation_result(result)
         processed = self._map_unit_level(processed)
 
-        if self.aggregate_per_year:
-            processed = processed.to_frame("value")
-
         df = pd.concat({variable: processed}, names=["variable"])
         return df.groupby(self._postprocess_group_levels()).sum()
 
@@ -323,10 +362,13 @@ class Network_Processor:
 
         Notes
         -----
-        When ``aggregation_level="country"``, the region is set to the full
-        country name from :data:`EU27_COUNTRY_CODES`.  When
-        ``aggregation_level="region"``, the ``location`` column in *df*
-        is used directly.
+        When ``aggregation_level="country"`` and ``country`` is a specific ISO
+        code, the region is set to the full country name from
+        :data:`EU27_COUNTRY_CODES`.  When ``country="all"``, the ``country``
+        column in *df* (populated by :meth:`_aggregate_to_country`) is mapped
+        to full country names and used as the region dimension, so each country
+        appears as a separate row.  When ``aggregation_level="region"``, the
+        ``location`` column in *df* is used directly.
         """
         # add 'variable' and 'unit' columns
         df = df.reset_index()
@@ -340,15 +382,30 @@ class Network_Processor:
         )
 
         if self.aggregation_level == "country":
-            region = EU27_COUNTRY_CODES.get(self.country, self.country)
-            dsd = pyam.IamDataFrame(
-                data=df.drop_duplicates(),
-                model=self.model_name,
-                scenario=self.scenario_name,
-                region=region,
-                variable="variable_name",
-                unit="unit_pypsa",
-            )
+            if self.country == "all":
+                # Map 2-letter country codes in the "country" column to full
+                # country names so each country becomes its own pyam region.
+                df["country"] = df["country"].map(
+                    lambda c: EU27_COUNTRY_CODES.get(c, c)
+                )
+                dsd = pyam.IamDataFrame(
+                    data=df.drop_duplicates(),
+                    model=self.model_name,
+                    scenario=self.scenario_name,
+                    region="country",
+                    variable="variable_name",
+                    unit="unit_pypsa",
+                )
+            else:
+                region = EU27_COUNTRY_CODES.get(self.country, self.country)
+                dsd = pyam.IamDataFrame(
+                    data=df.drop_duplicates(),
+                    model=self.model_name,
+                    scenario=self.scenario_name,
+                    region=region,
+                    variable="variable_name",
+                    unit="unit_pypsa",
+                )
         else:
             # region: use column "location" for pyams region-variable
             dsd = pyam.IamDataFrame(
@@ -410,9 +467,13 @@ class Network_Processor:
         Applies aggregation based on ``self.aggregation_level`` config.
         """
         merge_keys = (
-            ["variable", "unit"]
-            if self.aggregation_level == "country"
-            else ["variable", "location", "unit"]
+            ["variable", "country", "unit"]
+            if (self.aggregation_level == "country" and self.country == "all")
+            else (
+                ["variable", "unit"]
+                if self.aggregation_level == "country"
+                else ["variable", "location", "unit"]
+            )
         )
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):
@@ -424,6 +485,9 @@ class Network_Processor:
             for variable in self.dsd.variable.to_pandas()["variable"]:
                 result = self._execute_function_for_variable(variable, n, config=network_config)
                 if result is not None:
+                    # if aggregate_per_year, function returns a Series - convert to DataFrame.
+                    if self.aggregate_per_year == True:
+                        result = result.to_frame(name="value")
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
@@ -483,7 +547,10 @@ class Network_Processor:
             )
 
         base_dir = self.path_dsd_with_values
-        base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
+        if self.country == "all":
+            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}"
+        else:
+            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
 
         if self.aggregate_per_year:
             file_path = base_dir / f"{base_filename}.xlsx"
@@ -491,7 +558,10 @@ class Network_Processor:
             self.dsd_with_values.to_excel(file_path)
             return file_path
         else:
-            folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
+            if self.country == "all":
+                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}"
+            else:
+                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
             folder_path = base_dir / folder_name
             folder_path.mkdir(parents=True, exist_ok=True)
             for investment_year, iam_df in self.dsd_with_values:
