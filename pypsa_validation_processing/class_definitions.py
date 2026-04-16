@@ -20,8 +20,8 @@ class Network_Processor:
     corresponding statistics functions to extract values from a given PyPSA
     NetworkCollection, and returns the results as a pyam.IamDataFrame.
 
-    When ``common_definitions_path`` is configured, output units are
-    mandatorily converted to match those common definitions via
+    Outputs are converted to the units of common definitions, set in the
+    definitions variable in ``definitions_path`` via
     :meth:`pyam.IamDataFrame.convert_unit`.
     """
 
@@ -43,7 +43,7 @@ class Network_Processor:
                 f"Network results folder does not exist: {self.network_results_path}"
             )
 
-        definitions_path = self.config.get("definitions_path")
+        definitions_path = self.config.get("definitions_path", None)
         if definitions_path is None:
             raise ValueError(
                 f"'definition_path' not set in config at {self.config_path}"
@@ -53,19 +53,12 @@ class Network_Processor:
             raise FileNotFoundError(
                 f"Definition folder does not exist: {self.definitions_path}"
             )
-        common_definitions_path = self.config.get("common_definitions_path")
-        if common_definitions_path is not None:
-            self.common_definitions_path: Path | None = Path(common_definitions_path)
-            if not self.common_definitions_path.exists():
-                raise FileNotFoundError(
-                    f"Common definitions folder does not exist: {self.common_definitions_path}"
-                )
+
+        self.convert_units = self.config.get("convert_units", True)
+        if self.convert_units:
             self.common_dsd: nomenclature.DataStructureDefinition | None = (
-                nomenclature.DataStructureDefinition(self.common_definitions_path)
+                nomenclature.DataStructureDefinition(self.definitions_path)
             )
-        else:
-            self.common_definitions_path = None
-            self.common_dsd = None
 
         default_mappings_path = (
             Path(__file__).resolve().parent / "configs" / "mapping.default.yaml"
@@ -495,6 +488,10 @@ class Network_Processor:
         match = variables_df.loc[variables_df[variable_col] == variable]
         if match.empty:
             raise KeyError(f"Variable '{variable}' not defined in common definitions.")
+        if len(match) > 1:
+            raise KeyError(
+                f"Multiple definitions found for variable '{variable}' in common definitions. Take first one: {match.iloc[0]}"
+            )
 
         target_unit = match.iloc[0][unit_col]
         if pd.isna(target_unit):
