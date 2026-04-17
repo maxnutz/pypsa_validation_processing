@@ -450,9 +450,9 @@ class Network_Processor:
             if self.country == "all":
                 # Map 2-letter country codes in the "country" column to full
                 # country names so each country becomes its own pyam region.
-                df["country"] = df["country"].map(
-                    lambda c: EU27_COUNTRY_CODES.get(c, c)
-                )
+                # df["country"] = df["country"].map(
+                #     lambda c: EU27_COUNTRY_CODES.get(c, c)
+                # )
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
@@ -462,7 +462,7 @@ class Network_Processor:
                     unit="unit_pypsa",
                 )
             else:
-                region = EU27_COUNTRY_CODES.get(self.country, self.country)
+                # region = EU27_COUNTRY_CODES.get(self.country, self.country)
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
