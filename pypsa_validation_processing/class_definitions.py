@@ -133,6 +133,11 @@ class Network_Processor:
             raise ValueError(
                 f"'model_name' and 'scenario_name' must be set in config at {self.config_path}"
             )
+        self.model_name_path_token: str = self._sanitize_path_token(self.model_name)
+        self.scenario_name_path_token: str = self._sanitize_path_token(
+            self.scenario_name
+        )
+        self.country_path_token: str = self._sanitize_path_token(self.country)
         self.network_collection = self._read_pypsa_network_collection()
         self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
         self.functions_dict: dict[str, str | list] = self._read_mappings()
@@ -154,13 +159,13 @@ class Network_Processor:
             default_path_dsd_with_values = (
                 Path(__file__).resolve().parent
                 / "resources"
-                / f"PYPSA_{self.model_name}_{self.scenario_name}.xlsx"
+                / f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}.xlsx"
             )
         else:
             default_path_dsd_with_values = (
                 Path(__file__).resolve().parent
                 / "resources"
-                / f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}.xlsx"
+                / f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}.xlsx"
             )
         self.path_dsd_with_values: Path = (
             Path(self.config["output_path"])
@@ -176,6 +181,11 @@ class Network_Processor:
             f"  network_results_path: {self.network_results_path}\n"
             f"  definitions_path: {self.definitions_path}\n"
         )
+
+    @staticmethod
+    def _sanitize_path_token(value: str) -> str:
+        """Strip and replace whitespace runs with underscores for path safety."""
+        return re.sub(r"\s+", "_", value.strip())
 
     def _is_valid_country_identifier(self, country: str) -> bool:
         """Check if country is a valid ISO code or the special value 'all'."""
@@ -682,9 +692,13 @@ class Network_Processor:
 
         base_dir = self.path_dsd_with_values
         if self.country == "all":
-            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}"
+            base_filename = (
+                f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}"
+            )
         else:
-            base_filename = f"PYPSA_{self.model_name}_{self.scenario_name}_{self.country}"
+            base_filename = (
+                f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
+            )
 
         if self.aggregate_per_year:
             file_path = base_dir / f"{base_filename}.xlsx"
@@ -693,9 +707,13 @@ class Network_Processor:
             return file_path
         else:
             if self.country == "all":
-                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}"
+                folder_name = (
+                    f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}"
+                )
             else:
-                folder_name = f"PYPSA_timeseries_{self.model_name}_{self.scenario_name}_{self.country}"
+                folder_name = (
+                    f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
+                )
             folder_path = base_dir / folder_name
             folder_path.mkdir(parents=True, exist_ok=True)
             for investment_year, iam_df in self.dsd_with_values:
