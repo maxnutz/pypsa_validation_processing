@@ -6,6 +6,7 @@ convert_units: true # convert units from PyPSA to common definitions _optional, 
 output_path: resources            # path the outputfile should be written to
 aggregation_level: "region"      # Options: "country" or "region"
 aggregate_per_year: true          # true: one value per investment year; false: full time series per year
+map_country_codes_to_names: false # true: map AT -> Austria in output regions; false: keep country/region codes
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results

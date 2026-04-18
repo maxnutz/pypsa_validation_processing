@@ -148,6 +148,14 @@ class Network_Processor:
                 f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
                 f"Must be true or false."
             )
+        self.map_country_codes_to_names: bool = self.config.get(
+            "map_country_codes_to_names", False
+        )
+        if not isinstance(self.map_country_codes_to_names, bool):
+            raise ValueError(
+                f"Invalid map_country_codes_to_names: '{self.map_country_codes_to_names}'. "
+                f"Must be true or false."
+            )
         self._function_parameter_cache: dict[object, set[str]] = {}
         self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
         if self.country == "all":
@@ -425,13 +433,13 @@ class Network_Processor:
 
         Notes
         -----
-        When ``aggregation_level="country"`` and ``country`` is a specific ISO
-        code, the region is set to the full country name from
-        :data:`EU27_COUNTRY_CODES`.  When ``country="all"``, the ``country``
-        column in *df* (populated by :meth:`_aggregate_to_country`) is mapped
-        to full country names and used as the region dimension, so each country
-        appears as a separate row.  When ``aggregation_level="region"``, the
-        ``location`` column in *df* is used directly.
+        When ``aggregation_level="country"``, region labels are country codes by
+        default. If ``map_country_codes_to_names`` is ``True`` in config, country
+        codes are mapped to full names via :data:`EU27_COUNTRY_CODES`. For
+        ``country="all"``, the ``country`` column in *df* (populated by
+        :meth:`_aggregate_to_country`) is used as the region dimension, one row
+        per country. When ``aggregation_level="region"``, the ``location`` column
+        in *df* is used directly.
         """
         df = format_timestamps(df)
         # add 'variable' and 'unit' columns
@@ -447,11 +455,12 @@ class Network_Processor:
 
         if self.aggregation_level == "country":
             if self.country == "all":
-                # Map 2-letter country codes in the "country" column to full
-                # country names so each country becomes its own pyam region.
-                df["country"] = df["country"].map(
-                    lambda c: EU27_COUNTRY_CODES.get(c, c)
-                )
+                if self.map_country_codes_to_names:
+                    # Map 2-letter country codes in the "country" column to full
+                    # country names so each country becomes its own pyam region.
+                    df["country"] = df["country"].map(
+                        lambda c: EU27_COUNTRY_CODES.get(c, c)
+                    )
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
@@ -461,7 +470,10 @@ class Network_Processor:
                     unit="unit_pypsa",
                 )
             else:
-                region = EU27_COUNTRY_CODES.get(self.country, self.country)
+                if self.map_country_codes_to_names:
+                    region = EU27_COUNTRY_CODES.get(self.country, self.country)
+                else:
+                    region = self.country
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
