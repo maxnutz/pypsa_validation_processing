@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -389,6 +390,81 @@ class TestNetworkProcessorOutputGeneration:
                 mock_iam_2030.to_excel.assert_called_once_with(
                     expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
                 )
+
+    def test_write_output_sanitizes_whitespace_in_aggregate_filename(
+        self, tmp_path: Path
+    ):
+        """Output filename must not contain whitespace when model/scenario contain it."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: AT
+model_name: "  My\\t  Model   Name  "
+scenario_name: " Scenario\\t Name "
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                processor.dsd_with_values = MagicMock()
+
+                result_path = processor.write_output_to_xlsx()
+
+                assert result_path.name == "PYPSA_My_Model_Name_Scenario_Name_AT.xlsx"
+                assert re.search(r"\s", str(result_path)) is None
+
+    def test_write_output_sanitizes_whitespace_in_timeseries_naming(
+        self, tmp_path: Path
+    ):
+        """Timeseries folder and per-year filenames must not contain whitespace."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: all
+model_name: " Model\\t  Name "
+scenario_name: "  Scenario   Name\\t "
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                processor.aggregate_per_year = False
+                mock_iam_2020 = MagicMock()
+                processor.dsd_with_values = [(2020, mock_iam_2020)]
+
+                result_path = processor.write_output_to_xlsx()
+
+                assert result_path.name == "PYPSA_timeseries_Model_Name_Scenario_Name"
+                mock_iam_2020.to_excel.assert_called_once_with(
+                    result_path / "PYPSA_Model_Name_Scenario_Name_2020.xlsx"
+                )
+                assert re.search(r"\s", str(result_path)) is None
 
     def test_timeseries_column_year_matches_investment_year(
         self, mock_config_file: Path, tmp_path: Path
@@ -957,6 +1033,37 @@ output_path: {tmp_path / 'output.xlsx'}
                 processor.structure_pyam_from_pandas(df)
             mock_iam.assert_not_called()
 
+    def test_structure_pyam_preserves_original_model_and_scenario_metadata(
+        self, tmp_path: Path
+    ):
+        """IAMC metadata must keep original model/scenario strings (incl. spaces)."""
+        processor = self._setup_processor(tmp_path)
+        processor.model_name = "  Model  Name  "
+        processor.scenario_name = " Scenario\tName "
+        processor.aggregation_level = "country"
+        processor.country = "AT"
+        processor.common_dsd = None
+
+        df = pd.DataFrame(
+            {pd.Timestamp("2020-01-01"): [1000.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("Final Energy|Electricity", "MWh_el")],
+                names=["variable", "unit"],
+            ),
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+        ) as mock_iam:
+            mock_iam_df = MagicMock()
+            mock_iam.return_value = mock_iam_df
+
+            result = processor.structure_pyam_from_pandas(df)
+
+            assert result is mock_iam_df
+            assert mock_iam.call_args.kwargs["model"] == "  Model  Name  "
+            assert mock_iam.call_args.kwargs["scenario"] == " Scenario\tName "
+
 
 # ---------------------------------------------------------------------------
 # Tests for file I/O and network loading
@@ -1159,3 +1266,47 @@ output_path: {tmp_path / 'output.xlsx'}
                 # For country="all", filename should not include country suffix
                 assert "PYPSA_MyModel_MyScenario.xlsx" in str(result_path)
                 assert "PYPSA_MyModel_MyScenario_all.xlsx" not in str(result_path)
+
+    def test_default_output_path_sanitizes_whitespace(self, tmp_path: Path):
+        """Default output filename should sanitize whitespace in path tokens."""
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+
+        config_content = f"""
+country: AT
+model_name: "  Model\\t Name  "
+scenario_name: "  Scenario   Name "
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert (
+                    processor.path_dsd_with_values.name
+                    == "PYPSA_Model_Name_Scenario_Name_AT.xlsx"
+                )
+                assert re.search(r"\s", processor.path_dsd_with_values.name) is None
+
+    def test_sanitize_path_token_collapses_mixed_whitespace(self):
+        """Path token sanitization should trim and collapse mixed whitespace."""
+        assert (
+            Network_Processor._sanitize_path_token(" \tMy   Model\t Name  \n")
+            == "My_Model_Name"
+        )
+
+    def test_sanitize_path_token_edge_cases(self):
+        """Path token sanitization should handle edge cases consistently."""
+        assert Network_Processor._sanitize_path_token("") == ""
+        assert Network_Processor._sanitize_path_token("   ") == ""
+        assert Network_Processor._sanitize_path_token("NoWhitespace") == "NoWhitespace"
