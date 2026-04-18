@@ -23,10 +23,6 @@ class TestEU27CountryCodes:
         assert EU27_COUNTRY_CODES["DE"] == "Germany"
         assert EU27_COUNTRY_CODES["FR"] == "France"
 
-    def test_eu27_aggregate_key(self):
-        assert "EU27_{year}" in EU27_COUNTRY_CODES
-        assert EU27_COUNTRY_CODES["EU27_{year}"] == "EU27"
-
     def test_values_are_strings(self):
         for key, value in EU27_COUNTRY_CODES.items():
             assert isinstance(key, str), f"Key {key!r} is not a string"

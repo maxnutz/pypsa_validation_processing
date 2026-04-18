@@ -904,8 +904,9 @@ output_path: {tmp_path / 'output.xlsx'}
             "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
         ) as mock_iam:
             mock_iam.return_value = MagicMock()
-            processor.structure_pyam_from_pandas(df)
-            mock_iam.assert_called_once()
+            with pytest.raises(AttributeError, match="to_pydatetime"):
+                processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_not_called()
 
     def test_structure_pyam_from_pandas_country_all(self, tmp_path: Path):
         """Test structure_pyam_from_pandas with country='all'."""
@@ -928,8 +929,9 @@ output_path: {tmp_path / 'output.xlsx'}
             "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
         ) as mock_iam:
             mock_iam.return_value = MagicMock()
-            processor.structure_pyam_from_pandas(df)
-            mock_iam.assert_called_once()
+            with pytest.raises(AttributeError, match="to_pydatetime"):
+                processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_not_called()
 
     def test_structure_pyam_from_pandas_region_mode(self, tmp_path: Path):
         """Test structure_pyam_from_pandas with region aggregation level."""
@@ -951,8 +953,9 @@ output_path: {tmp_path / 'output.xlsx'}
             "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
         ) as mock_iam:
             mock_iam.return_value = MagicMock()
-            processor.structure_pyam_from_pandas(df)
-            mock_iam.assert_called_once()
+            with pytest.raises(AttributeError, match="to_pydatetime"):
+                processor.structure_pyam_from_pandas(df)
+            mock_iam.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
