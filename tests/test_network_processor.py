@@ -522,6 +522,48 @@ output_path: {tmp_path / 'output.xlsx'}
                 with pytest.raises(ValueError, match="Invalid aggregation_level"):
                     Network_Processor(config_path=config_file)
 
+    def test_map_country_codes_to_names_defaults_to_false(self, tmp_path: Path):
+        """Test that map_country_codes_to_names defaults to False if not specified."""
+        config_file = self._make_config_file(tmp_path)
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.map_country_codes_to_names is False
+
+    def test_map_country_codes_to_names_from_config_true(self, tmp_path: Path):
+        """Test that map_country_codes_to_names=true is read from config."""
+        config_file = self._make_config_file(
+            tmp_path, extra="map_country_codes_to_names: true"
+        )
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_file)
+                assert processor.map_country_codes_to_names is True
+
+    def test_map_country_codes_to_names_validation_non_bool(self, tmp_path: Path):
+        """Test that non-boolean map_country_codes_to_names raises ValueError."""
+        config_file = self._make_config_file(
+            tmp_path, extra='map_country_codes_to_names: "yes"'
+        )
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(
+                    ValueError, match="Invalid map_country_codes_to_names"
+                ):
+                    Network_Processor(config_path=config_file)
+
 
 # ---------------------------------------------------------------------------
 # Tests for country="all" initialization
