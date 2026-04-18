@@ -48,7 +48,7 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
 
         try:
             ts_tz = ts.tz_localize(fixed_tz)
-        except Exception as exc:
+        except (TypeError, ValueError) as exc:
             print(
                 f"WARNING: format_timestamps: failed to localize column {col!r}: {exc}. "
                 "Setting label to pd.NaT"
@@ -62,9 +62,8 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
 
     py_datetimes = pd.Index(cols, name=idx_name).to_pydatetime()
     df.columns = pd.Index(py_datetimes, dtype="object", name=idx_name)
-    print("format_timestamps: converted columns:", converted_list)
     if nat_list:
-        print("format_timestamps: columns set to NaT:", nat_list)
+        print("WARNING: format_timestamps: columns set to NaT:", nat_list)
     return df
 
 
