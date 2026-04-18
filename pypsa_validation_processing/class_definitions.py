@@ -60,8 +60,8 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
         if not pd.isna(ts_tz):
             converted_list.append(col)
 
-    # Keep mixed labels (timestamps + non-time columns) as an object index.
-    df.columns = pd.Index(cols, dtype="object", name=idx_name)
+    py_datetimes = pd.Index(cols, name=idx_name).to_pydatetime()
+    df.columns = pd.Index(py_datetimes, dtype="object", name=idx_name)
     print("format_timestamps: converted columns:", converted_list)
     if nat_list:
         print("format_timestamps: columns set to NaT:", nat_list)

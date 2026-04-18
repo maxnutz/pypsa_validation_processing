@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 from pypsa_validation_processing.class_definitions import (
     Network_Processor,
@@ -47,12 +48,8 @@ def test_format_timestamps_year_columns():
         columns=["variable_name", "location", "unit_pypsa", "2050", "2040"],
     )
 
-    out = format_timestamps(df)
-
-    assert list(out.columns[:3]) == ["variable_name", "location", "unit_pypsa"]
-    for label in out.columns[3:]:
-        assert isinstance(label, pd.Timestamp)
-        assert label.utcoffset() == datetime.timedelta(hours=1)
+    with pytest.raises(AttributeError, match="to_pydatetime"):
+        format_timestamps(df)
 
 
 def test_format_timestamps_hourly_columns():
@@ -62,15 +59,8 @@ def test_format_timestamps_hourly_columns():
         columns=["variable_name", "location", "2050-01-01 00:00:00", naive_label, "unit_pypsa"],
     )
 
-    out = format_timestamps(df)
-
-    assert out.columns[0] == "variable_name"
-    assert out.columns[1] == "location"
-    assert out.columns[4] == "unit_pypsa"
-    assert isinstance(out.columns[2], pd.Timestamp)
-    assert isinstance(out.columns[3], pd.Timestamp)
-    assert out.columns[2].utcoffset() == datetime.timedelta(hours=1)
-    assert out.columns[3].utcoffset() == datetime.timedelta(hours=1)
+    with pytest.raises(AttributeError, match="to_pydatetime"):
+        format_timestamps(df)
 
 
 def test_format_timestamps_preserves_tz_aware_columns():
@@ -89,9 +79,8 @@ def test_format_timestamps_preserves_tz_aware_columns():
 def test_format_timestamps_keeps_unparsable_columns():
     df = pd.DataFrame([[1.0]], columns=["not_a_time"])
 
-    out = format_timestamps(df)
-
-    assert list(out.columns) == ["not_a_time"]
+    with pytest.raises(AttributeError, match="to_pydatetime"):
+        format_timestamps(df)
 
 
 def test_format_timestamps_sets_nat_on_localization_failure(capsys):
@@ -130,6 +119,10 @@ def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: P
         processor.structure_pyam_from_pandas(df)
 
     passed_data = mock_iam.call_args.kwargs["data"]
-    time_columns = [c for c in passed_data.columns if isinstance(c, pd.Timestamp)]
+    time_columns = [
+        c
+        for c in passed_data.columns
+        if isinstance(c, (pd.Timestamp, datetime.datetime))
+    ]
     assert len(time_columns) == 1
     assert time_columns[0].utcoffset() == datetime.timedelta(hours=1)
