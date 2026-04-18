@@ -32,7 +32,6 @@ EU27_COUNTRY_CODES: dict[str, str] = {
     "ES": "Spain",
     "ES0": "Spain 0",
     "ES1": "Spain-Mallorca",
-    "EU": "European Union",
     "FI": "Finland",
     "FR": "France",
     "FR0": "France 0",
