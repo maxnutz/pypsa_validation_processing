@@ -125,3 +125,12 @@ UNITS_MAPPING = {
     "t_co2": "t",
     "": "",
 }
+
+## standards for statistics-functions
+# standardize kwargs for pypsa-statistics statements
+statistics_kwargs = {
+    "groupby": ["name", "bus", "carrier", "location", "unit"],
+    "nice_names": False,
+}
+# standardize MultiIndex
+statistics_grouping_index = ["location", "unit"]
