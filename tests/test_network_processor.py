@@ -598,7 +598,7 @@ output_path: {tmp_path / 'output.xlsx'}
                 with pytest.raises(ValueError, match="Invalid aggregation_level"):
                     Network_Processor(config_path=config_file)
 
-    def test_map_country_codes_to_names_defaults_to_false(self, tmp_path: Path):
+    def test_map_country_codes_to_names_defaults_to_true(self, tmp_path: Path):
         """Test that map_country_codes_to_names defaults to False if not specified."""
         config_file = self._make_config_file(tmp_path)
         with patch(
@@ -608,7 +608,7 @@ output_path: {tmp_path / 'output.xlsx'}
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=config_file)
-                assert processor.map_country_codes_to_names is False
+                assert processor.map_country_codes_to_names is True
 
     def test_map_country_codes_to_names_from_config_true(self, tmp_path: Path):
         """Test that map_country_codes_to_names=true is read from config."""
