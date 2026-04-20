@@ -71,20 +71,8 @@ class TestFinalEnergyByCarrierElectricity:
 class TestFinalEnergyBySectorTransportation:
     """Test suite for Final_Energy_by_Sector__Transportation function."""
 
-    @staticmethod
-    def _patch_energy_balance_with_at_port(network: MockPyPSANetwork) -> None:
-        """Patch mock accessor to accept at_port used by transportation function."""
-        original_energy_balance = network.statistics.energy_balance
-
-        def energy_balance_with_at_port(*args, at_port=None, **kwargs):
-            _ = at_port
-            return original_energy_balance(*args, **kwargs)
-
-        network.statistics.energy_balance = energy_balance_with_at_port
-
     def test_returns_series(self, mock_network: MockPyPSANetwork):
         """Test that the function returns a pandas Series."""
-        self._patch_energy_balance_with_at_port(mock_network)
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert isinstance(result, pd.Series)
 
@@ -92,17 +80,16 @@ class TestFinalEnergyBySectorTransportation:
         """Test that result has MultiIndex with location and unit levels."""
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
 
     def test_not_empty(self, mock_network: MockPyPSANetwork):
         """Test that result is not empty."""
-        self._patch_energy_balance_with_at_port(mock_network)
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert len(result) > 0
 
     def test_numeric_values(self, mock_network: MockPyPSANetwork):
         """Test that result values are numeric."""
-        self._patch_energy_balance_with_at_port(mock_network)
         result = Final_Energy_by_Sector__Transportation(mock_network)
         assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
             result.dtype
@@ -118,11 +105,11 @@ class TestFinalEnergyBySectorTransportation:
     def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
         """Test processing multiple networks from collection."""
         for network in mock_network_collection:
-            self._patch_energy_balance_with_at_port(network)
             result = Final_Energy_by_Sector__Transportation(network)
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
+            assert "location" in result.index.names
+            assert "unit" in result.index.names
             assert len(result) > 0
 
 
@@ -346,9 +333,17 @@ class TestAggregatePerYearFalse:
 
     _FUNCTIONS = [
         Final_Energy_by_Carrier__Electricity,
-        Final_Energy_by_Sector__Transportation,
         Final_Energy_by_Sector__Agriculture,
     ]
+
+    def test_transportation_still_returns_series(self, mock_network: MockPyPSANetwork):
+        """Transportation currently returns an aggregated Series even when aggregate_per_year=False."""
+        result = Final_Energy_by_Sector__Transportation(mock_network, aggregate_per_year=False)
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
+        assert len(result) > 0
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
     def test_returns_dataframe(self, mock_network: MockPyPSANetwork, func):

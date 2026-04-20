@@ -12,7 +12,7 @@ import pytest
 class MockStatisticsAccessor:
     """Mock PyPSA Statistics accessor for testing.
 
-    This mock provides the energy_balance method that returns realistic
+    This mock provides energy_balance/withdrawal methods that return realistic
     pandas Series with MultiIndex structure matching PyPSA output.
     """
 
@@ -29,6 +29,8 @@ class MockStatisticsAccessor:
         direction: str = "withdrawal",
         at_port: list[str] | None = None,
         groupby_time: bool = True,
+        nice_names: bool | None = None,
+        **_: object,
     ) -> pd.Series | pd.DataFrame:
         """Mock energy_balance method for PyPSA Network.statistics.
 
@@ -53,6 +55,8 @@ class MockStatisticsAccessor:
         groupby_time : bool
             If ``True`` (default) return an aggregated Series.
             If ``False`` return a DataFrame with 4 hourly timestamps as columns.
+        nice_names : bool | None
+            Ignored in mock, accepted for compatibility with production calls.
 
         Returns
         -------
@@ -83,14 +87,22 @@ class MockStatisticsAccessor:
                 for unit in ["MWh_el", "MWh_th"]:
                     # Create index tuple based on groupby keys
                     idx_dict = {
+                        "name": f"{c}_{location}",
+                        "bus": f"{location} bus",
                         "carrier": c,
                         "location": location,
                         "unit": unit,
                     }
-                    idx_tuple = tuple(idx_dict[key] for key in groupby)
+                    idx_tuple = tuple(idx_dict.get(key, f"mock_{key}") for key in groupby)
                     index_tuples.append(idx_tuple)
-                    # Mock value: roughly realistic energy value
-                    values.append(1000.0)
+                    # Provide deterministic signs for link ports used in
+                    # transportation charging-loss calculations.
+                    if components == "Link" and at_port == ["bus0"]:
+                        values.append(-1000.0)
+                    elif components == "Link" and at_port == ["bus1"]:
+                        values.append(900.0)
+                    else:
+                        values.append(1000.0)
 
         # Create MultiIndex
         index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
@@ -105,6 +117,33 @@ class MockStatisticsAccessor:
                 index=index,
                 dtype=float,
             )
+
+    def withdrawal(
+        self,
+        bus_carrier: str | None = None,
+        carrier: list[str] | str | None = None,
+        components: str | list[str] | None = None,
+        aggregate_time: bool = True,
+        groupby: list[str] | None = None,
+        nice_names: bool | None = None,
+        **kwargs: object,
+    ) -> pd.Series | pd.DataFrame:
+        """Mock withdrawal method forwarding to energy_balance.
+
+        PyPSA's statistics.withdrawal uses ``aggregate_time`` while
+        ``energy_balance`` uses ``groupby_time``. This adapter keeps tests
+        compatible with either call style.
+        """
+        return self.energy_balance(
+            bus_carrier=bus_carrier,
+            carrier=carrier,
+            components=components,
+            groupby=groupby,
+            direction="withdrawal",
+            groupby_time=aggregate_time,
+            nice_names=nice_names,
+            **kwargs,
+        )
 
 
 class MockPyPSANetwork:
