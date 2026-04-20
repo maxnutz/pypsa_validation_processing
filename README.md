@@ -6,7 +6,12 @@ This repository is licensed under the [MIT License](https://github.com/maxnutz/p
 > [!NOTE]  
 > This package is currently in an **early state of development**. Expect ongoing changes and updates. Documentation and Readme will be continuously updated with changes.
 
-This package processes a PyPSA NetworkCollection for a given set of IAMC variable definitions and computes mapped PyPSA statistics per variable. The workflow returns IAMC-structured outputs for validation against the Eurostat Energy Balance, supporting both full time series outputs and investment-year aggregates, and both region-level and country-level aggregation.
+This package processes a PyPSA `NetworkCollection` for a given set of IAMC variable definitions and computes mapped PyPSA statistics per variable. The workflow returns IAMC-structured outputs for validation against the Eurostat Energy Balance and supports:
+- investment-year aggregates (`aggregate_per_year: true`) and full time series exports (`aggregate_per_year: false`)
+- region-level and country-level aggregation (`aggregation_level`)
+- single-country runs (`country: AT`) and all-country processing (`country: all`)
+- optional mapping of country/region codes to readable names (`map_country_codes_to_names`)
+- optional conversion to units defined in the definitions folder (`convert_units`)
 
 > [!TIP]
 > The corresponding package for Eurostat Energy Balance Evaluation is available [here](https://github.com/maxnutz/eurostat-energy-balance_processing/tree/main)
@@ -27,26 +32,33 @@ pip install .
 The file `config.default.yaml` provides a guideline for the two config sections and current defaults:
 ```yaml
 # General section
-country: AT               # ISO 3166-1 alpha-2 country code, e.g. AT
+country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all"
 definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder
+convert_units: true       # convert output units to units from definitions_path
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
-output_path: outputs            # path the outputfile should be written to
-aggregation_level: "country"      # Options: "country" or "region"
-aggregate_per_year: false          # true: one value per investment year; false: full time series per year
+output_path: resources            # path the outputfile should be written to
+aggregation_level: "region"      # Options: "country" or "region"
+aggregate_per_year: true          # true: one value per investment year; false: full time series per year
+map_country_codes_to_names: true # true: map codes to names (AT -> Austria), false: keep codes
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
 model_name: pypsa-at            # name of the PyPSA model
 scenario_name: KN2040test        # name of the PyPSA scenario
 ```
-Personalized config files need to be specified when running the workflow with inline parameter `--config <path-to-config-file>`.
+Personalized config files can be specified with `--config <path-to-config-file>`.
 
 ### Run the workflow
 Run the workflow with 
 ```bash
 pixi run workflow
 ```
-This statement runs `"python workflow.py"` 
+This statement runs `"python workflow.py"` and uses the packaged default config if no `--config` is given.
+
+You can also run:
+```bash
+pixi run python workflow.py --config /absolute/path/to/config.yaml
+```
 ### Run tests
 Run tests with
 ```bash
@@ -54,12 +66,20 @@ pixi run test
 ```
 This statement runs `"pytest tests/ -v"` 
 
+### Output behavior
+
+- `aggregate_per_year: true` writes one xlsx file.
+- `aggregate_per_year: false` writes one folder with one xlsx file per investment year.
+- Generated output file and folder names are sanitized (whitespace collapsed to `_`).
+- Time-like columns are normalized to timezone-aware timestamps using a fixed `+01:00` offset before `pyam.IamDataFrame` creation.
+
 ## Project structure
 
 ```text
 pypsa_validation_processing/
 |-- workflow.py                         # CLI/entry script
 |-- pypsa_validation_processing/
+|   |-- __init__.py
 |   |-- workflow.py                     # package-level workflow orchestration
 |   |-- class_definitions.py            # core processing classes
 |   |-- statistics_functions.py         # pypsa statistics functions
@@ -152,6 +172,8 @@ Length: 6, dtype: float64
 ```yaml
 Final Energy [by Carrier]|Electricity: Final_Energy_by_Carrier__Electricity
 Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
+Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
+Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 ```
 
 At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. 
