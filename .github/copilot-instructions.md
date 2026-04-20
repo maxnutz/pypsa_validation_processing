@@ -12,26 +12,6 @@ This repository is a Python package that computes IAMC variables from PyPSA netw
 - Root `workflow.py` is only a compatibility wrapper.
 - Statistics functions are discovered dynamically from mapping names in `statistics_functions.py`.
 
-### Config behavior currently implemented
-The packaged default config is in `pypsa_validation_processing/configs/config.default.yaml`.
-
-Relevant keys:
-- `country`: ISO alpha-2 code (e.g. `AT`) or `all`
-- `definitions_path`: path to IAMC definitions
-- `convert_units`: bool (default `true`) to convert output units to definitions units
-- `mapping_path`: optional override for variable-function mapping YAML
-- `output_path`: base output directory
-- `aggregation_level`: `country` or `region`
-- `aggregate_per_year`: bool
-- `map_country_codes_to_names`: bool (default `true`)
-- `network_results_path`, `model_name`, `scenario_name`
-
-### Output behavior
-- `aggregate_per_year: true` writes one file.
-- `aggregate_per_year: false` writes one folder and one file per investment year.
-- Output file/folder names are sanitized (`_sanitize_path_token`) so whitespace becomes `_`.
-- For `country: all`, filenames omit a country suffix.
-
 ### Aggregation behavior
 - `aggregation_level: country`
   - `country: AT` -> sum AT* regions into one country row.

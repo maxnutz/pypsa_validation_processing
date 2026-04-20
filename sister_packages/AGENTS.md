@@ -1,6 +1,7 @@
 # Sister packages 
 - Related packages are placed here.
 - Use packages, information is provided for a specific task
+- This folder and subfolders is **read-only** 
 - Do not change code in `/sister_packages`
 
 ## Blueprint for statistics-functions
