@@ -71,7 +71,7 @@ This statement runs `"pytest tests/ -v"`
 - `aggregate_per_year: true` writes one xlsx file.
 - `aggregate_per_year: false` writes one folder with one xlsx file per investment year.
 - Generated output file and folder names are sanitized (whitespace collapsed to `_`).
-- Time-like columns are normalized to timezone-aware timestamps (`+01:00`) before `pyam.IamDataFrame` creation.
+- Time-like columns are normalized to timezone-aware timestamps using a fixed `+01:00` offset before `pyam.IamDataFrame` creation.
 
 ## Project structure
 
