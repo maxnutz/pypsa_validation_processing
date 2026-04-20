@@ -82,6 +82,8 @@ FALLBACK_NUTS_2_REGIONS: dict[str, str] = {
     "AT31": "Upper Austria",
     "AT32": "Salzburg",
     "AT33": "Tyrol",
+    # Keep historical model key for compatibility; fallback NUTS3 keeps the same key.
+    "AT333": "East Tyrol",
     "AT34": "Vorarlberg",
 }
 
@@ -140,7 +142,9 @@ def _warn_and_return_fallback(
 
 def _get_eurostat_geo_dic(dataset: str) -> dict[str, str]:
     if eurostat is None:
-        raise RuntimeError("eurostat package is not installed")
+        raise RuntimeError(
+            "eurostat package is not available (install with: pip install eurostat)"
+        )
     geo_dic = eurostat.get_dic(dataset, par="geo", frmt="dict", lang="en")
     if not isinstance(geo_dic, dict):
         raise TypeError(f"Unexpected Eurostat payload for {dataset}: {type(geo_dic)!r}")

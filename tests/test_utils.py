@@ -33,15 +33,13 @@ class TestRegionsCodes:
         assert expected_codes.issubset(utils.REGION_MAPPING)
 
     def test_region_mapping_contains_nuts2_and_nuts3_codes(self):
-        nuts2 = [code for code in utils.REGION_MAPPING if len(code) == 4 and code[:2].isalpha()]
-        nuts3 = [code for code in utils.REGION_MAPPING if len(code) == 5 and code[:2].isalpha()]
-        assert nuts2
-        assert nuts3
+        assert "AT11" in utils.REGION_MAPPING
+        assert "AT111" in utils.REGION_MAPPING
 
 
 class TestEurostatMappingLoaders:
     def test_create_region_mapping_success_path_uses_eurostat_data(self):
-        def _mock_geo(dataset: str) -> dict[str, str]:
+        def _mock_eurostat_geo_dic(dataset: str) -> dict[str, str]:
             if dataset == "nama_10_gdp":
                 return {"AT": "Austria", "DE": "Germany", "DE1": "invalid"}
             if dataset == "nama_10r_2gdp":
@@ -50,13 +48,17 @@ class TestEurostatMappingLoaders:
                 return {"AT111": "Mittelburgenland", "AT11": "invalid"}
             raise AssertionError(dataset)
 
-        with patch.object(utils, "_get_eurostat_geo_dic", side_effect=_mock_geo):
+        with patch.object(
+            utils, "_get_eurostat_geo_dic", side_effect=_mock_eurostat_geo_dic
+        ):
             region_mapping = utils.create_region_mapping()
 
         assert region_mapping["AT"] == "Austria"
         assert region_mapping["AT11"] == "Burgenland"
         assert region_mapping["AT111"] == "Mittelburgenland"
+        assert "ATX" not in region_mapping
         assert "DE1" in region_mapping  # from special cases
+        assert region_mapping["DE1"] != "invalid"
         assert region_mapping["DE1"] == utils.COUNTRIES_SPECIAL_CASES["DE1"]
 
     def test_create_region_mapping_falls_back_when_eurostat_fails(self):
@@ -84,8 +86,15 @@ class TestEurostatMappingLoaders:
         assert region_mapping["AT111"] == utils.FALLBACK_NUTS_3_REGIONS["AT111"]
 
     def test_special_cases_override_other_mapping_sources(self):
+        def _mock_nuts_mapping(
+            level: int, country_prefix: str | None = None
+        ) -> dict[str, str]:
+            assert country_prefix is None
+            assert level in (2, 3)
+            return {"DE1": f"NUTS{level} DE1"}
+
         with patch.object(utils, "get_country_mapping", return_value={"DE1": "Country DE1"}):
-            with patch.object(utils, "get_nuts_mapping", return_value={"DE1": "NUTS DE1"}):
+            with patch.object(utils, "get_nuts_mapping", side_effect=_mock_nuts_mapping):
                 region_mapping = utils.create_region_mapping()
 
         assert region_mapping["DE1"] == utils.COUNTRIES_SPECIAL_CASES["DE1"]
