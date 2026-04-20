@@ -315,31 +315,23 @@ def Final_Energy_by_Sector__Agriculture(
         .groupby(["location", "unit"])
         .sum()
     )
+    if any(carrier in n.carriers.index for carrier in cc_carriers):
+        cc_in = n.statistics.energy_balance(
+            carrier=cc_carriers,
+            groupby=["carrier", "location", "unit"],
+            components="Link",
+            at_port=["bus0"],
+            groupby_time=aggregate_per_year,
+        )
+        cc_out = n.statistics.energy_balance(
+            carrier=cc_carriers,
+            groupby=["carrier", "location", "unit"],
+            components="Link",
+            at_port=["bus1"],
+            groupby_time=aggregate_per_year,
+        )
+        eff_loss = abs(cc_in - cc_out)
+        eff_loss = eff_loss.groupby(["location", "unit"]).sum()
+        res = res.add(eff_loss, fill_value=0)
 
-    # losses while charging-for-transport
-    charging_out = n.statistics.energy_balance(
-        carrier="BEV charger",
-        components="Link",
-        groupby=["country", "unit"],
-        at_port=["bus1"],
-    )
-    charging_out.replace(0, np.nan, inplace=True)
-    charging_in = n.statistics.energy_balance(
-        carrier="BEV charger",
-        components="Link",
-        groupby=["country", "unit"],
-        at_port=["bus0"],
-    )
-    v2g_in = n.statistics.energy_balance(
-        carrier="V2G", components="Link", groupby=["country", "unit"], at_port=["bus0"]
-    )
-    if not (no_v2g := v2g_in.empty):
-        EV_charging_percentage = (charging_out + v2g_in) / charging_out
-    total_link_losses = charging_out + charging_in
-    EV_charging_losses = (
-        abs(total_link_losses)
-        if no_v2g
-        else abs(total_link_losses * EV_charging_percentage)
-    )
-
-    return stat_transport.add(EV_charging_losses, fill_value=0)
+    return res
