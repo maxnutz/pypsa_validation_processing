@@ -23,5 +23,5 @@ requests = ">=2.20"
 pandas = ">=1.0.0"
 pyam-iamc = ">=2.0.0"
 nomenclature-iamc = ">=0.29"
+eurostat = ">=1.1.1"
 pypsa-validation-processing = { path = ".", editable = true }
-
