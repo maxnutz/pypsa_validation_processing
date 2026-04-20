@@ -2,12 +2,12 @@
 
 import pytest
 
-from pypsa_validation_processing.utils import EU27_COUNTRY_CODES
+from pypsa_validation_processing.utils import REGION_MAPPING
 
 
-class TestEU27CountryCodes:
+class TestRegionsCodes:
     def test_is_dict(self):
-        assert isinstance(EU27_COUNTRY_CODES, dict)
+        assert isinstance(REGION_MAPPING, dict)
 
     def test_has_all_27_member_states(self):
         # All 27 EU member state ISO codes must be present
@@ -16,14 +16,14 @@ class TestEU27CountryCodes:
             "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT",
             "NL", "PL", "PT", "RO", "SE", "SI", "SK",
         }
-        assert expected_codes.issubset(EU27_COUNTRY_CODES.keys())
+        assert expected_codes.issubset(REGION_MAPPING.keys())
 
     def test_sample_mappings(self):
-        assert EU27_COUNTRY_CODES["AT"] == "Austria"
-        assert EU27_COUNTRY_CODES["DE"] == "Germany"
-        assert EU27_COUNTRY_CODES["FR"] == "France"
+        assert REGION_MAPPING["AT"] == "Austria"
+        assert REGION_MAPPING["DE"] == "Germany"
+        assert REGION_MAPPING["FR"] == "France"
 
     def test_values_are_strings(self):
-        for key, value in EU27_COUNTRY_CODES.items():
+        for key, value in REGION_MAPPING.items():
             assert isinstance(key, str), f"Key {key!r} is not a string"
             assert isinstance(value, str), f"Value {value!r} for key {key!r} is not a string"
