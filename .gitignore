@@ -67,6 +67,10 @@ Thumbs.db
 
 # Data and output (non-versioned)
 resources/
-sister_packages/
+sister_packages/*
+!sister_packages/AGENTS.md
 *.xlsx
 *.csv
+pypsa_validation_processing/configs/*
+!pypsa_validation_processing/configs/config.default.yaml
+!pypsa_validation_processing/config/mapping.default.yaml

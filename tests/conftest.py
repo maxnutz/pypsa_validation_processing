@@ -27,11 +27,14 @@ class MockStatisticsAccessor:
         components: str | list[str] | None = None,
         groupby: list[str] | None = None,
         direction: str = "withdrawal",
-    ) -> pd.Series:
+        at_port: list[str] | None = None,
+        groupby_time: bool = True,
+    ) -> pd.Series | pd.DataFrame:
         """Mock energy_balance method for PyPSA Network.statistics.
 
-        Returns a pandas Series with MultiIndex including 'country' and 'unit'
-        to match the expected output structure.
+        Returns a pandas Series (when ``groupby_time=True``) or DataFrame with
+        timestamp columns (when ``groupby_time=False``) with MultiIndex
+        including 'location' and 'unit' to match the expected output structure.
 
         Parameters
         ----------
@@ -45,15 +48,21 @@ class MockStatisticsAccessor:
             Grouping keys for the result
         direction : str
             Direction of energy flow ("withdrawal" or "supply")
+        at_port : list[str] | None
+            Port filter (e.g., "bus0" or "bus1" for Links)
+        groupby_time : bool
+            If ``True`` (default) return an aggregated Series.
+            If ``False`` return a DataFrame with 4 hourly timestamps as columns.
 
         Returns
         -------
-        pd.Series
-            Series with MultiIndex containing 'country' and 'unit' levels
+        pd.Series | pd.DataFrame
+            Series (``groupby_time=True``) or DataFrame (``groupby_time=False``)
+            with MultiIndex containing 'location' and 'unit' levels.
         """
         # Default groupby if not specified
         if groupby is None:
-            groupby = ["carrier", "country", "unit"]
+            groupby = ["carrier", "location", "unit"]
 
         # Create mock data structure based on groupby
         index_tuples = []
@@ -70,12 +79,12 @@ class MockStatisticsAccessor:
             carriers = ["electricity"]
 
         for c in carriers:
-            for country in ["AT", "DE"]:
+            for location in ["AT1", "AT2", "AT3"]:
                 for unit in ["MWh_el", "MWh_th"]:
                     # Create index tuple based on groupby keys
                     idx_dict = {
                         "carrier": c,
-                        "country": country,
+                        "location": location,
                         "unit": unit,
                     }
                     idx_tuple = tuple(idx_dict[key] for key in groupby)
@@ -83,9 +92,19 @@ class MockStatisticsAccessor:
                     # Mock value: roughly realistic energy value
                     values.append(1000.0)
 
-        # Create MultiIndex Series
+        # Create MultiIndex
         index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-        return pd.Series(values, index=index, dtype=float)
+
+        if groupby_time:
+            return pd.Series(values, index=index, dtype=float)
+        else:
+            # Return DataFrame with 4 hourly timestamps as columns
+            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+            return pd.DataFrame(
+                {ts: values for ts in timestamps},
+                index=index,
+                dtype=float,
+            )
 
 
 class MockPyPSANetwork:
@@ -110,6 +129,8 @@ class MockPyPSANetwork:
             "wildcards": {"planning_horizons": 2020},
         }
         self.statistics = MockStatisticsAccessor()
+        # Add carriers attribute with empty index by default
+        self.carriers = pd.DataFrame(index=[])
 
         # Set any additional attributes
         for key, value in kwargs.items():
