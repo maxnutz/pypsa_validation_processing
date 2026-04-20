@@ -7,7 +7,7 @@ This repository is licensed under the [MIT License](https://github.com/maxnutz/p
 > This package is currently in an **early state of development**. Expect ongoing changes and updates. Documentation and Readme will be continuously updated with changes.
 
 This package processes a PyPSA `NetworkCollection` for a given set of IAMC variable definitions and computes mapped PyPSA statistics per variable. The workflow returns IAMC-structured outputs for validation against the Eurostat Energy Balance and supports:
-- investment-year aggregates (`aggregate_per_year: true`) and full timeseries exports (`aggregate_per_year: false`)
+- investment-year aggregates (`aggregate_per_year: true`) and full time series exports (`aggregate_per_year: false`)
 - region-level and country-level aggregation (`aggregation_level`)
 - single-country runs (`country: AT`) and all-country processing (`country: all`)
 - optional mapping of country/region codes to readable names (`map_country_codes_to_names`)
