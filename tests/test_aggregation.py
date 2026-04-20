@@ -42,7 +42,12 @@ def _make_locational_timeseries(
     )
 
 
-def _make_processor(tmp_path: Path, aggregation_level: str = "country", country: str = "AT") -> Network_Processor:
+def _make_processor(
+    tmp_path: Path,
+    aggregation_level: str = "country",
+    country: str = "AT",
+    map_country_codes_to_names: bool = False,
+) -> Network_Processor:
     """Create a Network_Processor with mocked heavy dependencies."""
     defs_path = tmp_path / "definitions"
     defs_path.mkdir()
@@ -58,6 +63,7 @@ definitions_path: {defs_path}
 network_results_path: {tmp_path}
 output_path: {tmp_path / 'out.xlsx'}
 aggregation_level: "{aggregation_level}"
+map_country_codes_to_names: {str(map_country_codes_to_names).lower()}
 """
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_text)
@@ -278,7 +284,23 @@ class TestPyamStructuringAllCountries:
         )
         df = pd.DataFrame({2020: [100.0, 200.0]}, index=idx)
         iam_df = processor.structure_pyam_from_pandas(df)
-        # Country codes must be mapped to full names
+        assert set(iam_df.region) == {"AT", "DE"}
+
+    def test_per_country_regions_mapped_when_enabled(self, tmp_path: Path):
+        """When enabled, country='all' country regions must be mapped to full names."""
+        processor = _make_processor(
+            tmp_path,
+            aggregation_level="country",
+            country="all",
+            map_country_codes_to_names=True,
+        )
+        processor.common_dsd = None
+        idx = pd.MultiIndex.from_tuples(
+            [("Test|Var", "AT", "MWh"), ("Test|Var", "DE", "MWh")],
+            names=["variable", "country", "unit"],
+        )
+        df = pd.DataFrame({2020: [100.0, 200.0]}, index=idx)
+        iam_df = processor.structure_pyam_from_pandas(df)
         assert set(iam_df.region) == {"Austria", "Germany"}
 
     def test_preserves_locations_when_all_countries_region(self, tmp_path: Path):

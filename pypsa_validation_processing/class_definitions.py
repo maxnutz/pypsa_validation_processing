@@ -12,7 +12,11 @@ import pypsa
 import nomenclature
 import pyam
 
-from pypsa_validation_processing.utils import EU27_COUNTRY_CODES, UNITS_MAPPING
+from pypsa_validation_processing.utils import (
+    EU27_COUNTRY_CODES,
+    REGION_MAPPING,
+    UNITS_MAPPING,
+)
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
@@ -151,6 +155,14 @@ class Network_Processor:
         if not isinstance(self.aggregate_per_year, bool):
             raise ValueError(
                 f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
+                f"Must be true or false."
+            )
+        self.map_country_codes_to_names: bool = self.config.get(
+            "map_country_codes_to_names", True
+        )
+        if not isinstance(self.map_country_codes_to_names, bool):
+            raise ValueError(
+                f"Invalid map_country_codes_to_names: '{self.map_country_codes_to_names}'. "
                 f"Must be true or false."
             )
         self._function_parameter_cache: dict[object, set[str]] = {}
@@ -435,13 +447,13 @@ class Network_Processor:
 
         Notes
         -----
-        When ``aggregation_level="country"`` and ``country`` is a specific ISO
-        code, the region is set to the full country name from
-        :data:`EU27_COUNTRY_CODES`.  When ``country="all"``, the ``country``
-        column in *df* (populated by :meth:`_aggregate_to_country`) is mapped
-        to full country names and used as the region dimension, so each country
-        appears as a separate row.  When ``aggregation_level="region"``, the
-        ``location`` column in *df* is used directly.
+        When ``aggregation_level="country"``, region labels are country codes by
+        default. If ``map_country_codes_to_names`` is ``True`` in config, country
+        codes are mapped to full names via :data:`REGION_MAPPING`. For
+        ``country="all"``, the ``country`` column in *df* (populated by
+        :meth:`_aggregate_to_country`) is used as the region dimension, one row
+        per country. When ``aggregation_level="region"``, the ``location`` column
+        in *df* is used directly.
         """
         df = format_timestamps(df)
         # add 'variable' and 'unit' columns
@@ -450,33 +462,37 @@ class Network_Processor:
         col_renaming_dict = {
             "variable": "variable_name",
             "unit": "unit_pypsa",
+            "country": "location",
         }
         df = df.rename(
             columns={k: v for k, v in col_renaming_dict.items() if k in df.columns}
         )
 
+        if self.aggregation_level == "country" and self.country != "all":
+            df["location"] = self.country
+
+        if self.map_country_codes_to_names:
+            # Map 2-letter country codes and nuts2 / nuts3 regions code
+            # to full names (en for country-codes, de for nuts2/nuts3)
+            df["location"] = df["location"].map(lambda c: REGION_MAPPING.get(c, c))
+
         if self.aggregation_level == "country":
             if self.country == "all":
-                # Map 2-letter country codes in the "country" column to full
-                # country names so each country becomes its own pyam region.
-                df["country"] = df["country"].map(
-                    lambda c: EU27_COUNTRY_CODES.get(c, c)
-                )
+
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
                     scenario=self.scenario_name,
-                    region="country",
+                    region="location",
                     variable="variable_name",
                     unit="unit_pypsa",
                 )
             else:
-                region = EU27_COUNTRY_CODES.get(self.country, self.country)
                 dsd = pyam.IamDataFrame(
                     data=df.drop_duplicates(),
                     model=self.model_name,
                     scenario=self.scenario_name,
-                    region=region,
+                    region="location",
                     variable="variable_name",
                     unit="unit_pypsa",
                 )
