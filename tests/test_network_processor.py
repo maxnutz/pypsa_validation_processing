@@ -1106,6 +1106,62 @@ output_path: {tmp_path / 'output.xlsx'}
             assert mock_iam.call_args.kwargs["model"] == "  Model  Name  "
             assert mock_iam.call_args.kwargs["scenario"] == " Scenario\tName "
 
+    def test_structure_pyam_maps_location_when_enabled(self, tmp_path: Path):
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "region"
+        processor.map_country_codes_to_names = True
+        processor.common_dsd = None
+
+        df = pd.DataFrame(
+            {pd.Timestamp("2020-01-01"): [1000.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("Final Energy|Electricity", "AT11", "MWh_el")],
+                names=["variable", "location", "unit"],
+            ),
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.REGION_MAPPING",
+            {"AT11": "Burgenland"},
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+            ) as mock_iam:
+                mock_iam.return_value = MagicMock()
+                processor.structure_pyam_from_pandas(df)
+
+        mapped_df = mock_iam.call_args.kwargs["data"]
+        assert mapped_df["location"].tolist() == ["Burgenland"]
+
+    def test_structure_pyam_keeps_location_code_when_mapping_disabled(
+        self, tmp_path: Path
+    ):
+        processor = self._setup_processor(tmp_path)
+        processor.aggregation_level = "region"
+        processor.map_country_codes_to_names = False
+        processor.common_dsd = None
+
+        df = pd.DataFrame(
+            {pd.Timestamp("2020-01-01"): [1000.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("Final Energy|Electricity", "AT11", "MWh_el")],
+                names=["variable", "location", "unit"],
+            ),
+        )
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.REGION_MAPPING",
+            {"AT11": "Burgenland"},
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+            ) as mock_iam:
+                mock_iam.return_value = MagicMock()
+                processor.structure_pyam_from_pandas(df)
+
+        mapped_df = mock_iam.call_args.kwargs["data"]
+        assert mapped_df["location"].tolist() == ["AT11"]
+
 
 # ---------------------------------------------------------------------------
 # Tests for file I/O and network loading

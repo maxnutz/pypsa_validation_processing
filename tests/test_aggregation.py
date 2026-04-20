@@ -317,6 +317,26 @@ class TestPyamStructuringAllCountries:
         iam_df = processor.structure_pyam_from_pandas(df)
         assert set(iam_df.region) == {"AT1", "DE1"}
 
+    def test_maps_region_codes_when_enabled_in_region_mode(self, tmp_path: Path):
+        processor = _make_processor(
+            tmp_path,
+            aggregation_level="region",
+            country="all",
+            map_country_codes_to_names=True,
+        )
+        processor.common_dsd = None
+        idx = pd.MultiIndex.from_tuples(
+            [("Test|Var", "AT11", "MWh"), ("Test|Var", "DE11", "MWh")],
+            names=["variable", "location", "unit"],
+        )
+        df = pd.DataFrame({2020: [100.0, 200.0]}, index=idx)
+        with patch(
+            "pypsa_validation_processing.class_definitions.REGION_MAPPING",
+            {"AT11": "Burgenland", "DE11": "Stuttgart"},
+        ):
+            iam_df = processor.structure_pyam_from_pandas(df)
+        assert set(iam_df.region) == {"Burgenland", "Stuttgart"}
+
 
 # ---------------------------------------------------------------------------
 # Tests for backward compatibility

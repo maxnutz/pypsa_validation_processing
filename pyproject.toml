@@ -17,6 +17,7 @@ dependencies = [
     "pypsa",
     "pyam-iamc",
     "nomenclature-iamc",
+    "eurostat",
 ]
 
 [project.urls]
