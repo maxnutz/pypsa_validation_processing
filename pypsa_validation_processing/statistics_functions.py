@@ -20,9 +20,11 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 """
 
 from __future__ import annotations
-
+from functools import reduce
 import pandas as pd
 import pypsa
+from pypsa_validation_processing.utils import statistics_kwargs as kwargs
+from pypsa_validation_processing.utils import statistics_grouping_index
 
 
 def Final_Energy_by_Carrier__Electricity(
