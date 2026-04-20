@@ -57,7 +57,7 @@ This statement runs `"python workflow.py"` and uses the packaged default config 
 
 You can also run:
 ```bash
-python workflow.py --config /absolute/path/to/config.yaml
+pixi run python workflow.py --config /absolute/path/to/config.yaml
 ```
 ### Run tests
 Run tests with
