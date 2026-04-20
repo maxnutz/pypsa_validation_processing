@@ -158,7 +158,7 @@ class Network_Processor:
                 f"Must be true or false."
             )
         self.map_country_codes_to_names: bool = self.config.get(
-            "map_country_codes_to_names", False
+            "map_country_codes_to_names", True
         )
         if not isinstance(self.map_country_codes_to_names, bool):
             raise ValueError(
@@ -474,9 +474,7 @@ class Network_Processor:
         if self.map_country_codes_to_names:
             # Map 2-letter country codes and nuts2 / nuts3 regions code
             # to full names (en for country-codes, de for nuts2/nuts3)
-            df["location"] = df["location"].map(
-                lambda c: REGION_MAPPING.get(c, "not found")
-            )
+            df["location"] = df["location"].map(lambda c: REGION_MAPPING.get(c, c))
 
         if self.aggregation_level == "country":
             if self.country == "all":

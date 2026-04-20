@@ -112,7 +112,7 @@ NUTS_3_REGIONS: dict[str, str] = {
     "ATXXX": "Not regionalised/Unknown NUTS 3",
     "ATZZZ": "Extra-Regio NUTS 3",
 }
-
+# NUTS 3 overwrites NUTS2, relevant because of language change of East Tyrol -> Osttirol
 REGION_MAPPING = (
     EU27_COUNTRY_CODES | COUNTRIES_SPECIAL_CASES | NUTS_2_REGIONS | NUTS_3_REGIONS
 )
