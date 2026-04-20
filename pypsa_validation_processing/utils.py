@@ -8,8 +8,24 @@ from functools import lru_cache
 
 try:
     import eurostat
-except ImportError:  # pragma: no cover
+except Exception as error:  # pragma: no cover
+    EUROSTAT_IMPORT_ERROR = error
     eurostat = None
+else:
+    EUROSTAT_IMPORT_ERROR = None
+
+try:
+    from requests import RequestException
+except Exception:  # pragma: no cover
+    RequestException = RuntimeError
+
+EUROSTAT_MAPPING_ERRORS = (
+    RuntimeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    RequestException,
+)
 
 
 FALLBACK_COUNTRY_CODES: dict[str, str] = {
@@ -143,8 +159,8 @@ def _warn_and_return_fallback(
 def _get_eurostat_geo_dic(dataset: str) -> dict[str, str]:
     if eurostat is None:
         raise RuntimeError(
-            "eurostat package is not available (install with: pip install eurostat)"
-        )
+            "eurostat package is not available (install with: pixi add eurostat)"
+        ) from EUROSTAT_IMPORT_ERROR
     geo_dic = eurostat.get_dic(dataset, par="geo", frmt="dict", lang="en")
     if not isinstance(geo_dic, dict):
         raise TypeError(f"Unexpected Eurostat payload for {dataset}: {type(geo_dic)!r}")
@@ -177,7 +193,7 @@ def get_country_mapping() -> dict[str, str]:
         if not mapping:
             return _warn_and_return_fallback("countries", FALLBACK_COUNTRY_CODES)
         return mapping
-    except Exception as error:  # pragma: no cover - exercised via tests/mocking
+    except EUROSTAT_MAPPING_ERRORS as error:  # pragma: no cover - tests cover this path
         return _warn_and_return_fallback("countries", FALLBACK_COUNTRY_CODES, error)
 
 
@@ -197,7 +213,7 @@ def get_nuts_mapping(level: int, country_prefix: str | None = None) -> dict[str,
         if not mapping:
             return _warn_and_return_fallback(f"nuts{level}", fallback)
         return mapping
-    except Exception as error:  # pragma: no cover - exercised via tests/mocking
+    except EUROSTAT_MAPPING_ERRORS as error:  # pragma: no cover - tests cover this path
         return _warn_and_return_fallback(f"nuts{level}", fallback, error)
 
 

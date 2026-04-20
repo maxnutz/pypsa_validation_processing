@@ -58,7 +58,6 @@ class TestEurostatMappingLoaders:
         assert region_mapping["AT111"] == "Mittelburgenland"
         assert "ATX" not in region_mapping
         assert "DE1" in region_mapping  # from special cases
-        assert region_mapping["DE1"] != "invalid"
         assert region_mapping["DE1"] == utils.COUNTRIES_SPECIAL_CASES["DE1"]
 
     def test_create_region_mapping_falls_back_when_eurostat_fails(self):
