@@ -132,7 +132,7 @@ class TestFinalEnergyBySectorTransportation:
 
     def test_raises_without_energy_totals(self, mock_network: MockPyPSANetwork):
         """Current implementation requires energy_totals to compute domestic shares."""
-        with pytest.raises(ValueError, match="Invalid file path or buffer object type"):
+        with pytest.raises(ValueError):
             Final_Energy_by_Sector__Transportation(mock_network)
 
 

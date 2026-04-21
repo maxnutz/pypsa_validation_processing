@@ -153,7 +153,7 @@ def get_energy_totals_domestic_share(
     Parameters
     ----------
     energy_totals
-        The energy totals data frame filtered to one energy year.
+        Path to the energy totals csv file.
     kind: {'aviation', 'navigation'}
         The kind of energy totals to calculate the factor for.
 

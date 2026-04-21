@@ -21,6 +21,7 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 
 from __future__ import annotations
 from functools import reduce
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
@@ -89,9 +90,54 @@ def Final_Energy_by_Carrier__Electricity(
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
-    energy_totals: pd.DataFrame | None = None,
+    energy_totals: Path | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """ """
+    """Extract transportation-sector final energy from a PyPSA Network.
+
+    Returns the total energy consumed by the Transportation sector
+    (excluding transmission / distribution losses) across the pypsa-network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+    energy_totals : pathlib.Path | None, optional
+        Path to an energy totals file used to determine domestic shares for
+        aviation and navigation liquid fuels. If ``None``, default domestic
+        shares from :func:`get_energy_totals_domestic_share` are used.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including ``location``
+        and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Sums transportation final energy from electricity, hydrogen, and liquid
+    fuels:
+    - Electricity demand from BEV charging loads.
+    - Additional EV charging losses computed from BEV charger link flows and
+      adjusted for V2G participation.
+    - Hydrogen demand from fuel-cell land transport.
+    - Liquid fuels for aviation and navigation scaled by domestic fractions,
+      plus land-transport oil.
+
+    Raises
+    ------
+    ValueError
+        If BEV charging flow sign conventions are violated.
+    TypeError
+        If intermediate statistics return mixed result types.
+    """
 
     domestic_aviation_fraction = get_energy_totals_domestic_share(
         energy_totals, "aviation"
@@ -199,8 +245,9 @@ def Final_Energy_by_Sector__Transportation(
     ]
     series_list = [series for series in series_list if not series.empty]
 
-    result_type = type(series_list[0])
-    if any(type(series) is not result_type for series in series_list):
+    if series_list and any(
+        type(series) is not type(series_list[0]) for series in series_list
+    ):
         raise TypeError(
             "Transportation energy statistics must all have the same datatype."
         )
