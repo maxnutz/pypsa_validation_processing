@@ -31,7 +31,39 @@ def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """ """
+    """Extract electricity-carrier final energy from a PyPSA Network.
+
+    Returns the total final energy demand supplied by electricity across
+    agriculture, residential and commercial, transportation, and industry
+    and DAC.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Combines electricity withdrawals from the following contributions:
+    agriculture electricity loads, residential/commercial low-voltage loads
+    (excluding dedicated industry/agriculture/charger/distribution categories,
+    BEV charging) industry electricity loads, and DAC electricity demand
+    change in home battery is of magnitude 1e-9 compared to electricity demand.
+    """
     # get Final Energy|Agriculture|Electricity
     agri = n.statistics.withdrawal(
         carrier=["agriculture electricity", "agriculture machinery electric"],
