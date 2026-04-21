@@ -89,24 +89,32 @@ def Final_Energy_by_Carrier__Electricity(
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    energy_totals: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
     """ """
 
-    # TOOD: get domestic to international fractions for avation and navigation
-    domestic_aviation_fraction = 0.2
-    domestic_navigation_fraction = 0.3
+    domestic_aviation_fraction = get_energy_totals_domestic_share(
+        energy_totals, "aviation"
+    )
+    domestic_navigation_fraction = get_energy_totals_domestic_share(
+        energy_totals, "navigation"
+    )
 
     # get Final Energy [by Sector]|Transportation|Electricity
     elec = n.statistics.withdrawal(
         bus_carrier="low voltage",
         carrier="BEV charger",
-        aggregate_time=True,
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
     # include losses from EV charging
     charging_out = (
         n.statistics.energy_balance(
-            carrier="BEV charger", components="Link", at_port=["bus1"], **kwargs
+            carrier="BEV charger",
+            components="Link",
+            at_port=["bus1"],
+            groupby_time=aggregate_per_year,
+            **kwargs,
         )
         .groupby(statistics_grouping_index)
         .sum()
@@ -114,31 +122,42 @@ def Final_Energy_by_Sector__Transportation(
     charging_out.replace(0, np.nan, inplace=True)
     charging_in = (
         n.statistics.energy_balance(
-            carrier="BEV charger", components="Link", at_port=["bus0"], **kwargs
+            carrier="BEV charger",
+            components="Link",
+            at_port=["bus0"],
+            groupby_time=aggregate_per_year,
+            **kwargs,
         )
         .groupby(statistics_grouping_index)
         .sum()
     )
     v2g_in = n.statistics.energy_balance(
-        carrier="V2G", components="Link", at_port=["bus0"], **kwargs
+        carrier="V2G",
+        components="Link",
+        at_port=["bus0"],
+        groupby_time=aggregate_per_year,
+        **kwargs,
     )
     if v2g_in.empty:
-        ev_share = pd.Series(1.0, index=charging_out.index)
+        ev_share = charging_out.copy()
+        ev_share.loc[:] = 1.0
     else:
         v2g_in = v2g_in.groupby(statistics_grouping_index).sum()
         ev_share = charging_out.add(v2g_in, fill_value=0).div(charging_out)
 
-    if (charging_in > 0).any() or (charging_out < 0).any():
+    charging_in_has_positive = (charging_in > 0).to_numpy().any()
+    charging_out_has_negative = (charging_out < 0).to_numpy().any()
+    if charging_in_has_positive or charging_out_has_negative:
         raise ValueError("Charging in must be positive, charging out must be negative.")
 
     total_link_losses = charging_out.add(charging_in, fill_value=0)
     EV_charging_losses = total_link_losses.abs().mul(ev_share, fill_value=1.0)
 
-    # get Final Energy [by Sector]|Transportation|Hydroghen
+    # get Final Energy [by Sector]|Transportation|Hydrogen
     h2 = n.statistics.withdrawal(
         carrier="land transport fuel cell",
         components="Load",
-        aggregate_time=True,
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -147,7 +166,7 @@ def Final_Energy_by_Sector__Transportation(
         n.statistics.withdrawal(
             carrier="kerosene for aviation",
             components="Load",
-            aggregate_time=True,
+            aggregate_time=aggregate_per_year,
             **kwargs,
         )
         * domestic_aviation_fraction
@@ -157,14 +176,17 @@ def Final_Energy_by_Sector__Transportation(
         n.statistics.withdrawal(
             carrier=["shipping oil", "shipping methanol"],
             components="Load",
-            aggregate_time=True,
+            aggregate_time=aggregate_per_year,
             **kwargs,
         )
         * domestic_navigation_fraction
     )
 
     land_transport_liquids = n.statistics.withdrawal(
-        carrier="land transport oil", components="Load", aggregate_time=True, **kwargs
+        carrier="land transport oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
     )
 
     series_list = [
@@ -175,9 +197,18 @@ def Final_Energy_by_Sector__Transportation(
         land_transport_liquids,
         EV_charging_losses,
     ]
+    series_list = [series for series in series_list if not series.empty]
+
+    result_type = type(series_list[0])
+    if any(type(series) is not result_type for series in series_list):
+        raise TypeError(
+            "Transportation energy statistics must all have the same datatype."
+        )
+
     total = reduce(lambda a, b: a.add(b, fill_value=0), series_list)
-    total.groupby(statistics_grouping_index).sum()
+    total = total.groupby(statistics_grouping_index).sum()
     return total
+
 
 def Final_Energy_by_Sector__Industry(
     n: pypsa.Network,
