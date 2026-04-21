@@ -1,5 +1,9 @@
 """Static information and general utility functions for pypsa_validation_processing."""
 
+import pandas as pd
+from pathlib import Path
+
+
 EU27_COUNTRY_CODES: dict[str, str] = {
     "AL": "Albania",
     "AT": "Austria",
@@ -134,3 +138,33 @@ statistics_kwargs = {
 }
 # standardize MultiIndex
 statistics_grouping_index = ["location", "unit"]
+
+
+## UTILS FUNCTIONS
+
+
+def get_energy_totals_domestic_share(
+    energy_totals: Path,
+    kind: str,
+) -> pd.Series:
+    """
+    Return the domestic share of energy totals for a given kind.
+
+    Parameters
+    ----------
+    energy_totals
+        The energy totals data frame filtered to one energy year.
+    kind: {'aviation', 'navigation'}
+        The kind of energy totals to calculate the factor for.
+
+    Returns
+    -------
+    :
+        The share of national aviation or navigation per country.
+    """
+    # TODO generalize energy totals for all countries
+    energy_totals = pd.read_csv(energy_totals, index_col="country").loc["AT"]
+    energy_totals = energy_totals[energy_totals.year == 2020]
+    domestic = energy_totals[f"total domestic {kind}"]
+    international = energy_totals[f"total international {kind}"]
+    return (domestic / (domestic + international)).values[0]

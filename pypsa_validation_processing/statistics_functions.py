@@ -25,7 +25,10 @@ import pandas as pd
 import numpy as np
 import pypsa
 from pypsa_validation_processing.utils import statistics_kwargs as kwargs
-from pypsa_validation_processing.utils import statistics_grouping_index
+from pypsa_validation_processing.utils import (
+    statistics_grouping_index,
+    get_energy_totals_domestic_share,
+)
 
 
 def Final_Energy_by_Carrier__Electricity(

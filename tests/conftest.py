@@ -251,3 +251,21 @@ network_results_path: /tmp/network_results
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_content)
     return config_file
+
+
+@pytest.fixture
+def energy_totals_csv(tmp_path: Path) -> Path:
+    """Fixture providing a minimal energy_totals.csv for domestic-share tests."""
+    energy_totals = pd.DataFrame(
+        {
+            "country": ["AT", "AT"],
+            "year": [2020, 2021],
+            "total domestic aviation": [30.0, 0.0],
+            "total international aviation": [70.0, 0.0],
+            "total domestic navigation": [20.0, 0.0],
+            "total international navigation": [80.0, 0.0],
+        }
+    )
+    csv_path = tmp_path / "energy_totals.csv"
+    energy_totals.to_csv(csv_path, index=False)
+    return csv_path
