@@ -29,55 +29,67 @@ def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract electricity final energy from a PyPSA Network.
-
-    Returns the total electricity consumption (excluding transmission /
-    distribution losses)
-
-    Parameters
-    ----------
-    n : pypsa.Network
-        PyPSA network to process.
-    aggregate_per_year : bool, optional
-        If ``True`` (default), aggregate over all snapshots and return a
-        :class:`pandas.Series`.  If ``False``, return a
-        :class:`pandas.DataFrame` with snapshots as columns.
-
-    Returns
-    -------
-    pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    Extracts all withdrawals from elec network. low_voltage is included in AC withdrawal.
-    Remove discharger afterwards, as battery-connecting links have different carrier names.
-    """
-    # withdrawal from electricity including low_voltage
-    res = abs(
-        n.statistics.energy_balance(
-            bus_carrier="AC",
-            groupby=["carrier", "location", "unit"],
-            groupby_time=aggregate_per_year,
-        )
+    """ """
+    # get Final Energy|Agriculture|Electricity
+    agri = n.statistics.withdrawal(
+        carrier=["agriculture electricity", "agriculture machinery electric"],
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
     )
-    # as battery is Store, discharger-link needs to be evaluated separately.
-    res_storage = n.statistics.energy_balance(
+
+    # get Final Energy|Residential and Commercial|Electricity
+    lv = n.statistics.withdrawal(
+        bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs
+    )
+    forbitten_list = []
+    for i in lv.index.get_level_values("carrier").unique():
+        for regex in [
+            "urban central",
+            "industry",
+            "agriculture",
+            "charger",
+            "distribution",
+        ]:
+            if regex in i:
+                forbitten_list.append(i)
+    rescom = lv[~lv.index.get_level_values("carrier").isin(forbitten_list)]
+
+    # get Final Energy|Transportation|Electricity
+    transpo = n.statistics.withdrawal(
+        bus_carrier="low voltage",
+        carrier="BEV charger",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # get Final Energy|Industry|Electricity
+    industry = n.statistics.withdrawal(
+        carrier="industry electricity",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # get electricity load from DAC
+    dac = n.statistics.withdrawal(
         bus_carrier="AC",
-        groupby=["carrier", "location", "unit"],
-        carrier=["battery discharger"],
-        groupby_time=aggregate_per_year,
+        carrier="DAC",
+        **kwargs,
     )
-    return (
-        pd.concat([res, res_storage.mul(-1)], axis=0)
-        .groupby(["location", "unit"])
-        .sum()
-    )
+
+    series_list = [agri, rescom, transpo, industry, dac]
+    series_list = [series for series in series_list if not series.empty]
+
+    if series_list and any(
+        type(series) is not type(series_list[0]) for series in series_list
+    ):
+        raise TypeError(
+            "Final Energy\|Electricity energy statistics must all have the same datatype."
+        )
+
+    result = reduce(lambda a, b: a.add(b, fill_value=0), series_list)
+    return result
 
 
 def Final_Energy_by_Sector__Transportation(
