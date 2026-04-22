@@ -217,13 +217,6 @@ def Final_Energy_by_Sector__Transportation(
     ]
     series_list = [series for series in series_list if not series.empty]
 
-    if series_list and any(
-        type(series) is not type(series_list[0]) for series in series_list
-    ):
-        raise TypeError(
-            "Transportation energy statistics must all have the same datatype."
-        )
-
     total = pd.concat(series_list)
     return total
 
