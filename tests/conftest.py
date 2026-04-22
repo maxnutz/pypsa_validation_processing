@@ -168,6 +168,13 @@ class MockPyPSANetwork:
             "wildcards": {"planning_horizons": 2020},
         }
         self.statistics = MockStatisticsAccessor()
+        self.links = pd.DataFrame(
+            {
+                "carrier": ["BEV charger", "BEV charger", "other link"],
+                "efficiency": [0.9, 0.9, 1.0],
+            },
+            index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
+        )
         # Add carriers attribute with empty index by default
         self.carriers = pd.DataFrame(index=[])
 
