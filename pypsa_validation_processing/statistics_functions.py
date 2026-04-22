@@ -150,58 +150,27 @@ def Final_Energy_by_Sector__Transportation(
     )
 
     # get Final Energy [by Sector]|Transportation|Electricity
+    # get elec load losses from BEV-charger links
+    bev_charger_efficiencies = n.links.loc[
+        n.links.carrier == "BEV charger", "efficiency"
+    ].dropna()
+    if bev_charger_efficiencies.nunique() == 1:
+        eff = bev_charger_efficiencies.iloc[0]
+    else:
+        eff = bev_charger_efficiencies.mean()
+        print(
+            "WARNING: Network includes different efficiencies for BEV chargers. Using mean value for variable Final_Energy_by_Sector__Transportation"
+        )
+
     elec = n.statistics.withdrawal(
         bus_carrier="low voltage",
         carrier="BEV charger",
         components="Link",
         aggregate_time=aggregate_per_year,
         **kwargs,
-    )
-    # include losses from EV charging
-    charging_out = (
-        n.statistics.energy_balance(
-            carrier="BEV charger",
-            components="Link",
-            at_port=["bus1"],
-            groupby_time=aggregate_per_year,
-            **kwargs,
-        )
-        .groupby(statistics_grouping_index)
-        .sum()
-    )
-    charging_out.replace(0, np.nan, inplace=True)
-    charging_in = (
-        n.statistics.energy_balance(
-            carrier="BEV charger",
-            components="Link",
-            at_port=["bus0"],
-            groupby_time=aggregate_per_year,
-            **kwargs,
-        )
-        .groupby(statistics_grouping_index)
-        .sum()
-    )
-    v2g_in = n.statistics.energy_balance(
-        carrier="V2G",
-        components="Link",
-        at_port=["bus0"],
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-    if v2g_in.empty:
-        ev_share = charging_out.copy()
-        ev_share.loc[:] = 1.0
-    else:
-        v2g_in = v2g_in.groupby(statistics_grouping_index).sum()
-        ev_share = charging_out.add(v2g_in, fill_value=0).div(charging_out)
-
-    charging_in_has_positive = (charging_in > 0).to_numpy().any()
-    charging_out_has_negative = (charging_out < 0).to_numpy().any()
-    if charging_in_has_positive or charging_out_has_negative:
-        raise ValueError("Charging in must be positive, charging out must be negative.")
-
-    total_link_losses = charging_out.add(charging_in, fill_value=0)
-    EV_charging_losses = total_link_losses.abs().mul(ev_share, fill_value=1.0)
+    ).mul(
+        1 / eff
+    )  # ( 1 + ((1/eff)-1))
 
     # get Final Energy [by Sector]|Transportation|Hydrogen
     h2 = n.statistics.withdrawal(
@@ -245,7 +214,6 @@ def Final_Energy_by_Sector__Transportation(
         aviation_liquids,
         navigation_liquids,
         land_transport_liquids,
-        EV_charging_losses,
     ]
     series_list = [series for series in series_list if not series.empty]
 
