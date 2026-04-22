@@ -133,6 +133,10 @@ UNITS_MAPPING = {
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
+    "groupby": ["location", "unit"],
+    "nice_names": False,
+}
+statistics_kwargs_for_filtering = {
     "groupby": ["name", "bus", "carrier", "location", "unit"],
     "nice_names": False,
 }

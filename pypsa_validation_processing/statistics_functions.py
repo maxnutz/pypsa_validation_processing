@@ -27,6 +27,9 @@ import numpy as np
 import pypsa
 from pypsa_validation_processing.utils import statistics_kwargs as kwargs
 from pypsa_validation_processing.utils import (
+    statistics_kwargs_for_filtering as kwargs_filtering,
+)
+from pypsa_validation_processing.utils import (
     statistics_grouping_index,
     get_energy_totals_domestic_share,
 )
@@ -150,6 +153,7 @@ def Final_Energy_by_Sector__Transportation(
     elec = n.statistics.withdrawal(
         bus_carrier="low voltage",
         carrier="BEV charger",
+        components="Link",
         aggregate_time=aggregate_per_year,
         **kwargs,
     )
@@ -252,8 +256,7 @@ def Final_Energy_by_Sector__Transportation(
             "Transportation energy statistics must all have the same datatype."
         )
 
-    total = reduce(lambda a, b: a.add(b, fill_value=0), series_list)
-    total = total.groupby(statistics_grouping_index).sum()
+    total = pd.concat(series_list)
     return total
 
 
