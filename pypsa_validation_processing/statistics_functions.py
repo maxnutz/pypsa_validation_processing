@@ -20,6 +20,7 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 """
 
 from __future__ import annotations
+import re
 from functools import reduce
 from pathlib import Path
 import pandas as pd
@@ -87,19 +88,18 @@ def Final_Energy_by_Carrier__Electricity(
     lv = n.statistics.withdrawal(
         bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs_filtering
     )
-    forbitten_list = []
-    for i in lv.index.get_level_values("carrier").unique():
-        for regex in [
-            "urban central",
-            "industry",
-            "agriculture",
-            "charger",
-            "distribution",
-        ]:
-            if regex in i:
-                forbitten_list.append(i)
-    rescom = lv[~lv.index.get_level_values("carrier").isin(forbitten_list)]
-    rescom = rescom.groupby(kwargs["groupby"]).sum()
+    forbitten_parts = [
+        "urban central",
+        "industry",
+        "agriculture",
+        "charger",
+        "distribution",
+    ]
+    lv_carriers = lv.index.get_level_values("carrier").astype(str)
+    forbitten_pattern = "|".join(re.escape(part) for part in forbitten_parts)
+    forbitten_mask = lv_carriers.str.contains(forbitten_pattern, case=False, regex=True)
+    rescom = lv[~forbitten_mask].groupby(kwargs["groupby"]).sum()
+
     # get Final Energy|Transportation|Electricity
     transpo = n.statistics.withdrawal(
         bus_carrier="low voltage",
@@ -129,9 +129,7 @@ def Final_Energy_by_Carrier__Electricity(
     series_list = [agri, rescom, transpo, industry, dac]
     series_list = [series for series in series_list if not series.empty]
 
-    result = pd.concat(
-        series_list
-    )  # reduce(lambda a, b: a.add(b, fill_value=0), series_list)
+    result = pd.concat(series_list)
     return result
 
 
