@@ -288,6 +288,11 @@ class Network_Processor:
             kwargs["config"] = config
         if "aggregate_per_year" in params:
             kwargs["aggregate_per_year"] = self.aggregate_per_year
+        if "energy_totals" in params:
+            kwargs["energy_totals"] = (
+                self.network_results_path / "resources" / "energy_totals.csv"
+            )
+
         return func(n, **kwargs)
 
     def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:

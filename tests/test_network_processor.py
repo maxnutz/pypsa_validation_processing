@@ -269,6 +269,51 @@ class TestNetworkProcessorFunctionExecution:
                     assert isinstance(result, pd.Series)
                     assert call_kwargs.get("called_with_config") is False
 
+    def test_execute_function_passes_energy_totals_when_accepted(
+        self, mock_config_file: Path
+    ):
+        """Test that energy_totals path is passed to functions that accept it."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {
+                    "Test Variable": "mock_func_with_energy_totals"
+                }
+
+                captured_kwargs = {}
+
+                def mock_func_with_energy_totals(n, energy_totals=None):
+                    captured_kwargs["energy_totals"] = energy_totals
+                    return pd.Series(
+                        [1.0],
+                        index=pd.MultiIndex.from_tuples(
+                            [("AT", "MWh_el")], names=["country", "unit"]
+                        ),
+                    )
+
+                with patch(
+                    "pypsa_validation_processing.class_definitions.importlib.import_module"
+                ) as mock_import:
+                    mock_module = MagicMock()
+                    mock_module.mock_func_with_energy_totals = (
+                        mock_func_with_energy_totals
+                    )
+                    mock_import.return_value = mock_module
+
+                    mock_network = MockPyPSANetwork()
+                    result = processor._execute_function_for_variable(
+                        "Test Variable", mock_network
+                    )
+
+                assert isinstance(result, pd.Series)
+                assert captured_kwargs["energy_totals"] == (
+                    processor.network_results_path / "resources" / "energy_totals.csv"
+                )
+
     def test_execute_function_caches_signature_parameters(self, mock_config_file: Path):
         """Test that function signature inspection is cached per function."""
         with patch(

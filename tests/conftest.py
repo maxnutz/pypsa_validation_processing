@@ -12,7 +12,7 @@ import pytest
 class MockStatisticsAccessor:
     """Mock PyPSA Statistics accessor for testing.
 
-    This mock provides the energy_balance method that returns realistic
+    This mock provides energy_balance/withdrawal methods that return realistic
     pandas Series with MultiIndex structure matching PyPSA output.
     """
 
@@ -29,6 +29,8 @@ class MockStatisticsAccessor:
         direction: str = "withdrawal",
         at_port: list[str] | None = None,
         groupby_time: bool = True,
+        nice_names: bool | None = None,
+        **_: object,
     ) -> pd.Series | pd.DataFrame:
         """Mock energy_balance method for PyPSA Network.statistics.
 
@@ -53,6 +55,8 @@ class MockStatisticsAccessor:
         groupby_time : bool
             If ``True`` (default) return an aggregated Series.
             If ``False`` return a DataFrame with 4 hourly timestamps as columns.
+        nice_names : bool | None
+            Ignored in mock, accepted for compatibility with production calls.
 
         Returns
         -------
@@ -83,14 +87,22 @@ class MockStatisticsAccessor:
                 for unit in ["MWh_el", "MWh_th"]:
                     # Create index tuple based on groupby keys
                     idx_dict = {
+                        "name": f"{c}_{location}",
+                        "bus": f"{location} bus",
                         "carrier": c,
                         "location": location,
                         "unit": unit,
                     }
-                    idx_tuple = tuple(idx_dict[key] for key in groupby)
+                    idx_tuple = tuple(idx_dict.get(key, f"mock_{key}") for key in groupby)
                     index_tuples.append(idx_tuple)
-                    # Mock value: roughly realistic energy value
-                    values.append(1000.0)
+                    # Provide deterministic signs for link ports used in
+                    # transportation charging-loss calculations.
+                    if components == "Link" and at_port == ["bus0"]:
+                        values.append(-1000.0)
+                    elif components == "Link" and at_port == ["bus1"]:
+                        values.append(900.0)
+                    else:
+                        values.append(1000.0)
 
         # Create MultiIndex
         index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
@@ -105,6 +117,33 @@ class MockStatisticsAccessor:
                 index=index,
                 dtype=float,
             )
+
+    def withdrawal(
+        self,
+        bus_carrier: str | None = None,
+        carrier: list[str] | str | None = None,
+        components: str | list[str] | None = None,
+        aggregate_time: bool = True,
+        groupby: list[str] | None = None,
+        nice_names: bool | None = None,
+        **kwargs: object,
+    ) -> pd.Series | pd.DataFrame:
+        """Mock withdrawal method forwarding to energy_balance.
+
+        PyPSA's statistics.withdrawal uses ``aggregate_time`` while
+        ``energy_balance`` uses ``groupby_time``. This adapter keeps tests
+        compatible with either call style.
+        """
+        return self.energy_balance(
+            bus_carrier=bus_carrier,
+            carrier=carrier,
+            components=components,
+            groupby=groupby,
+            direction="withdrawal",
+            groupby_time=aggregate_time,
+            nice_names=nice_names,
+            **kwargs,
+        )
 
 
 class MockPyPSANetwork:
@@ -129,6 +168,13 @@ class MockPyPSANetwork:
             "wildcards": {"planning_horizons": 2020},
         }
         self.statistics = MockStatisticsAccessor()
+        self.links = pd.DataFrame(
+            {
+                "carrier": ["BEV charger", "BEV charger", "other link"],
+                "efficiency": [0.9, 0.9, 1.0],
+            },
+            index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
+        )
         # Add carriers attribute with empty index by default
         self.carriers = pd.DataFrame(index=[])
 
@@ -212,3 +258,21 @@ network_results_path: /tmp/network_results
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_content)
     return config_file
+
+
+@pytest.fixture
+def energy_totals_csv(tmp_path: Path) -> Path:
+    """Fixture providing a minimal energy_totals.csv for domestic-share tests."""
+    energy_totals = pd.DataFrame(
+        {
+            "country": ["AT", "AT"],
+            "year": [2020, 2021],
+            "total domestic aviation": [30.0, 0.0],
+            "total international aviation": [70.0, 0.0],
+            "total domestic navigation": [20.0, 0.0],
+            "total international navigation": [80.0, 0.0],
+        }
+    )
+    csv_path = tmp_path / "energy_totals.csv"
+    energy_totals.to_csv(csv_path, index=False)
+    return csv_path
