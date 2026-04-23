@@ -30,8 +30,8 @@ from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
 )
 from pypsa_validation_processing.utils import (
-    statistics_grouping_index,
     get_energy_totals_domestic_share,
+    create_location_index_from_cupperplate,
 )
 
 
@@ -88,6 +88,67 @@ def Final_Energy_by_Carrier__Electricity(
         .groupby(["location", "unit"])
         .sum()
     )
+
+
+def Final_Energy_by_Carrier__Oil(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Docstring oil from cupperplate to AT"""
+
+    # TODO: calculate the fraction of renewable oil regionwise
+
+    # Final Energy|Agricultur|Liquids - agriculture machinery oil
+    agri = n.statistics.withdrawal(
+        carrier="agriculture machinery oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Liquids - urban decentral oil boiler, rural oil boiler
+    raw_rescom = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=["rural oil boiler", "urban decentral oil boiler"],
+        groupby=kwargs_filtering["groupby"] + ["bus1"],
+        aggregate_time=aggregate_per_year,
+    )
+    if raw_rescom.empty:
+        rescom = raw_rescom
+    else:
+        raw_rescom = raw_rescom.drop("Store", errors="ignore")
+        usage_location = [
+            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+        ]
+        rescom = (
+            create_location_index_from_cupperplate(raw_rescom, usage_location)
+            .groupby(kwargs["groupby"])
+            .sum()
+        )
+
+    # Final Energy|Transportation|Liquids
+    transpo = n.statistics.withdrawal(
+        carrier="land transport oil", components="Load", **kwargs
+    )
+
+    # Final Energy|Industry|Liquids - naphtha for industry
+    industry = n.statistics.withdrawal(
+        bus_carrier="naphtha for industry",
+        carrier="naphtha for industry",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    series_list = [
+        agri,
+        rescom,
+        transpo,
+        industry,
+    ]
+    series_list = [series for series in series_list if not series.empty]
+
+    total = pd.concat(series_list)
+    return total
 
 
 def Final_Energy_by_Sector__Transportation(
