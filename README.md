@@ -127,7 +127,9 @@ def <function_name>(
     ...
 ```
 
-If a variable-specific function needs additional settings, an optional `config: dict` argument can be added and is passed automatically by the processor when present.
+If a variable-specific function needs additional settings, optional function parameters can be added. Currently, these include: 
+- `config: dict`: dict of the configuration 
+- `energy_totals: Path`: Path to the file energy_totals, needed to calculate domestic-to-international ratios. This path is currently set to `self.network_results_path / "resources" / "energy_totals.csv"`
 
 Return format rules:
 
