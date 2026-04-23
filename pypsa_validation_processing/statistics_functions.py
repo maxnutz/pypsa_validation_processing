@@ -71,6 +71,9 @@ def Final_Energy_by_Carrier__Electricity(
     (excluding dedicated industry/agriculture/charger/distribution categories,
     BEV charging) industry electricity loads, and DAC electricity demand
     change in home battery is of magnitude 1e-9 compared to electricity demand.
+    Concerning heat: rural air heat pump, rural ground heat pump, rural resisive
+    heater and urban decentral heatings are included. Central heatings using
+    electricity as fuel are NOT included.
     """
     # get Final Energy|Agriculture|Electricity
     agri = n.statistics.withdrawal(
@@ -82,7 +85,7 @@ def Final_Energy_by_Carrier__Electricity(
 
     # get Final Energy|Residential and Commercial|Electricity
     lv = n.statistics.withdrawal(
-        bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs
+        bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs_filtering
     )
     forbitten_list = []
     for i in lv.index.get_level_values("carrier").unique():
@@ -96,11 +99,12 @@ def Final_Energy_by_Carrier__Electricity(
             if regex in i:
                 forbitten_list.append(i)
     rescom = lv[~lv.index.get_level_values("carrier").isin(forbitten_list)]
-
+    rescom = rescom.groupby(kwargs["groupby"]).sum()
     # get Final Energy|Transportation|Electricity
     transpo = n.statistics.withdrawal(
         bus_carrier="low voltage",
         carrier="BEV charger",
+        components="Link",
         aggregate_time=aggregate_per_year,
         **kwargs,
     )
@@ -117,20 +121,17 @@ def Final_Energy_by_Carrier__Electricity(
     dac = n.statistics.withdrawal(
         bus_carrier="AC",
         carrier="DAC",
+        components="Link",
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
 
     series_list = [agri, rescom, transpo, industry, dac]
     series_list = [series for series in series_list if not series.empty]
 
-    if series_list and any(
-        type(series) is not type(series_list[0]) for series in series_list
-    ):
-        raise TypeError(
-            "Final Energy\|Electricity energy statistics must all have the same datatype."
-        )
-
-    result = reduce(lambda a, b: a.add(b, fill_value=0), series_list)
+    result = pd.concat(
+        series_list
+    )  # reduce(lambda a, b: a.add(b, fill_value=0), series_list)
     return result
 
 
