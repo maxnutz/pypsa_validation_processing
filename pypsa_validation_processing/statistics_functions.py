@@ -88,7 +88,7 @@ def Final_Energy_by_Carrier__Electricity(
     lv = n.statistics.withdrawal(
         bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs_filtering
     )
-    forbitten_parts = [
+    forbidden_parts = [
         "urban central",
         "industry",
         "agriculture",
@@ -96,9 +96,9 @@ def Final_Energy_by_Carrier__Electricity(
         "distribution",
     ]
     lv_carriers = lv.index.get_level_values("carrier").astype(str)
-    forbitten_pattern = "|".join(re.escape(part) for part in forbitten_parts)
-    forbitten_mask = lv_carriers.str.contains(forbitten_pattern, case=False, regex=True)
-    rescom = lv[~forbitten_mask].groupby(kwargs["groupby"]).sum()
+    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
+    forbidden_mask = lv_carriers.str.contains(forbidden_pattern, case=False, regex=True)
+    rescom = lv[~forbidden_mask].groupby(kwargs["groupby"]).sum()
 
     # get Final Energy|Transportation|Electricity
     transpo = n.statistics.withdrawal(
