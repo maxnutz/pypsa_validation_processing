@@ -20,6 +20,7 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 """
 
 from __future__ import annotations
+import re
 from functools import reduce
 from pathlib import Path
 import pandas as pd
@@ -39,10 +40,11 @@ def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract electricity final energy from a PyPSA Network.
+    """Extract electricity-carrier final energy from a PyPSA Network.
 
-    Returns the total electricity consumption (excluding transmission /
-    distribution losses)
+    Returns the total final energy demand supplied by electricity across
+    agriculture, residential and commercial, transportation, and industry
+    and DAC.
 
     Parameters
     ----------
@@ -50,7 +52,7 @@ def Final_Energy_by_Carrier__Electricity(
         PyPSA network to process.
     aggregate_per_year : bool, optional
         If ``True`` (default), aggregate over all snapshots and return a
-        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
@@ -65,29 +67,70 @@ def Final_Energy_by_Carrier__Electricity(
 
     Notes
     -----
-    Extracts all withdrawals from elec network. low_voltage is included in AC withdrawal.
-    Remove discharger afterwards, as battery-connecting links have different carrier names.
+    Combines electricity withdrawals from the following contributions:
+    agriculture electricity loads, residential/commercial low-voltage loads
+    (excluding dedicated industry/agriculture/charger/distribution categories,
+    BEV charging) industry electricity loads, and DAC electricity demand
+    change in home battery is of magnitude 1e-9 compared to electricity demand.
+    Concerning heat: rural air heat pump, rural ground heat pump, rural resisive
+    heater and urban decentral heatings are included. Central heatings using
+    electricity as fuel are NOT included.
     """
-    # withdrawal from electricity including low_voltage
-    res = abs(
-        n.statistics.energy_balance(
-            bus_carrier="AC",
-            groupby=["carrier", "location", "unit"],
-            groupby_time=aggregate_per_year,
-        )
+    # get Final Energy|Agriculture|Electricity
+    agri = n.statistics.withdrawal(
+        carrier=["agriculture electricity", "agriculture machinery electric"],
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
     )
-    # as battery is Store, discharger-link needs to be evaluated separately.
-    res_storage = n.statistics.energy_balance(
+
+    # get Final Energy|Residential and Commercial|Electricity
+    lv = n.statistics.withdrawal(
+        bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs_filtering
+    )
+    forbidden_parts = [
+        "urban central",
+        "industry",
+        "agriculture",
+        "charger",
+        "distribution",
+    ]
+    lv_carriers = lv.index.get_level_values("carrier").astype(str)
+    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
+    forbidden_mask = lv_carriers.str.contains(forbidden_pattern, case=False, regex=True)
+    rescom = lv[~forbidden_mask].groupby(kwargs["groupby"]).sum()
+
+    # get Final Energy|Transportation|Electricity
+    transpo = n.statistics.withdrawal(
+        bus_carrier="low voltage",
+        carrier="BEV charger",
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # get Final Energy|Industry|Electricity
+    industry = n.statistics.withdrawal(
+        carrier="industry electricity",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # get electricity load from DAC
+    dac = n.statistics.withdrawal(
         bus_carrier="AC",
-        groupby=["carrier", "location", "unit"],
-        carrier=["battery discharger"],
-        groupby_time=aggregate_per_year,
+        carrier="DAC",
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
     )
-    return (
-        pd.concat([res, res_storage.mul(-1)], axis=0)
-        .groupby(["location", "unit"])
-        .sum()
-    )
+
+    series_list = [agri, rescom, transpo, industry, dac]
+    series_list = [series for series in series_list if not series.empty]
+
+    result = pd.concat(series_list)
+    return result
 
 
 def Final_Energy_by_Sector__Transportation(

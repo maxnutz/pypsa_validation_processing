@@ -23,6 +23,112 @@ from conftest import MockPyPSANetwork, MockNetworkCollection
 class TestFinalEnergyByCarrierElectricity:
     """Test suite for Final_Energy_by_Carrier__Electricity function."""
 
+    class _ElectricityStatisticsAccessor:
+        """Minimal accessor to verify electricity-carrier extraction behavior."""
+
+        def __init__(self, empty_dac: bool = False):
+            self.empty_dac = empty_dac
+            self.calls: list[dict] = []
+
+        @staticmethod
+        def _series_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_el",
+        ) -> pd.Series:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            return pd.Series(values, index=index, dtype=float)
+
+        def withdrawal(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "aggregate_time": aggregate_time,
+                    "groupby": groupby,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if carrier == ["agriculture electricity", "agriculture machinery electric"]:
+                return self._series_from_groupby(groupby, [10.0])
+
+            if bus_carrier == "low voltage" and components is None:
+                index = pd.MultiIndex.from_tuples(
+                    [
+                        ("n1", "AT1 bus", "household demand", "AT1", "MWh_el"),
+                        ("n2", "AT1 bus", "rural air heat pump", "AT1", "MWh_el"),
+                        ("n3", "AT1 bus", "industry electricity", "AT1", "MWh_el"),
+                        ("n4", "AT1 bus", "agriculture electricity", "AT1", "MWh_el"),
+                        ("n5", "AT1 bus", "BEV charger", "AT1", "MWh_el"),
+                        ("n6", "AT1 bus", "distribution losses", "AT1", "MWh_el"),
+                        (
+                            "n7",
+                            "AT1 bus",
+                            "urban central resistive heater",
+                            "AT1",
+                            "MWh_el",
+                        ),
+                    ],
+                    names=["name", "bus", "carrier", "location", "unit"],
+                )
+                return pd.Series(
+                    [7.0, 8.0, 100.0, 200.0, 300.0, 400.0, 500.0], index=index
+                )
+
+            if (
+                bus_carrier == "low voltage"
+                and carrier == "BEV charger"
+                and components == "Link"
+            ):
+                return self._series_from_groupby(groupby, [40.0])
+
+            if carrier == "industry electricity" and components == "Load":
+                return self._series_from_groupby(groupby, [50.0])
+
+            if bus_carrier == "AC" and carrier == "DAC" and components == "Link":
+                if self.empty_dac:
+                    return pd.Series(
+                        dtype=float,
+                        index=pd.MultiIndex.from_tuples([], names=groupby),
+                    )
+                return self._series_from_groupby(groupby, [60.0])
+
+            return pd.Series(
+                dtype=float,
+                index=pd.MultiIndex.from_tuples([], names=groupby),
+            )
+
+    class _ElectricityNetwork:
+        """Minimal network exposing the custom electricity statistics accessor."""
+
+        def __init__(self, empty_dac: bool = False):
+            self.statistics = (
+                TestFinalEnergyByCarrierElectricity._ElectricityStatisticsAccessor(
+                    empty_dac=empty_dac
+                )
+            )
+
+    def _electricity_network(self, empty_dac: bool = False):
+        return self._ElectricityNetwork(empty_dac=empty_dac)
+
     def test_returns_series(self, mock_network: MockPyPSANetwork):
         """Test that the function returns a pandas Series."""
         result = Final_Energy_by_Carrier__Electricity(mock_network)
@@ -61,6 +167,56 @@ class TestFinalEnergyByCarrierElectricity:
             assert isinstance(result.index, pd.MultiIndex)
             assert result.index.names == ["location", "unit"]
             assert len(result) > 0
+
+    def test_filters_forbidden_low_voltage_carriers(self):
+        """Residential/commercial low-voltage sum excludes forbidden carrier patterns."""
+        result = Final_Energy_by_Carrier__Electricity(self._electricity_network())
+        # Only household demand (7) and rural air heat pump (8) must remain from LV.
+        assert 15.0 in result.values
+        assert 100.0 not in result.values
+        assert 200.0 not in result.values
+        assert 300.0 not in result.values
+        assert 400.0 not in result.values
+        assert 500.0 not in result.values
+
+    def test_includes_all_non_empty_contributions_in_order(self):
+        """Result concatenates agriculture, res/com, transport, industry, and DAC."""
+        result = Final_Energy_by_Carrier__Electricity(self._electricity_network())
+        assert list(result.values) == [10.0, 15.0, 40.0, 50.0, 60.0]
+
+    def test_ignores_empty_contributions_before_concat(self):
+        """Empty contribution series are removed before concatenation."""
+        result = Final_Energy_by_Carrier__Electricity(
+            self._electricity_network(empty_dac=True)
+        )
+        assert list(result.values) == [10.0, 15.0, 40.0, 50.0]
+
+    def test_issues_expected_withdrawal_queries(self):
+        """Function requests the expected carrier/component combinations."""
+        network = self._electricity_network()
+        _ = Final_Energy_by_Carrier__Electricity(network)
+        calls = network.statistics.calls
+        assert len(calls) == 5
+
+        assert calls[0]["carrier"] == [
+            "agriculture electricity",
+            "agriculture machinery electric",
+        ]
+        assert calls[0]["components"] == "Load"
+
+        assert calls[1]["bus_carrier"] == "low voltage"
+        assert calls[1]["components"] is None
+
+        assert calls[2]["bus_carrier"] == "low voltage"
+        assert calls[2]["carrier"] == "BEV charger"
+        assert calls[2]["components"] == "Link"
+
+        assert calls[3]["carrier"] == "industry electricity"
+        assert calls[3]["components"] == "Load"
+
+        assert calls[4]["bus_carrier"] == "AC"
+        assert calls[4]["carrier"] == "DAC"
+        assert calls[4]["components"] == "Link"
 
 
 # ---------------------------------------------------------------------------
