@@ -128,6 +128,7 @@ UNITS_MAPPING = {
     "land transport": "MWh",
     "t_co2": "t",
     "": "",
+    "MWh": "MWh",
 }
 
 ## standards for statistics-functions

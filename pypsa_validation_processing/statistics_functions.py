@@ -25,9 +25,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
-from pypsa_validation_processing.utils import statistics_kwargs as kwargs
 from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
+    statistics_kwargs as kwargs,
+    UNITS_MAPPING,
 )
 from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
@@ -128,27 +129,82 @@ def Final_Energy_by_Carrier__Oil(
 
     # Final Energy|Transportation|Liquids
     transpo = n.statistics.withdrawal(
-        carrier="land transport oil", components="Load", **kwargs
-    )
-
-    # Final Energy|Industry|Liquids - naphtha for industry
-    industry = n.statistics.withdrawal(
-        bus_carrier="naphtha for industry",
-        carrier="naphtha for industry",
+        carrier="land transport oil",
         components="Load",
         aggregate_time=aggregate_per_year,
         **kwargs,
     )
+
     series_list = [
         agri,
         rescom,
         transpo,
-        industry,
     ]
     series_list = [series for series in series_list if not series.empty]
 
-    total = pd.concat(series_list)
-    return total
+    total = pd.concat(series_list).groupby(kwargs["groupby"]).sum()
+
+    # non-fossil parts from renewable-gas production per location
+    # renewable oil production
+    non_fossil_parts = n.statistics.supply(
+        bus_carrier="oil",
+        carrier=[
+            "unsustainable bioliquids",
+            "biomass to liquid",
+            "biomass to liquid CC",
+            "electrobiofuels",
+            "Fischer-Tropsch",
+        ],
+        at_port="bus1",
+        components="Link",
+        groupby=kwargs_filtering["groupby"] + ["bus0"],
+    )
+    home_location = [
+        bus.split(" ")[0]
+        for bus in list(non_fossil_parts.index.get_level_values("bus0"))
+    ]
+
+    non_fossil_parts = create_location_index_from_cupperplate(
+        non_fossil_parts, home_location
+    )
+    non_fossil_parts = non_fossil_parts.groupby(kwargs["groupby"]).sum()
+
+    # all oil use
+    all_oil = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=[
+            "land transport oil",
+            "naphtha for industry",
+            "shipping oil",
+            "kerosene for aviation",
+            "agriculture machinery oil",
+            "urban central oil CHP",
+            "oil",
+            "rural oil boiler",
+            "urban decentral oil boiler",
+        ],
+        components="Link",
+        at_port="bus0",
+        groupby=["bus1", "carrier", "location", "unit"],
+    )
+
+    home_location = [
+        bus.split(" ")[0] for bus in list(all_oil.index.get_level_values("bus1"))
+    ]
+
+    all_oil = create_location_index_from_cupperplate(all_oil, home_location)
+    all_oil = all_oil.groupby(kwargs["groupby"]).sum()
+
+    non_fossil_fraction = non_fossil_parts / all_oil
+    non_fossil_fraction = non_fossil_fraction.clip(upper=1)  # TODO: Issue #53
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
+    non_fossil_fraction = non_fossil_fraction.groupby(
+        kwargs["groupby"]
+    ).mean()  # avoid double-indexing
+    total = total.rename(index=UNITS_MAPPING)
+    total = total.groupby(kwargs["groupby"]).sum()
+    fossil_oil = total.mul(1 - non_fossil_fraction, axis=0)
+    return fossil_oil
 
 
 def Final_Energy_by_Sector__Transportation(
