@@ -287,7 +287,10 @@ def Final_Energy_by_Carrier__Oil(
     all_oil = create_location_index_from_cupperplate(all_oil, home_location)
     all_oil = all_oil.groupby(kwargs["groupby"]).sum()
 
-    non_fossil_fraction = non_fossil_parts / all_oil
+    non_fossil_fraction = non_fossil_parts.div(all_oil)
+    zero_oil = all_oil.eq(0).reindex(non_fossil_fraction.index, fill_value=False)
+    non_fossil_fraction = non_fossil_fraction.mask(zero_oil, 1.0)
+
     non_fossil_fraction = non_fossil_fraction.clip(upper=1)  # TODO: Issue #53
     non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
     non_fossil_fraction = non_fossil_fraction.groupby(
@@ -295,6 +298,13 @@ def Final_Energy_by_Carrier__Oil(
     ).mean()  # avoid double-indexing
     total = total.rename(index=UNITS_MAPPING)
     total = total.groupby(kwargs["groupby"]).sum()
+
+    # cover edge-case with no oil demand
+    if all_oil.empty:
+        non_fossil_fraction = total * 0.0 + 1.0
+    else:
+        non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0.0)
+
     fossil_oil = total.mul(1 - non_fossil_fraction, axis=0)
     return fossil_oil
 
