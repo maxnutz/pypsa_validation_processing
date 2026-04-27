@@ -236,7 +236,7 @@ def Final_Energy_by_Carrier__Oil(
 
     total = pd.concat(series_list).groupby(kwargs["groupby"]).sum()
 
-    # non-fossil parts from renewable-gas production per location
+    # non-fossil parts from renewable-oil production per location
     # renewable oil production
     non_fossil_parts = n.statistics.supply(
         bus_carrier="oil",
