@@ -95,9 +95,58 @@ def Final_Energy_by_Carrier__Oil(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Docstring oil from cupperplate to AT"""
+    """Extract fossil final-energy oil demand from a PyPSA Network.
 
-    # TODO: calculate the fraction of renewable oil regionwise
+    Returns the final energy from oil carriers after removing an estimated
+    renewable-oil share.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Fossil oil final energy with MultiIndex including ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Total oil final energy is built from:
+    - agriculture machinery oil (Load),
+    - residential/commercial oil boiler demand (rural + urban decentral),
+    - land transport oil (Load).
+
+    ``naphtha for industry`` is intentionally excluded because it is treated
+    as non-energy use and therefore not part of Final Energy variables.
+
+    Regionalization from the copperplate topology is performed by deriving a
+    region code from demand- or production-bus names and applying
+    :func:`create_location_index_from_cupperplate` before regrouping to
+    ``kwargs["groupby"]``.
+
+    The renewable-oil fraction is computed per region as:
+
+    ``renewable oil production in region / total oil demand in region``.
+
+    Renewable production is based on supply from selected renewable-oil
+    carriers, while total oil demand is based on withdrawals from oil-using
+    carriers. If the fraction exceeds 1 (i.e., renewable production is larger
+    than regional oil demand), it is clipped to 1, so the fossil share becomes
+    zero in that region. Cross-regional export/import effects of renewable oil
+    are not represented in this statistic.
+
+    ``UNITS_MAPPING`` is applied inside this function to enable multiplication
+    with demand-side units of renewable-oil-fraction``.
+    """
 
     # Final Energy|Agricultur|Liquids - agriculture machinery oil
     agri = n.statistics.withdrawal(
