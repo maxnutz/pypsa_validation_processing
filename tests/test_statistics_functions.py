@@ -231,9 +231,18 @@ class TestFinalEnergyByCarrierOil:
     class _OilStatisticsAccessor:
         """Deterministic accessor tailored to oil final-energy tests."""
 
-        def __init__(self, *, rescom_empty: bool = False, all_oil_value: float = 200.0):
+        def __init__(
+            self,
+            *,
+            rescom_empty: bool = False,
+            all_oil_value: float = 200.0,
+            all_oil_empty: bool = False,
+            non_fossil_empty: bool = False,
+        ):
             self.rescom_empty = rescom_empty
             self.all_oil_value = all_oil_value
+            self.all_oil_empty = all_oil_empty
+            self.non_fossil_empty = non_fossil_empty
 
         def _to_result(
             self,
@@ -331,6 +340,16 @@ class TestFinalEnergyByCarrierOil:
                 and at_port == "bus0"
                 and groupby == ["bus1", "carrier", "location", "unit"]
             ):
+                if self.all_oil_empty:
+                    empty_idx = pd.MultiIndex.from_arrays(
+                        [[], [], [], []],
+                        names=["bus1", "carrier", "location", "unit"],
+                    )
+                    return self._to_result(
+                        index=empty_idx,
+                        values=[],
+                        aggregate_time=aggregate_time,
+                    )
                 idx = pd.MultiIndex.from_tuples(
                     [
                         (
@@ -368,6 +387,16 @@ class TestFinalEnergyByCarrierOil:
                 and at_port == "bus1"
                 and groupby == ["name", "bus", "carrier", "location", "unit", "bus0"]
             ):
+                if self.non_fossil_empty:
+                    empty_idx = pd.MultiIndex.from_arrays(
+                        [[], [], [], [], [], []],
+                        names=["name", "bus", "carrier", "location", "unit", "bus0"],
+                    )
+                    return self._to_result(
+                        index=empty_idx,
+                        values=[],
+                        aggregate_time=aggregate_time,
+                    )
                 idx = pd.MultiIndex.from_tuples(
                     [
                         (
@@ -392,10 +421,19 @@ class TestFinalEnergyByCarrierOil:
     class _OilNetwork:
         """Minimal network object exposing only the statistics accessor."""
 
-        def __init__(self, *, rescom_empty: bool = False, all_oil_value: float = 200.0):
+        def __init__(
+            self,
+            *,
+            rescom_empty: bool = False,
+            all_oil_value: float = 200.0,
+            all_oil_empty: bool = False,
+            non_fossil_empty: bool = False,
+        ):
             self.statistics = TestFinalEnergyByCarrierOil._OilStatisticsAccessor(
                 rescom_empty=rescom_empty,
                 all_oil_value=all_oil_value,
+                all_oil_empty=all_oil_empty,
+                non_fossil_empty=non_fossil_empty,
             )
 
     def test_clips_non_fossil_share_above_one_to_zero_fossil(self):
@@ -423,6 +461,29 @@ class TestFinalEnergyByCarrierOil:
 
         assert isinstance(result, pd.Series)
         assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
+
+    def test_no_renewable_oil_production_fossil_equals_total(self):
+        """Without renewable oil supply, fossil oil should equal total oil demand."""
+        result = Final_Energy_by_Carrier__Oil(self._OilNetwork(non_fossil_empty=True))
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert not result.isna().any()
+        # 100 (agri) + 100 (res/com) + 300 (transport) = 500
+        assert result.loc[("AT1", "MWh")] == pytest.approx(500.0)
+
+    def test_handles_empty_all_oil_without_failing(self):
+        """Function should work when total oil-withdrawal denominator is empty."""
+        result = Final_Energy_by_Carrier__Oil(
+            self._OilNetwork(all_oil_empty=True, non_fossil_empty=True)
+        )
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert not result.isna().any()
+        assert (result == 0.0).all()
 
     def test_returns_dataframe_for_aggregate_per_year_false(self):
         """Function should return a timeseries DataFrame for aggregate_per_year=False."""

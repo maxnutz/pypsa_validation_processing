@@ -209,7 +209,6 @@ def create_location_index_from_cupperplate(
     """
     idx_df = raw_input.index.to_frame(index=False)
     idx_df["location"] = pd.Index(usage_location_list).to_numpy()
-    idx_df
     new_index = pd.MultiIndex.from_frame(idx_df, names=raw_input.index.names)
     output = raw_input.copy()
     output.index = new_index
