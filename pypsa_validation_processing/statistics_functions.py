@@ -26,9 +26,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
-from pypsa_validation_processing.utils import statistics_kwargs as kwargs
 from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
+    statistics_kwargs as kwargs,
+    UNITS_MAPPING,
 )
 from pypsa_validation_processing.utils import (
     statistics_grouping_index,
@@ -130,6 +131,73 @@ def Final_Energy_by_Carrier__Electricity(
     series_list = [series for series in series_list if not series.empty]
 
     result = pd.concat(series_list)
+    return result
+
+
+def Final_Energy_by_Carrier__Natural_Gas(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """IAMC variable Final Energy[by Carrier]|Gas"""
+    # get fraction fossil-gas non-fossil-gas
+    # non-fossil-gas-production per region
+    non_fossil_gas_prod = n.statistics.supply(
+        bus_carrier="gas",
+        carrier=[
+            "Sabatier",
+            "biogas to gas",
+            "biogas to gas CC",
+            "BioSNG",
+            "BioSNG CC",
+        ],
+        at_port="bus1",
+        components="Link",
+        **kwargs,
+    )
+
+    # all gas-usage per region
+    all_gas = n.statistics.withdrawal(
+        bus_carrier="gas", components="Link", **kwargs_filtering
+    )
+    all_gas.index.get_level_values("carrier").unique()
+    forbidden_parts = ["pipeline"]
+    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
+
+    total_gas_usage_carriers = all_gas.index.get_level_values("carrier").astype(str)
+    forbidden_mask = total_gas_usage_carriers.str.contains(
+        forbidden_pattern, case=False, regex=True
+    )
+    total_gas_usage = all_gas[~forbidden_mask]
+    total_gas_usage = total_gas_usage.groupby(kwargs["groupby"]).sum()
+
+    # fraction of usage and production values
+    non_fossil_fraction = non_fossil_gas_prod / total_gas_usage
+    non_fossil_fraction = non_fossil_fraction.clip(upper=1)
+    non_fossil_fraction = non_fossil_fraction.groupby(kwargs["groupby"]).mean()
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
+
+    # Final Energy|Residential and Commercial|Natural Gas - urban decentral gas boiler
+    rescom = n.statistics.withdrawal(
+        bus_carrier="gas",
+        carrier=["urban decentral gas boiler", "rural gas boiler"],
+        components="Link",
+        **kwargs,
+    )
+
+    # Final Energy|Industry|Natural Gas
+    industry = n.statistics.withdrawal(
+        bus_carrier="gas for industry",
+        carrier=["gas for industry", "as for industry CC"],
+        components="Load",
+        **kwargs,
+    )
+
+    series_list = [rescom, industry]
+    series_list = [series for series in series_list if not series.empty]
+
+    total = pd.concat(series_list)
+    total = total.rename(index=UNITS_MAPPING).groupby(kwargs["groupby"]).sum()
+    result = total.mul(1 - non_fossil_fraction, axis=0)
     return result
 
 
