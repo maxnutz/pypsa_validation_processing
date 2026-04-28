@@ -172,6 +172,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
 
     # fraction of usage and production values
     non_fossil_fraction = non_fossil_gas_prod / total_gas_usage
+    non_fossil_fraction = non_fossil_fraction.replace([np.inf, -np.inf], np.nan)
     non_fossil_fraction = non_fossil_fraction.clip(upper=1)
     non_fossil_fraction = non_fossil_fraction.groupby(kwargs["groupby"]).mean()
     non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
@@ -195,8 +196,15 @@ def Final_Energy_by_Carrier__Natural_Gas(
     series_list = [rescom, industry]
     series_list = [series for series in series_list if not series.empty]
 
+    if not series_list:
+        return pd.Series(
+            dtype=float,
+            index=pd.MultiIndex.from_tuples([], names=kwargs["groupby"]),
+        )
+
     total = pd.concat(series_list)
     total = total.rename(index=UNITS_MAPPING).groupby(kwargs["groupby"]).sum()
+    non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0)
     result = total.mul(1 - non_fossil_fraction, axis=0)
     return result
 

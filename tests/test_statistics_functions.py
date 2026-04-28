@@ -7,6 +7,7 @@ import pytest
 
 from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Carrier__Electricity,
+    Final_Energy_by_Carrier__Natural_Gas,
     Final_Energy_by_Sector__Industry,
     Final_Energy_by_Sector__Agriculture,
     Final_Energy_by_Sector__Transportation,
@@ -217,6 +218,181 @@ class TestFinalEnergyByCarrierElectricity:
         assert calls[4]["bus_carrier"] == "AC"
         assert calls[4]["carrier"] == "DAC"
         assert calls[4]["components"] == "Link"
+
+
+# ---------------------------------------------------------------------------
+# Tests for Final_Energy_by_Carrier__Natural_Gas
+# ---------------------------------------------------------------------------
+
+
+class TestFinalEnergyByCarrierNaturalGas:
+    """Test suite for Final_Energy_by_Carrier__Natural_Gas function."""
+
+    class _NaturalGasStatisticsAccessor:
+        """Minimal accessor to verify natural-gas extraction behavior."""
+
+        def __init__(self, scenario: str = "mixed"):
+            self.scenario = scenario
+
+        @staticmethod
+        def _empty_series(groupby: list[str]) -> pd.Series:
+            return pd.Series(
+                dtype=float,
+                index=pd.MultiIndex.from_tuples([], names=groupby),
+            )
+
+        @staticmethod
+        def _series_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_LHV",
+        ) -> pd.Series:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            return pd.Series(values, index=index, dtype=float)
+
+        def supply(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            at_port: str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series:
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if (
+                bus_carrier == "gas"
+                and isinstance(carrier, list)
+                and components == "Link"
+                and at_port == "bus1"
+            ):
+                if self.scenario in ("no_gas", "no_renewable"):
+                    return self._empty_series(groupby)
+                if self.scenario == "no_fossil":
+                    return self._series_from_groupby(groupby, [100.0])
+                return self._series_from_groupby(groupby, [20.0])
+
+            return self._empty_series(groupby)
+
+        def withdrawal(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series:
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if (
+                bus_carrier == "gas"
+                and components == "Link"
+                and groupby == ["name", "bus", "carrier", "location", "unit"]
+            ):
+                if self.scenario == "no_gas":
+                    return self._empty_series(groupby)
+
+                index = pd.MultiIndex.from_tuples(
+                    [
+                        (
+                            "gas_link",
+                            "AT1 gas",
+                            "urban decentral gas boiler",
+                            "AT1",
+                            "MWh_LHV",
+                        ),
+                        (
+                            "pipeline_link",
+                            "AT1 gas",
+                            "gas pipeline",
+                            "AT1",
+                            "MWh_LHV",
+                        ),
+                    ],
+                    names=groupby,
+                )
+                return pd.Series([100.0, 900.0], index=index, dtype=float)
+
+            if (
+                bus_carrier == "gas"
+                and carrier == ["urban decentral gas boiler", "rural gas boiler"]
+                and components == "Link"
+            ):
+                if self.scenario == "no_gas":
+                    return self._empty_series(groupby)
+                return self._series_from_groupby(groupby, [40.0])
+
+            if (
+                bus_carrier == "gas for industry"
+                and carrier == ["gas for industry", "as for industry CC"]
+                and components == "Load"
+            ):
+                if self.scenario == "no_gas":
+                    return self._empty_series(groupby)
+                return self._series_from_groupby(groupby, [60.0])
+
+            return self._empty_series(groupby)
+
+    class _NaturalGasNetwork:
+        """Minimal network exposing the custom natural-gas statistics accessor."""
+
+        def __init__(self, scenario: str = "mixed"):
+            self.statistics = (
+                TestFinalEnergyByCarrierNaturalGas._NaturalGasStatisticsAccessor(
+                    scenario=scenario
+                )
+            )
+
+    def _natural_gas_network(self, scenario: str = "mixed"):
+        return self._NaturalGasNetwork(scenario=scenario)
+
+    def test_returns_series(self):
+        """Function returns a Series with expected output format."""
+        result = Final_Energy_by_Carrier__Natural_Gas(self._natural_gas_network())
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+
+    def test_filters_pipeline_from_total_gas_usage(self):
+        """Pipeline carriers are excluded when building the non-fossil share denominator."""
+        result = Final_Energy_by_Carrier__Natural_Gas(
+            self._natural_gas_network("mixed")
+        )
+        # total=100, non-fossil share=20/100, result=100*(1-0.2)=80
+        assert result.loc[("AT1", "MWh")] == 80.0
+
+    def test_edge_case_no_gas_returns_empty_series(self):
+        """No gas usage and no gas demand should return an empty result."""
+        result = Final_Energy_by_Carrier__Natural_Gas(
+            self._natural_gas_network("no_gas")
+        )
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert result.empty
+
+    def test_edge_case_no_fossil_gas_returns_zero(self):
+        """If all gas is renewable, fossil natural gas final energy must be zero."""
+        result = Final_Energy_by_Carrier__Natural_Gas(
+            self._natural_gas_network("no_fossil")
+        )
+        assert result.loc[("AT1", "MWh")] == 0.0
+
+    def test_edge_case_no_renewable_gas_returns_total(self):
+        """If there is no renewable gas production, all demand counts as fossil gas."""
+        result = Final_Energy_by_Carrier__Natural_Gas(
+            self._natural_gas_network("no_renewable")
+        )
+        assert result.loc[("AT1", "MWh")] == 100.0
 
 
 # ---------------------------------------------------------------------------
