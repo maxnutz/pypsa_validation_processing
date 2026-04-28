@@ -133,6 +133,20 @@ def Final_Energy_by_Carrier__Electricity(
     return result
 
 
+def Final_Energy_by_Carrier__Coal(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Docstring for IAMC variable Final Energy [by Carrier]|Coal"""
+    industry = n.statistics.withdrawal(
+        carrier="coal for industry",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    return industry
+
+
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
