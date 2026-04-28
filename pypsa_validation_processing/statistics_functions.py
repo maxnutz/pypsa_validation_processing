@@ -185,13 +185,23 @@ def Final_Energy_by_Carrier__Natural_Gas(
         **kwargs,
     )
 
-    # Final Energy|Industry|Natural Gas
+    # Final Energy|Industry|Natural Gas - gas for industry
     industry = n.statistics.withdrawal(
         bus_carrier="gas for industry",
         carrier=["gas for industry", "as for industry CC"],
         components="Load",
         **kwargs,
     )
+
+    # get fraction of non-energetic use in industry
+    # data from Eurostat energy balance for 2024 | EU27 | in TWh
+    # online available (used 2026-04-28): https://ec.europa.eu/eurostat/cache/visualisations/energy-balances/enbal.html?geo=EU27_2020&unit=KTOE&language=EN&year=&fuel=fuelMainFuel&siec=TOTAL&details=1&chartOptions=0&stacking=normal&chartBal=&chart=&full=0&chartBalText=&order=DESC&siecs=&dataset=nrg_bal_c&decimals=0&agregates=0&share=false&fuelList=fuelElectricity%2CfuelCombustible%2CfuelNonCombustible%2CfuelOtherPetroleum%2CfuelMainPetroleum%2CfuelOil%2CfuelOtherFossil%2CfuelFossil%2CfuelCoal%2CfuelMainFuel
+    # Final consumption - energy use: 7 217 049
+    # Final consumption - non-energy use (fuels not combusted): 458 572
+    fc_energy = 7217049
+    fc_noenergy = 458572
+    energy_fraction_industry_gas = fc_energy / (fc_energy + fc_noenergy)
+    industry = industry.mul(energy_fraction_industry_gas)
 
     series_list = [rescom, industry]
     series_list = [series for series in series_list if not series.empty]
