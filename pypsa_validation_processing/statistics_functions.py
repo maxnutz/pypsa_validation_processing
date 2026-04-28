@@ -138,13 +138,17 @@ def Final_Energy_by_Carrier__Coal(
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
     """Docstring for IAMC variable Final Energy [by Carrier]|Coal"""
-    industry = n.statistics.withdrawal(
-        carrier="coal for industry",
-        components="Load",
-        aggregate_time=aggregate_per_year,
-        **kwargs,
-    )
-    return industry
+    try:
+        industry = n.statistics.withdrawal(
+            bus_carrier="coal for industry",
+            carrier="coal for industry",
+            components="Load",
+            aggregate_time=aggregate_per_year,
+            **kwargs,
+        )
+        return industry
+    except ValueError:
+        return None
 
 
 def Final_Energy_by_Sector__Transportation(
