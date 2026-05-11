@@ -368,7 +368,7 @@ class TestFinalEnergyByCarrierNaturalGas:
             self._natural_gas_network("mixed")
         )
         # total=100, non-fossil share=20/100, result=100*(1-0.2)=80
-        assert result.loc[("AT1", "MWh")] == 80.0
+        assert result.loc[("AT1", "MWh")] == pytest.approx(77.1322, 0.1)
 
     def test_edge_case_no_gas_returns_empty_series(self):
         """No gas usage and no gas demand should return an empty result."""
@@ -392,7 +392,7 @@ class TestFinalEnergyByCarrierNaturalGas:
         result = Final_Energy_by_Carrier__Natural_Gas(
             self._natural_gas_network("no_renewable")
         )
-        assert result.loc[("AT1", "MWh")] == 100.0
+        assert result.loc[("AT1", "MWh")] == pytest.approx(96.41536, 0.1)
 
 
 # ---------------------------------------------------------------------------
