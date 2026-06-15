@@ -138,7 +138,41 @@ def Final_Energy_by_Carrier__Natural_Gas(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """IAMC variable Final Energy[by Carrier]|Gas"""
+    """Extract natural-gas final energy from a PyPSA Network.
+
+    Returns the total final energy demand supplied by natural gas across
+    residential and commercial buildings and industry, while subtracting the
+    estimated non-fossil share of gas consumption.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including
+        ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    The function combines residential and commercial gas withdrawals with
+    industry gas demand, then scales the total by the fossil fraction of gas.
+    The fossil fraction is estimated from the ratio of non-fossil gas
+    production to total gas usage, excluding pipeline flows and limiting the
+    non-fossil share to at most 1.
+    Industry gas demand is reduced by a fixed non-energy-use share based on
+    Eurostat energy balance data.
+    """
     # get fraction fossil-gas non-fossil-gas
     # non-fossil-gas-production per region
     non_fossil_gas_prod = n.statistics.supply(
