@@ -7,7 +7,11 @@ platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 
 [tasks]
 workflow = "python workflow.py"
-workflow_test = "python workflow.py --config pypsa_validation_processing/configs/config.country-timeseries.yaml && python workflow.py --config pypsa_validation_processing/configs/config.country-year.yaml && python workflow.py --config pypsa_validation_processing/configs/config.region-timeseries.yaml && python workflow.py --config pypsa_validation_processing/configs/config.region-year.yaml && pytest tests/ -v"
+workflow_test = """python workflow.py --config pypsa_validation_processing/configs/config.country-timeseries.yaml&&
+                python workflow.py --config pypsa_validation_processing/configs/config.country-year.yaml&&
+                python workflow.py --config pypsa_validation_processing/configs/config.region-timeseries.yaml&&
+                python workflow.py --config pypsa_validation_processing/configs/config.region-year.yaml&&
+                pytest tests/ -v"""
 test = "pytest tests/ -v"
 
 [dependencies]
