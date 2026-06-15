@@ -254,16 +254,33 @@ class TestFinalEnergyByCarrierNaturalGas:
             )
             return pd.Series(values, index=index, dtype=float)
 
+        @staticmethod
+        def _dataframe_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_LHV",
+        ) -> pd.DataFrame:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            columns = pd.Index(
+                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+            )
+            return pd.DataFrame([values[: len(columns)]], index=index, columns=columns)
+
         def supply(
             self,
             bus_carrier: str | None = None,
             carrier: list[str] | str | None = None,
             at_port: str | None = None,
             components: str | list[str] | None = None,
+            aggregate_time: bool = True,
             groupby: list[str] | None = None,
             nice_names: bool | None = None,
             **_: object,
-        ) -> pd.Series:
+        ) -> pd.Series | pd.DataFrame:
             if groupby is None:
                 groupby = ["location", "unit"]
 
@@ -276,8 +293,12 @@ class TestFinalEnergyByCarrierNaturalGas:
                 if self.scenario in ("no_gas", "no_renewable"):
                     return self._empty_series(groupby)
                 if self.scenario == "no_fossil":
-                    return self._series_from_groupby(groupby, [100.0])
-                return self._series_from_groupby(groupby, [20.0])
+                    if aggregate_time:
+                        return self._series_from_groupby(groupby, [100.0])
+                    return self._dataframe_from_groupby(groupby, [100.0, 100.0])
+                if aggregate_time:
+                    return self._series_from_groupby(groupby, [20.0])
+                return self._dataframe_from_groupby(groupby, [20.0, 20.0])
 
             return self._empty_series(groupby)
 
@@ -286,10 +307,11 @@ class TestFinalEnergyByCarrierNaturalGas:
             bus_carrier: str | None = None,
             carrier: list[str] | str | None = None,
             components: str | list[str] | None = None,
+            aggregate_time: bool = True,
             groupby: list[str] | None = None,
             nice_names: bool | None = None,
             **_: object,
-        ) -> pd.Series:
+        ) -> pd.Series | pd.DataFrame:
             if groupby is None:
                 groupby = ["location", "unit"]
 
@@ -320,7 +342,14 @@ class TestFinalEnergyByCarrierNaturalGas:
                     ],
                     names=groupby,
                 )
-                return pd.Series([100.0, 900.0], index=index, dtype=float)
+                if aggregate_time:
+                    return pd.Series([100.0, 900.0], index=index, dtype=float)
+                columns = pd.Index(
+                    pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+                )
+                return pd.DataFrame(
+                    [[100.0, 900.0], [100.0, 900.0]], index=index, columns=columns
+                )
 
             if (
                 bus_carrier == "gas"
@@ -329,7 +358,9 @@ class TestFinalEnergyByCarrierNaturalGas:
             ):
                 if self.scenario == "no_gas":
                     return self._empty_series(groupby)
-                return self._series_from_groupby(groupby, [40.0])
+                if aggregate_time:
+                    return self._series_from_groupby(groupby, [40.0])
+                return self._dataframe_from_groupby(groupby, [40.0, 40.0])
 
             if (
                 bus_carrier == "gas for industry"
@@ -338,7 +369,9 @@ class TestFinalEnergyByCarrierNaturalGas:
             ):
                 if self.scenario == "no_gas":
                     return self._empty_series(groupby)
-                return self._series_from_groupby(groupby, [60.0])
+                if aggregate_time:
+                    return self._series_from_groupby(groupby, [60.0])
+                return self._dataframe_from_groupby(groupby, [60.0, 60.0])
 
             return self._empty_series(groupby)
 
@@ -361,6 +394,17 @@ class TestFinalEnergyByCarrierNaturalGas:
         assert isinstance(result, pd.Series)
         assert isinstance(result.index, pd.MultiIndex)
         assert result.index.names == ["location", "unit"]
+
+    def test_returns_dataframe_when_not_aggregated(self):
+        """aggregate_per_year=False returns a non-empty DataFrame."""
+        result = Final_Energy_by_Carrier__Natural_Gas(
+            self._natural_gas_network(), aggregate_per_year=False
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert not result.empty
+        assert len(result.columns) > 0
 
     def test_filters_pipeline_from_total_gas_usage(self):
         """Pipeline carriers are excluded when building the non-fossil share denominator."""
