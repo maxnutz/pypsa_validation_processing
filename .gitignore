@@ -24,7 +24,6 @@ MANIFEST
 
 # Pixi
 .pixi/
-pixi.lock
 
 # Distribution / packaging
 .cache
