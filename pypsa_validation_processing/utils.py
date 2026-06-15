@@ -3,7 +3,6 @@
 import pandas as pd
 from pathlib import Path
 
-
 EU27_COUNTRY_CODES: dict[str, str] = {
     "AL": "Albania",
     "AT": "Austria",
