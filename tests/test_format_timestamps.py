@@ -56,7 +56,13 @@ def test_format_timestamps_hourly_columns():
     naive_label = pd.Timestamp("2050-01-01 06:00:00")
     df = pd.DataFrame(
         [[1, "AT", "MWh_el", 1.0, 2.0]],
-        columns=["variable_name", "location", "2050-01-01 00:00:00", naive_label, "unit_pypsa"],
+        columns=[
+            "variable_name",
+            "location",
+            "2050-01-01 00:00:00",
+            naive_label,
+            "unit_pypsa",
+        ],
     )
 
     with pytest.raises(AttributeError, match="to_pydatetime"):
@@ -114,7 +120,9 @@ def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: P
         index=pd.MultiIndex.from_tuples([("A", "EJ/yr")], names=["variable", "unit"]),
     )
 
-    with patch("pypsa_validation_processing.class_definitions.pyam.IamDataFrame") as mock_iam:
+    with patch(
+        "pypsa_validation_processing.class_definitions.pyam.IamDataFrame"
+    ) as mock_iam:
         mock_iam.return_value = MagicMock()
         processor.structure_pyam_from_pandas(df)
 

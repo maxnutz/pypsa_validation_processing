@@ -14,7 +14,6 @@ from pypsa_validation_processing.statistics_functions import (
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
 
-
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Electricity
 # ---------------------------------------------------------------------------
@@ -426,7 +425,9 @@ class TestFinalEnergyBySectorIndustry:
             if groupby_time:
                 return pd.Series(values, index=index, dtype=float)
             else:
-                timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                timestamps = pd.date_range(
+                    "2019-01-01", periods=4, freq="6h", name="snapshot"
+                )
                 return pd.DataFrame(
                     {ts: values for ts in timestamps},
                     index=index,
@@ -538,7 +539,9 @@ class TestAggregatePerYearFalse:
         assert isinstance(result, pd.DataFrame)
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork, func):
+    def test_has_location_and_unit_multiindex(
+        self, mock_network: MockPyPSANetwork, func
+    ):
         """DataFrame has MultiIndex with location and unit levels."""
         result = func(mock_network, aggregate_per_year=False)
         assert isinstance(result.index, pd.MultiIndex)
@@ -567,7 +570,10 @@ class TestAggregatePerYearFalse:
                 if isinstance(carriers, str):
                     carriers = [carriers]
                 index_tuples = [
-                    tuple({"carrier": c, "location": "AT1", "unit": "MWh_th"}[k] for k in groupby)
+                    tuple(
+                        {"carrier": c, "location": "AT1", "unit": "MWh_th"}[k]
+                        for k in groupby
+                    )
                     for c in carriers
                 ]
                 values = [10.0] * len(index_tuples)
@@ -575,14 +581,20 @@ class TestAggregatePerYearFalse:
                 groupby_time = kwargs.get("groupby_time", True)
                 if groupby_time:
                     return pd.Series(values, index=index, dtype=float)
-                timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
-                return pd.DataFrame({ts: values for ts in timestamps}, index=index, dtype=float)
+                timestamps = pd.date_range(
+                    "2019-01-01", periods=4, freq="6h", name="snapshot"
+                )
+                return pd.DataFrame(
+                    {ts: values for ts in timestamps}, index=index, dtype=float
+                )
 
         class _TS_IndustryNetwork:
             def __init__(self):
                 self.statistics = _TS_IndustryStatisticsAccessor()
 
-        result = Final_Energy_by_Sector__Industry(_TS_IndustryNetwork(), aggregate_per_year=False)
+        result = Final_Energy_by_Sector__Industry(
+            _TS_IndustryNetwork(), aggregate_per_year=False
+        )
         assert isinstance(result, pd.DataFrame)
         assert isinstance(result.index, pd.MultiIndex)
         assert "location" in result.index.names

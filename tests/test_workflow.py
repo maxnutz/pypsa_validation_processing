@@ -15,7 +15,6 @@ from pypsa_validation_processing.workflow import (
     build_parser,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tests for get_default_config_path
 # ---------------------------------------------------------------------------
@@ -62,7 +61,7 @@ class TestResolveConfigPath:
         """Test that absolute path is resolved correctly."""
         test_config = tmp_path / "custom_config.yaml"
         test_config.write_text("test: data")
-        
+
         result = resolve_config_path(str(test_config))
         assert result == test_config
 
@@ -77,7 +76,7 @@ class TestResolveConfigPath:
         """Test that returned path is absolute."""
         test_config = tmp_path / "config.yaml"
         test_config.write_text("test: data")
-        
+
         result = resolve_config_path(str(test_config))
         assert result.is_absolute()
 
@@ -93,7 +92,7 @@ class TestBuildParser:
     def test_returns_argument_parser(self):
         """Test that function returns an ArgumentParser."""
         from argparse import ArgumentParser
-        
+
         parser = build_parser()
         assert isinstance(parser, ArgumentParser)
 
@@ -130,10 +129,10 @@ class TestMainWorkflow:
         """Test that main() creates and uses Network_Processor correctly."""
         mock_processor = MagicMock()
         mock_processor_class.return_value = mock_processor
-        
+
         # Import main here to avoid issues
         from pypsa_validation_processing.workflow import main
-        
+
         # Mock sys.argv
         with patch.object(sys, "argv", ["workflow.py", "--config", "test.yaml"]):
             with patch(
@@ -170,7 +169,7 @@ class TestCLIBehavior:
     def test_unknown_argument_raises_error(self):
         """Test that unknown arguments raise an error."""
         from argparse import ArgumentError
-        
+
         parser = build_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["--unknown-arg", "value"])

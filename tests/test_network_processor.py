@@ -12,7 +12,6 @@ import pandas as pd
 from pypsa_validation_processing.class_definitions import Network_Processor
 from conftest import MockPyPSANetwork, MockNetworkCollection
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -35,7 +34,7 @@ def mock_definitions_path(tmp_path: Path) -> Path:
     """Fixture providing a mock definitions directory."""
     defs_path = tmp_path / "definitions"
     defs_path.mkdir()
-    
+
     # Create a minimal definitions file (CSV format expected by nomenclature)
     definitions_file = defs_path / "variables.csv"
     definitions_file.write_text(
@@ -51,7 +50,7 @@ def mock_network_results_path(tmp_path: Path) -> Path:
     """Fixture providing a mock network results directory with networks."""
     nw_path = tmp_path / "networks"
     nw_path.mkdir(parents=True, exist_ok=True)
-    
+
     # Create dummy network files
     for year in [2020, 2030]:
         (nw_path / f"base_s_adm__none_{year}.nc").touch()
@@ -101,7 +100,7 @@ class TestNetworkProcessorInit:
         """Test initialization fails with missing required config keys."""
         config_file = tmp_path / "bad_config.yaml"
         config_file.write_text("model_name: test\n")  # Missing required keys
-        
+
         with pytest.raises(ValueError):
             Network_Processor(config_path=config_file)
 
@@ -202,9 +201,7 @@ class TestNetworkProcessorFunctionExecution:
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=mock_config_file)
-                processor.functions_dict = {
-                    "Test Variable": "mock_func_with_config"
-                }
+                processor.functions_dict = {"Test Variable": "mock_func_with_config"}
 
                 # Create a mock function that accepts config
                 received_config = {}
@@ -213,7 +210,9 @@ class TestNetworkProcessorFunctionExecution:
                     received_config["value"] = config
                     return pd.Series(
                         [1.0],
-                        index=pd.MultiIndex.from_tuples([("AT", "MWh_el")], names=["country", "unit"]),
+                        index=pd.MultiIndex.from_tuples(
+                            [("AT", "MWh_el")], names=["country", "unit"]
+                        ),
                     )
 
                 with patch(
@@ -241,9 +240,7 @@ class TestNetworkProcessorFunctionExecution:
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=mock_config_file)
-                processor.functions_dict = {
-                    "Test Variable": "mock_func_without_config"
-                }
+                processor.functions_dict = {"Test Variable": "mock_func_without_config"}
 
                 call_kwargs = {}
 
@@ -251,7 +248,9 @@ class TestNetworkProcessorFunctionExecution:
                     call_kwargs["called_with_config"] = False
                     return pd.Series(
                         [1.0],
-                        index=pd.MultiIndex.from_tuples([("AT", "MWh_el")], names=["country", "unit"]),
+                        index=pd.MultiIndex.from_tuples(
+                            [("AT", "MWh_el")], names=["country", "unit"]
+                        ),
                     )
 
                 with patch(
@@ -419,7 +418,10 @@ class TestNetworkProcessorOutputGeneration:
 
                 mock_iam_2020 = MagicMock()
                 mock_iam_2030 = MagicMock()
-                processor.dsd_with_values = [(2020, mock_iam_2020), (2030, mock_iam_2030)]
+                processor.dsd_with_values = [
+                    (2020, mock_iam_2020),
+                    (2030, mock_iam_2030),
+                ]
 
                 result_path = processor.write_output_to_xlsx()
 
@@ -536,7 +538,9 @@ output_path: {tmp_path / 'output'}
                     {"variable": ["Test Variable"]}
                 )
 
-                ts_2019 = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+                ts_2019 = pd.date_range(
+                    "2019-01-01", periods=4, freq="6h", name="snapshot"
+                )
                 raw_df = pd.DataFrame(
                     {ts: [1.0] for ts in ts_2019},
                     index=pd.MultiIndex.from_tuples(
@@ -607,7 +611,9 @@ output_path: {tmp_path / 'output.xlsx'}
 
     def test_aggregation_level_from_config_country(self, tmp_path: Path):
         """Test that aggregation_level='country' is read from config."""
-        config_file = self._make_config_file(tmp_path, extra='aggregation_level: "country"')
+        config_file = self._make_config_file(
+            tmp_path, extra='aggregation_level: "country"'
+        )
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -633,7 +639,9 @@ output_path: {tmp_path / 'output.xlsx'}
 
     def test_aggregation_level_validation_invalid(self, tmp_path: Path):
         """Test that invalid aggregation_level raises ValueError."""
-        config_file = self._make_config_file(tmp_path, extra='aggregation_level: "invalid"')
+        config_file = self._make_config_file(
+            tmp_path, extra='aggregation_level: "invalid"'
+        )
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -694,7 +702,9 @@ output_path: {tmp_path / 'output.xlsx'}
 class TestNetworkProcessorCountryAll:
     """Tests for Network_Processor with country='all'."""
 
-    def _make_config_file(self, tmp_path: Path, country: str = "all", extra: str = "") -> Path:
+    def _make_config_file(
+        self, tmp_path: Path, country: str = "all", extra: str = ""
+    ) -> Path:
         defs_path = tmp_path / "definitions"
         defs_path.mkdir(exist_ok=True)
         nw_path = tmp_path / "networks"
@@ -739,7 +749,9 @@ output_path: {tmp_path / 'output.xlsx'}
 
     def test_repr_includes_aggregation_level(self, tmp_path: Path):
         """__repr__ must include the aggregation_level field."""
-        config_file = self._make_config_file(tmp_path, country="AT", extra='aggregation_level: "region"')
+        config_file = self._make_config_file(
+            tmp_path, country="AT", extra='aggregation_level: "region"'
+        )
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
