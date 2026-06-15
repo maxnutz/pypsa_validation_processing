@@ -653,6 +653,11 @@ class Network_Processor:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
                     if self.aggregate_per_year == True:
                         result = result.to_frame(name="value")
+                    else:
+                        if type(result) != pd.DataFrame:
+                            raise RuntimeError(
+                                f"Expected DataFrame for variable '{variable}' when aggregate_per_year=False, got {type(result)}"
+                            )
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )

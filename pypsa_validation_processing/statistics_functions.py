@@ -186,12 +186,16 @@ def Final_Energy_by_Carrier__Natural_Gas(
         ],
         at_port="bus1",
         components="Link",
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
 
     # all gas-usage per region
     all_gas = n.statistics.withdrawal(
-        bus_carrier="gas", components="Link", **kwargs_filtering
+        bus_carrier="gas",
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs_filtering,
     )
     all_gas.index.get_level_values("carrier").unique()
     forbidden_parts = ["pipeline"]
@@ -216,6 +220,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         bus_carrier="gas",
         carrier=["urban decentral gas boiler", "rural gas boiler"],
         components="Link",
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -224,6 +229,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         bus_carrier="gas for industry",
         carrier=["gas for industry", "gas for industry CC"],
         components="Load",
+        aggregate_time=aggregate_per_year,
         **kwargs,
     )
 
