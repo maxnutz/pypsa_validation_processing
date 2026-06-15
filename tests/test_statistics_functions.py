@@ -333,7 +333,7 @@ class TestFinalEnergyByCarrierNaturalGas:
 
             if (
                 bus_carrier == "gas for industry"
-                and carrier == ["gas for industry", "as for industry CC"]
+                and carrier == ["gas for industry", "gas for industry CC"]
                 and components == "Load"
             ):
                 if self.scenario == "no_gas":

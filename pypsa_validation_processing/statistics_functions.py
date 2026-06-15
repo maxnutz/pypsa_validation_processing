@@ -222,7 +222,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
     # Final Energy|Industry|Natural Gas - gas for industry
     industry = n.statistics.withdrawal(
         bus_carrier="gas for industry",
-        carrier=["gas for industry", "as for industry CC"],
+        carrier=["gas for industry", "gas for industry CC"],
         components="Load",
         **kwargs,
     )
