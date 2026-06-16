@@ -204,6 +204,7 @@ def prices_by_bus_carrier(
         grouped = grouped.reindex([c for c in bus_carriers if c in grouped.index])
         return grouped.dropna()
     except Exception:
+        print("WARNING: Price extraction failed, falling back to manual method.")
         return _manual_price_extraction(n, bus_carriers, country_prefix)
 
 
@@ -330,6 +331,7 @@ def installed_capacity_by_carrier(
             if not combined.empty:
                 return combined
     except Exception:
+        print("WARNING: Capacity extraction failed.")
         pass
 
     return _manual_capacity_extraction(
