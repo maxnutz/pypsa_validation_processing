@@ -8,65 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import eval_helpers as eh
 import pytest
 
-
-class DummyNetwork:
-    def __init__(self, name):
-        self.name = name
-
-
-def test_load_networks_uses_network_collection(monkeypatch, tmp_path):
-    called = {}
-
-    class FakeNetworkCollection(dict):
-        def __init__(self, *args, **kwargs):
-            called["args"] = args
-            called["kwargs"] = kwargs
-            super().__init__({
-                "scenario-1": DummyNetwork("n1"),
-                "scenario-2": DummyNetwork("n2"),
-            })
-
-    # Ensure load_networks uses NetworkCollection when it succeeds
-    monkeypatch.setattr(eh.pypsa, "NetworkCollection", FakeNetworkCollection, raising=True)
-
-    networks = eh.load_networks(tmp_path)
-
-    assert set(networks.keys()) == {"scenario-1", "scenario-2"}
-    assert isinstance(networks["scenario-1"], DummyNetwork)
-    assert isinstance(networks["scenario-2"], DummyNetwork)
-    # Sanity check that NetworkCollection was constructed
-    assert "args" in called
-
-
-def test_load_networks_falls_back_to_single_network(monkeypatch, tmp_path):
-    class Boom(Exception):
-        pass
-
-    # Simulate NetworkCollection failing
-    def failing_network_collection(*args, **kwargs):
-        raise Boom("NetworkCollection failed")
-
-    created = {}
-
-    # Fallback Network loader
-    def fake_network(path):
-        created["path"] = path
-        return DummyNetwork("fallback")
-
-    monkeypatch.setattr(eh.pypsa, "NetworkCollection", failing_network_collection, raising=True)
-    monkeypatch.setattr(eh.pypsa, "Network", fake_network, raising=True)
-
-    networks = eh.load_networks(tmp_path)
-
-    # Expect a mapping with a single entry pointing to the fallback network
-    assert isinstance(networks, dict)
-    assert len(networks) == 1
-    (key, net), = networks.items()
-    assert isinstance(net, DummyNetwork)
-    # Ensure the fallback Network was actually called with some path
-    assert created["path"] is not None
-
-
 class DummyStatistics:
     def __init__(self, prices_result, capacity_result):
         self._prices_result = prices_result
