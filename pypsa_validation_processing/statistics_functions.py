@@ -137,7 +137,7 @@ def Final_Energy_by_Carrier__Electricity(
 def Final_Energy_by_Carrier__Coal(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
-) -> pd.Series | pd.DataFrame:
+) -> pd.Series | pd.DataFrame | None:
     """Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.
 
     Parameters
@@ -151,7 +151,7 @@ def Final_Energy_by_Carrier__Coal(
 
     Returns
     -------
-    pd.Series | pd.DataFrame
+    pd.Series | pd.DataFrame | None
         Pandas Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex of ``location`` and
         ``unit``.
