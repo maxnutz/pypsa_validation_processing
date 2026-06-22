@@ -165,17 +165,16 @@ def Final_Energy_by_Carrier__Coal(
     coal for electricity or CHP, but only focuses on the carrier ``coal for industry``
     as Final Energy of Coal. Return None, if this carrier is not present in the network.
     """
-    try:
-        industry = n.statistics.withdrawal(
-            bus_carrier="coal for industry",
-            carrier="coal for industry",
-            components="Load",
-            aggregate_time=aggregate_per_year,
-            **kwargs,
-        )
-        return industry
-    except ValueError:
+    if "coal for industry" not in n.carriers.index:
         return None
+    industry = n.statistics.withdrawal(
+        bus_carrier="coal for industry",
+        carrier="coal for industry",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    return industry
 
 
 def Final_Energy_by_Carrier__Oil(

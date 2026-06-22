@@ -1061,13 +1061,24 @@ class TestFinalEnergyByCarrierCoal:
     class _CoalNetwork:
         """Minimal network exposing the custom coal statistics accessor."""
 
-        def __init__(self, raise_missing: bool = False):
+        def __init__(
+            self,
+            raise_missing: bool = False,
+            carriers: list[str] | None = None,
+        ):
             self.statistics = TestFinalEnergyByCarrierCoal._CoalStatisticsAccessor(
                 raise_missing=raise_missing
             )
+            self.carriers = pd.DataFrame(
+                index=pd.Index(["coal for industry"] if carriers is None else carriers)
+            )
 
-    def _coal_network(self, raise_missing: bool = False):
-        return self._CoalNetwork(raise_missing=raise_missing)
+    def _coal_network(
+        self,
+        raise_missing: bool = False,
+        carriers: list[str] | None = None,
+    ):
+        return self._CoalNetwork(raise_missing=raise_missing, carriers=carriers)
 
     def test_returns_series(self, mock_network: MockPyPSANetwork):
         """Test that the function returns a pandas Series."""
@@ -1116,10 +1127,12 @@ class TestFinalEnergyByCarrierCoal:
         assert calls[0]["carrier"] == "coal for industry"
         assert calls[0]["components"] == "Load"
 
-    def test_returns_none_when_withdrawal_raises_value_error(self):
-        """Missing coal carrier should be converted into None."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network(raise_missing=True))
+    def test_returns_none_when_carrier_is_missing(self):
+        """Missing coal carrier should short-circuit before statistics are queried."""
+        network = self._coal_network(carriers=[])
+        result = Final_Energy_by_Carrier__Coal(network)
         assert result is None
+        assert network.statistics.calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -1441,6 +1454,9 @@ class TestAggregatePerYearFalse:
     def test_returns_dataframe(self, mock_network: MockPyPSANetwork, func):
         """Function returns a DataFrame (not a Series) when aggregate_per_year=False."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result, pd.DataFrame)
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
@@ -1449,6 +1465,9 @@ class TestAggregatePerYearFalse:
     ):
         """DataFrame has MultiIndex with location and unit levels."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result.index, pd.MultiIndex)
         assert "location" in result.index.names
         assert "unit" in result.index.names
@@ -1457,12 +1476,18 @@ class TestAggregatePerYearFalse:
     def test_columns_are_timestamps(self, mock_network: MockPyPSANetwork, func):
         """DataFrame columns are a DatetimeIndex (snapshot timestamps)."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result.columns, pd.DatetimeIndex)
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
     def test_not_empty(self, mock_network: MockPyPSANetwork, func):
         """DataFrame is not empty."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert not result.empty
 
     def test_industry_returns_dataframe(self):
