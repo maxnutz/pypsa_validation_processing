@@ -188,10 +188,10 @@ def Final_Energy_by_Carrier__Oil(
     are not represented in this statistic.
 
     ``UNITS_MAPPING`` is applied inside this function to enable multiplication
-    with demand-side units of renewable-oil-fraction``.
+    with demand-side units of the renewable-oil fraction.
     """
 
-    # Final Energy|Agricultur|Liquids - agriculture machinery oil
+    # Final Energy|Agriculture|Liquids - agriculture machinery oil
     agri = n.statistics.withdrawal(
         carrier="agriculture machinery oil",
         components="Load",
