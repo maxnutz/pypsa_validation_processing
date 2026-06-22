@@ -6,6 +6,7 @@
 # Primary Energy|Coal: primary_energy_coal
 
 Final Energy [by Carrier]|Electricity: Final_Energy_by_Carrier__Electricity
+Final Energy [by Carrier]|Coal: Final_Energy_by_Carrier__Coal
 Final Energy [by Carrier]|Natural Gas: Final_Energy_by_Carrier__Natural_Gas
 Final Energy [by Carrier]|Oil: Final_Energy_by_Carrier__Oil
 Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation

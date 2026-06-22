@@ -134,6 +134,49 @@ def Final_Energy_by_Carrier__Electricity(
     return result
 
 
+def Final_Energy_by_Carrier__Coal(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame | None:
+    """Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame | None
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    This function includes only the Final Energy consumption of coal. This excludes
+    coal for electricity or CHP, but only focuses on the carrier ``coal for industry``
+    as Final Energy of Coal. Return None, if this carrier is not present in the network.
+    """
+    if "coal for industry" not in n.carriers.index:
+        return None
+    industry = n.statistics.withdrawal(
+        bus_carrier="coal for industry",
+        carrier="coal for industry",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    return industry
+
+
 def Final_Energy_by_Carrier__Oil(
     n: pypsa.Network,
     aggregate_per_year: bool = True,

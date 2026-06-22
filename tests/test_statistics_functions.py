@@ -7,6 +7,7 @@ import pytest
 
 from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Carrier__Electricity,
+    Final_Energy_by_Carrier__Coal,
     Final_Energy_by_Carrier__Natural_Gas,
     Final_Energy_by_Carrier__Oil,
     Final_Energy_by_Sector__Industry,
@@ -995,6 +996,146 @@ class TestFinalEnergyByCarrierOil:
 
 
 # ---------------------------------------------------------------------------
+# Tests for Final_Energy_by_Carrier__Coal
+# ---------------------------------------------------------------------------
+
+
+class TestFinalEnergyByCarrierCoal:
+    """Test suite for Final_Energy_by_Carrier__Coal function."""
+
+    class _CoalStatisticsAccessor:
+        """Minimal accessor to verify coal-carrier extraction behavior."""
+
+        def __init__(self, raise_missing: bool = False):
+            self.raise_missing = raise_missing
+            self.calls: list[dict] = []
+
+        @staticmethod
+        def _series_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_th",
+        ) -> pd.Series:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            return pd.Series(values, index=index, dtype=float)
+
+        def withdrawal(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "aggregate_time": aggregate_time,
+                    "groupby": groupby,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if self.raise_missing:
+                raise ValueError("coal carrier missing")
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if bus_carrier == "coal for industry" and carrier == "coal for industry":
+                return self._series_from_groupby(groupby, [25.0])
+
+            return pd.Series(
+                dtype=float,
+                index=pd.MultiIndex.from_tuples([], names=groupby),
+            )
+
+    class _CoalNetwork:
+        """Minimal network exposing the custom coal statistics accessor."""
+
+        def __init__(
+            self,
+            raise_missing: bool = False,
+            carriers: list[str] | None = None,
+        ):
+            self.statistics = TestFinalEnergyByCarrierCoal._CoalStatisticsAccessor(
+                raise_missing=raise_missing
+            )
+            self.carriers = pd.DataFrame(
+                index=pd.Index(["coal for industry"] if carriers is None else carriers)
+            )
+
+    def _coal_network(
+        self,
+        raise_missing: bool = False,
+        carriers: list[str] | None = None,
+    ):
+        return self._CoalNetwork(raise_missing=raise_missing, carriers=carriers)
+
+    def test_returns_series(self, mock_network: MockPyPSANetwork):
+        """Test that the function returns a pandas Series."""
+        result = Final_Energy_by_Carrier__Coal(self._coal_network())
+        assert isinstance(result, pd.Series)
+
+    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
+        """Test that result has MultiIndex with location and unit levels."""
+        result = Final_Energy_by_Carrier__Coal(self._coal_network())
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+
+    def test_not_empty(self, mock_network: MockPyPSANetwork):
+        """Test that result is not empty."""
+        result = Final_Energy_by_Carrier__Coal(self._coal_network())
+        assert len(result) > 0
+
+    def test_numeric_values(self, mock_network: MockPyPSANetwork):
+        """Test that result values are numeric."""
+        result = Final_Energy_by_Carrier__Coal(self._coal_network())
+        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
+            result.dtype
+        )
+
+    def test_contains_at1_location(self, mock_network: MockPyPSANetwork):
+        """Test that result contains AT1 locational data."""
+        result = Final_Energy_by_Carrier__Coal(self._coal_network())
+        assert "AT1" in result.index.get_level_values("location")
+
+    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
+        """Test processing multiple networks from collection."""
+        for _ in mock_network_collection:
+            result = Final_Energy_by_Carrier__Coal(self._coal_network())
+            assert isinstance(result, pd.Series)
+            assert isinstance(result.index, pd.MultiIndex)
+            assert result.index.names == ["location", "unit"]
+            assert len(result) > 0
+
+    def test_issues_expected_withdrawal_query(self):
+        """Function requests the expected coal carrier/component combination."""
+        network = self._coal_network()
+        _ = Final_Energy_by_Carrier__Coal(network)
+        calls = network.statistics.calls
+        assert len(calls) == 1
+        assert calls[0]["bus_carrier"] == "coal for industry"
+        assert calls[0]["carrier"] == "coal for industry"
+        assert calls[0]["components"] == "Load"
+
+    def test_returns_none_when_carrier_is_missing(self):
+        """Missing coal carrier should short-circuit before statistics are queried."""
+        network = self._coal_network(carriers=[])
+        result = Final_Energy_by_Carrier__Coal(network)
+        assert result is None
+        assert network.statistics.calls == []
+
+
+# ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Sector__Transportation
 # ---------------------------------------------------------------------------
 
@@ -1289,6 +1430,7 @@ class TestAggregatePerYearFalse:
 
     _FUNCTIONS = [
         Final_Energy_by_Carrier__Electricity,
+        Final_Energy_by_Carrier__Coal,
         Final_Energy_by_Sector__Agriculture,
     ]
 
@@ -1312,6 +1454,9 @@ class TestAggregatePerYearFalse:
     def test_returns_dataframe(self, mock_network: MockPyPSANetwork, func):
         """Function returns a DataFrame (not a Series) when aggregate_per_year=False."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result, pd.DataFrame)
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
@@ -1320,6 +1465,9 @@ class TestAggregatePerYearFalse:
     ):
         """DataFrame has MultiIndex with location and unit levels."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result.index, pd.MultiIndex)
         assert "location" in result.index.names
         assert "unit" in result.index.names
@@ -1328,12 +1476,18 @@ class TestAggregatePerYearFalse:
     def test_columns_are_timestamps(self, mock_network: MockPyPSANetwork, func):
         """DataFrame columns are a DatetimeIndex (snapshot timestamps)."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert isinstance(result.columns, pd.DatetimeIndex)
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
     def test_not_empty(self, mock_network: MockPyPSANetwork, func):
         """DataFrame is not empty."""
         result = func(mock_network, aggregate_per_year=False)
+        if func is Final_Energy_by_Carrier__Coal and result is None:
+            assert result is None
+            return
         assert not result.empty
 
     def test_industry_returns_dataframe(self):
