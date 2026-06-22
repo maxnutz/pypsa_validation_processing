@@ -33,7 +33,7 @@ from pypsa_validation_processing.utils import (
 )
 from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
-    create_location_index_from_cupperplate,
+    create_location_index_from_copperplate,
 )
 
 
@@ -173,7 +173,7 @@ def Final_Energy_by_Carrier__Oil(
 
     Regionalization from the copperplate topology is performed by deriving a
     region code from demand- or production-bus names and applying
-    :func:`create_location_index_from_cupperplate` before regrouping to
+    :func:`create_location_index_from_copperplate` before regrouping to
     ``kwargs["groupby"]``.
 
     The renewable-oil fraction is computed per region as:
@@ -214,7 +214,7 @@ def Final_Energy_by_Carrier__Oil(
             bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
         ]
         rescom = (
-            create_location_index_from_cupperplate(raw_rescom, usage_location)
+            create_location_index_from_copperplate(raw_rescom, usage_location)
             .groupby(kwargs["groupby"])
             .sum()
         )
@@ -256,7 +256,7 @@ def Final_Energy_by_Carrier__Oil(
         for bus in list(non_fossil_parts.index.get_level_values("bus0"))
     ]
 
-    non_fossil_parts = create_location_index_from_cupperplate(
+    non_fossil_parts = create_location_index_from_copperplate(
         non_fossil_parts, home_location
     )
     non_fossil_parts = non_fossil_parts.groupby(kwargs["groupby"]).sum()
@@ -284,7 +284,7 @@ def Final_Energy_by_Carrier__Oil(
         bus.split(" ")[0] for bus in list(all_oil.index.get_level_values("bus1"))
     ]
 
-    all_oil = create_location_index_from_cupperplate(all_oil, home_location)
+    all_oil = create_location_index_from_copperplate(all_oil, home_location)
     all_oil = all_oil.groupby(kwargs["groupby"]).sum()
 
     non_fossil_fraction = non_fossil_parts.div(all_oil)

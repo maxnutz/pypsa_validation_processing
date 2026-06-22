@@ -175,7 +175,7 @@ def get_energy_totals_domestic_share(
     return (domestic / (domestic + international)).values[0]
 
 
-def create_location_index_from_cupperplate(
+def create_location_index_from_copperplate(
     raw_input: pd.Series | pd.DataFrame, usage_location_list: list
 ):
     """
