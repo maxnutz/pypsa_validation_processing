@@ -12,9 +12,33 @@ class TestRegionsCodes:
     def test_has_all_27_member_states(self):
         # All 27 EU member state ISO codes must be present
         expected_codes = {
-            "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
-            "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT",
-            "NL", "PL", "PT", "RO", "SE", "SI", "SK",
+            "AT",
+            "BE",
+            "BG",
+            "CY",
+            "CZ",
+            "DE",
+            "DK",
+            "EE",
+            "ES",
+            "FI",
+            "FR",
+            "GR",
+            "HR",
+            "HU",
+            "IE",
+            "IT",
+            "LT",
+            "LU",
+            "LV",
+            "MT",
+            "NL",
+            "PL",
+            "PT",
+            "RO",
+            "SE",
+            "SI",
+            "SK",
         }
         assert expected_codes.issubset(REGION_MAPPING.keys())
 
@@ -26,4 +50,6 @@ class TestRegionsCodes:
     def test_values_are_strings(self):
         for key, value in REGION_MAPPING.items():
             assert isinstance(key, str), f"Key {key!r} is not a string"
-            assert isinstance(value, str), f"Value {value!r} for key {key!r} is not a string"
+            assert isinstance(
+                value, str
+            ), f"Value {value!r} for key {key!r} is not a string"
