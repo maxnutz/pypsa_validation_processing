@@ -26,13 +26,14 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
-from pypsa_validation_processing.utils import statistics_kwargs as kwargs
 from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
+    statistics_kwargs as kwargs,
+    UNITS_MAPPING,
 )
 from pypsa_validation_processing.utils import (
-    statistics_grouping_index,
     get_energy_totals_domestic_share,
+    create_location_index_from_copperplate,
 )
 
 
@@ -131,6 +132,181 @@ def Final_Energy_by_Carrier__Electricity(
 
     result = pd.concat(series_list)
     return result
+
+
+def Final_Energy_by_Carrier__Oil(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract fossil final-energy oil demand from a PyPSA Network.
+
+    Returns the final energy from oil carriers after removing an estimated
+    renewable-oil share.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Fossil oil final energy with MultiIndex including ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Total oil final energy is built from:
+    - agriculture machinery oil (Load),
+    - residential/commercial oil boiler demand (rural + urban decentral),
+    - land transport oil (Load).
+
+    ``naphtha for industry`` is intentionally excluded because it is treated
+    as non-energy use and therefore not part of Final Energy variables.
+
+    Regionalization from the copperplate topology is performed by deriving a
+    region code from demand- or production-bus names and applying
+    :func:`create_location_index_from_copperplate` before regrouping to
+    ``kwargs["groupby"]``.
+
+    The renewable-oil fraction is computed per region as:
+
+    ``renewable oil production in region / total oil demand in region``.
+
+    Renewable production is based on supply from selected renewable-oil
+    carriers, while total oil demand is based on withdrawals from oil-using
+    carriers. If the fraction exceeds 1 (i.e., renewable production is larger
+    than regional oil demand), it is clipped to 1, so the fossil share becomes
+    zero in that region. Cross-regional export/import effects of renewable oil
+    are not represented in this statistic.
+
+    ``UNITS_MAPPING`` is applied inside this function to enable multiplication
+    with demand-side units of the renewable-oil fraction.
+    """
+
+    # Final Energy|Agriculture|Liquids - agriculture machinery oil
+    agri = n.statistics.withdrawal(
+        carrier="agriculture machinery oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Liquids - urban decentral oil boiler, rural oil boiler
+    raw_rescom = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=["rural oil boiler", "urban decentral oil boiler"],
+        groupby=kwargs_filtering["groupby"] + ["bus1"],
+        aggregate_time=aggregate_per_year,
+    )
+    if raw_rescom.empty:
+        rescom = raw_rescom
+    else:
+        raw_rescom = raw_rescom.drop("Store", errors="ignore")
+        usage_location = [
+            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+        ]
+        rescom = (
+            create_location_index_from_copperplate(raw_rescom, usage_location)
+            .groupby(kwargs["groupby"])
+            .sum()
+        )
+
+    # Final Energy|Transportation|Liquids
+    transpo = n.statistics.withdrawal(
+        carrier="land transport oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    series_list = [
+        agri,
+        rescom,
+        transpo,
+    ]
+    series_list = [series for series in series_list if not series.empty]
+
+    total = pd.concat(series_list).groupby(kwargs["groupby"]).sum()
+
+    # non-fossil parts from renewable-oil production per location
+    # renewable oil production
+    non_fossil_parts = n.statistics.supply(
+        bus_carrier="oil",
+        carrier=[
+            "unsustainable bioliquids",
+            "biomass to liquid",
+            "biomass to liquid CC",
+            "electrobiofuels",
+            "Fischer-Tropsch",
+        ],
+        at_port="bus1",
+        components="Link",
+        groupby=kwargs_filtering["groupby"] + ["bus0"],
+    )
+    home_location = [
+        bus.split(" ")[0]
+        for bus in list(non_fossil_parts.index.get_level_values("bus0"))
+    ]
+
+    non_fossil_parts = create_location_index_from_copperplate(
+        non_fossil_parts, home_location
+    )
+    non_fossil_parts = non_fossil_parts.groupby(kwargs["groupby"]).sum()
+
+    # all oil use
+    all_oil = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=[
+            "land transport oil",
+            "naphtha for industry",
+            "shipping oil",
+            "kerosene for aviation",
+            "agriculture machinery oil",
+            "urban central oil CHP",
+            "oil",
+            "rural oil boiler",
+            "urban decentral oil boiler",
+        ],
+        components="Link",
+        at_port="bus0",
+        groupby=["bus1", "carrier", "location", "unit"],
+    )
+
+    home_location = [
+        bus.split(" ")[0] for bus in list(all_oil.index.get_level_values("bus1"))
+    ]
+
+    all_oil = create_location_index_from_copperplate(all_oil, home_location)
+    all_oil = all_oil.groupby(kwargs["groupby"]).sum()
+
+    non_fossil_fraction = non_fossil_parts.div(all_oil)
+    zero_oil = all_oil.eq(0).reindex(non_fossil_fraction.index, fill_value=False)
+    non_fossil_fraction = non_fossil_fraction.mask(zero_oil, 1.0)
+
+    non_fossil_fraction = non_fossil_fraction.clip(upper=1)  # TODO: Issue #53
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING, level="unit")
+    non_fossil_fraction = non_fossil_fraction.groupby(
+        kwargs["groupby"]
+    ).mean()  # avoid double-indexing
+    total = total.rename(index=UNITS_MAPPING)
+    total = total.groupby(kwargs["groupby"]).sum()
+
+    # cover edge-case with no oil demand
+    if all_oil.empty:
+        non_fossil_fraction = total * 0.0 + 1.0
+    else:
+        non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0.0)
+
+    fossil_oil = total.mul(1 - non_fossil_fraction, axis=0)
+    return fossil_oil
 
 
 def Final_Energy_by_Sector__Transportation(

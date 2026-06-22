@@ -127,6 +127,7 @@ UNITS_MAPPING = {
     "land transport": "MWh",
     "t_co2": "t",
     "": "",
+    "MWh": "MWh",
 }
 
 ## standards for statistics-functions
@@ -171,3 +172,43 @@ def get_energy_totals_domestic_share(
     domestic = energy_totals[f"total domestic {kind}"]
     international = energy_totals[f"total international {kind}"]
     return (domestic / (domestic + international)).values[0]
+
+
+def create_location_index_from_copperplate(
+    raw_input: pd.Series | pd.DataFrame, usage_location_list: list
+):
+    """
+    Replace the ``location`` level values of an indexed object.
+
+    This helper rebuilds the index of ``raw_input`` from its index frame and
+    overwrites the ``location`` column with values from
+    ``usage_location_list``. It is mainly used when location information from
+    a copperplate-carrier result must be mapped back to explicit regional labels.
+
+    Parameters
+    ----------
+    raw_input : pandas.Series or pandas.DataFrame
+        Input object with a (Multi)Index that includes a ``location`` level.
+        The function preserves data values and index level order/names.
+    usage_location_list : list
+        New location values to assign row-by-row. Must have the same length as
+        ``raw_input``.
+
+    Returns
+    -------
+    pandas.Series or pandas.DataFrame
+        A copy of ``raw_input`` with the same data and a rebuilt index where
+        the ``location`` level has been replaced.
+
+    Raises
+    ------
+    ValueError
+        If ``usage_location_list`` length does not match the number of rows, or
+        if the index cannot be reconstructed with the existing index names.
+    """
+    idx_df = raw_input.index.to_frame(index=False)
+    idx_df["location"] = pd.Index(usage_location_list).to_numpy()
+    new_index = pd.MultiIndex.from_frame(idx_df, names=raw_input.index.names)
+    output = raw_input.copy()
+    output.index = new_index
+    return output
