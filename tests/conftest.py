@@ -93,7 +93,9 @@ class MockStatisticsAccessor:
                         "location": location,
                         "unit": unit,
                     }
-                    idx_tuple = tuple(idx_dict.get(key, f"mock_{key}") for key in groupby)
+                    idx_tuple = tuple(
+                        idx_dict.get(key, f"mock_{key}") for key in groupby
+                    )
                     index_tuples.append(idx_tuple)
                     # Provide deterministic signs for link ports used in
                     # transportation charging-loss calculations.
@@ -111,7 +113,9 @@ class MockStatisticsAccessor:
             return pd.Series(values, index=index, dtype=float)
         else:
             # Return DataFrame with 4 hourly timestamps as columns
-            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+            timestamps = pd.date_range(
+                "2019-01-01", periods=4, freq="6h", name="snapshot"
+            )
             return pd.DataFrame(
                 {ts: values for ts in timestamps},
                 index=index,

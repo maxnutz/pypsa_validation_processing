@@ -166,7 +166,9 @@ class Network_Processor:
                 f"Must be true or false."
             )
         self._function_parameter_cache: dict[object, set[str]] = {}
-        self.dsd_with_values: pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None = None
+        self.dsd_with_values: (
+            pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None
+        ) = None
         if self.country == "all":
             default_path_dsd_with_values = (
                 Path(__file__).resolve().parent
@@ -211,9 +213,7 @@ class Network_Processor:
     def _read_mappings(self) -> dict:
         """Read and return the YAML mapping file."""
         if not self.mappings_path.exists():
-            raise FileNotFoundError(
-                f"Mapping file not found: {self.mappings_path}"
-            )
+            raise FileNotFoundError(f"Mapping file not found: {self.mappings_path}")
         with open(self.mappings_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
@@ -648,11 +648,17 @@ class Network_Processor:
 
             results = []
             for variable in self.dsd.variable.to_pandas()["variable"]:
-                result = self._execute_function_for_variable(variable, n, config=network_config)
+                result = self._execute_function_for_variable(
+                    variable, n, config=network_config
+                )
                 if result is not None:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
                     if self.aggregate_per_year == True:
                         result = result.to_frame(name="value")
+                    elif not isinstance(result, pd.DataFrame):
+                        raise RuntimeError(
+                            f"Expected DataFrame for variable '{variable}' when aggregate_per_year=False, got {type(result)}"
+                        )
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
@@ -660,7 +666,9 @@ class Network_Processor:
             if results:
                 year_df = pd.concat(results, ignore_index=False)
                 if self.aggregate_per_year:
-                    year_df.rename(columns={"value": str(investment_year)}, inplace=True)
+                    year_df.rename(
+                        columns={"value": str(investment_year)}, inplace=True
+                    )
                     container_investment_years.append(year_df)
                 else:
                     # Replace the year component of each snapshot timestamp with
@@ -717,9 +725,7 @@ class Network_Processor:
                 f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}"
             )
         else:
-            base_filename = (
-                f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
-            )
+            base_filename = f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
 
         if self.aggregate_per_year:
             file_path = base_dir / f"{base_filename}.xlsx"
@@ -728,13 +734,9 @@ class Network_Processor:
             return file_path
         else:
             if self.country == "all":
-                folder_name = (
-                    f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}"
-                )
+                folder_name = f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}"
             else:
-                folder_name = (
-                    f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
-                )
+                folder_name = f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
             folder_path = base_dir / folder_name
             folder_path.mkdir(parents=True, exist_ok=True)
             for investment_year, iam_df in self.dsd_with_values:

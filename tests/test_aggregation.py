@@ -11,7 +11,6 @@ import pytest
 from pypsa_validation_processing.class_definitions import Network_Processor
 from conftest import MockPyPSANetwork
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -165,7 +164,9 @@ class TestAggregationAllCountries:
 
     def test_aggregate_to_country_with_all_countries(self, tmp_path: Path):
         """When country='all', regions must be grouped per country and summed."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        processor = _make_processor(
+            tmp_path, aggregation_level="country", country="all"
+        )
         series = _make_locational_series(
             locations=("AT1", "DE1", "DE2", "FR1"), value=100.0
         ).to_frame(name="value")
@@ -177,7 +178,9 @@ class TestAggregationAllCountries:
 
     def test_aggregate_to_country_all_returns_country_unit_index(self, tmp_path: Path):
         """Result from all-countries aggregate must be indexed by ['country', 'unit']."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        processor = _make_processor(
+            tmp_path, aggregation_level="country", country="all"
+        )
         series = _make_locational_series(
             locations=("AT1", "DE1", "FR1"), value=50.0
         ).to_frame(name="value")
@@ -205,7 +208,9 @@ class TestOutputFilenameAllCountries:
 
     def test_output_filename_all_countries_aggregate(self, tmp_path: Path):
         """When country='all', output path must not contain a country suffix."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        processor = _make_processor(
+            tmp_path, aggregation_level="country", country="all"
+        )
         # The output_path in config points to tmp_path / 'out.xlsx'
         # so path_dsd_with_values is exactly that path (no country suffix)
         assert "all" not in processor.path_dsd_with_values.name
@@ -231,7 +236,9 @@ aggregation_level: "country"
 """
         config_file = tmp_path / "config_no_output.yaml"
         config_file.write_text(config_text)
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
@@ -255,7 +262,9 @@ aggregation_level: "country"
 """
         config_file = tmp_path / "config_all_no_output.yaml"
         config_file.write_text(config_text)
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
@@ -273,7 +282,9 @@ class TestPyamStructuringAllCountries:
 
     def test_per_country_regions_when_all_countries_aggregate(self, tmp_path: Path):
         """country='all' + aggregation_level='country' must produce one region per country."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="all")
+        processor = _make_processor(
+            tmp_path, aggregation_level="country", country="all"
+        )
         processor.common_dsd = None
         # Build a DataFrame with the same MultiIndex structure that
         # _postprocess_statistics_result produces for country="all" in country mode
@@ -329,9 +340,7 @@ class TestBackwardCompatibilityCountryFilter:
     def test_single_country_filter_excludes_others(self, tmp_path: Path):
         """country='AT' must exclude non-AT regions in region mode."""
         processor = _make_processor(tmp_path, aggregation_level="region", country="AT")
-        series = _make_locational_series(
-            locations=("AT1", "AT2", "DE1"), value=100.0
-        )
+        series = _make_locational_series(locations=("AT1", "AT2", "DE1"), value=100.0)
         result = processor._filter_to_regions(series)
         locations = result.index.get_level_values("location").unique().tolist()
         assert "DE1" not in locations
@@ -354,7 +363,9 @@ aggregation_level: "country"
 """
         config_file = tmp_path / "config_inv.yaml"
         config_file.write_text(config_text)
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):

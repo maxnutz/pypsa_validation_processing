@@ -26,13 +26,14 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
-from pypsa_validation_processing.utils import statistics_kwargs as kwargs
 from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
+    statistics_kwargs as kwargs,
+    UNITS_MAPPING,
 )
 from pypsa_validation_processing.utils import (
-    statistics_grouping_index,
     get_energy_totals_domestic_share,
+    create_location_index_from_copperplate,
 )
 
 
@@ -175,6 +176,306 @@ def Final_Energy_by_Carrier__Coal(
         return industry
     except ValueError:
         return None
+
+
+def Final_Energy_by_Carrier__Oil(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract fossil final-energy oil demand from a PyPSA Network.
+
+    Returns the final energy from oil carriers after removing an estimated
+    renewable-oil share.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Fossil oil final energy with MultiIndex including ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Total oil final energy is built from:
+    - agriculture machinery oil (Load),
+    - residential/commercial oil boiler demand (rural + urban decentral),
+    - land transport oil (Load).
+
+    ``naphtha for industry`` is intentionally excluded because it is treated
+    as non-energy use and therefore not part of Final Energy variables.
+
+    Regionalization from the copperplate topology is performed by deriving a
+    region code from demand- or production-bus names and applying
+    :func:`create_location_index_from_copperplate` before regrouping to
+    ``kwargs["groupby"]``.
+
+    The renewable-oil fraction is computed per region as:
+
+    ``renewable oil production in region / total oil demand in region``.
+
+    Renewable production is based on supply from selected renewable-oil
+    carriers, while total oil demand is based on withdrawals from oil-using
+    carriers. If the fraction exceeds 1 (i.e., renewable production is larger
+    than regional oil demand), it is clipped to 1, so the fossil share becomes
+    zero in that region. Cross-regional export/import effects of renewable oil
+    are not represented in this statistic.
+
+    ``UNITS_MAPPING`` is applied inside this function to enable multiplication
+    with demand-side units of the renewable-oil fraction.
+    """
+
+    # Final Energy|Agriculture|Liquids - agriculture machinery oil
+    agri = n.statistics.withdrawal(
+        carrier="agriculture machinery oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Liquids - urban decentral oil boiler, rural oil boiler
+    raw_rescom = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=["rural oil boiler", "urban decentral oil boiler"],
+        groupby=kwargs_filtering["groupby"] + ["bus1"],
+        aggregate_time=aggregate_per_year,
+    )
+    if raw_rescom.empty:
+        rescom = raw_rescom
+    else:
+        raw_rescom = raw_rescom.drop("Store", errors="ignore")
+        usage_location = [
+            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+        ]
+        rescom = (
+            create_location_index_from_copperplate(raw_rescom, usage_location)
+            .groupby(kwargs["groupby"])
+            .sum()
+        )
+
+    # Final Energy|Transportation|Liquids
+    transpo = n.statistics.withdrawal(
+        carrier="land transport oil",
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    series_list = [
+        agri,
+        rescom,
+        transpo,
+    ]
+    series_list = [series for series in series_list if not series.empty]
+
+    total = pd.concat(series_list).groupby(kwargs["groupby"]).sum()
+
+    # non-fossil parts from renewable-oil production per location
+    # renewable oil production
+    non_fossil_parts = n.statistics.supply(
+        bus_carrier="oil",
+        carrier=[
+            "unsustainable bioliquids",
+            "biomass to liquid",
+            "biomass to liquid CC",
+            "electrobiofuels",
+            "Fischer-Tropsch",
+        ],
+        at_port="bus1",
+        components="Link",
+        groupby=kwargs_filtering["groupby"] + ["bus0"],
+    )
+    home_location = [
+        bus.split(" ")[0]
+        for bus in list(non_fossil_parts.index.get_level_values("bus0"))
+    ]
+
+    non_fossil_parts = create_location_index_from_copperplate(
+        non_fossil_parts, home_location
+    )
+    non_fossil_parts = non_fossil_parts.groupby(kwargs["groupby"]).sum()
+
+    # all oil use
+    all_oil = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=[
+            "land transport oil",
+            "naphtha for industry",
+            "shipping oil",
+            "kerosene for aviation",
+            "agriculture machinery oil",
+            "urban central oil CHP",
+            "oil",
+            "rural oil boiler",
+            "urban decentral oil boiler",
+        ],
+        components="Link",
+        at_port="bus0",
+        groupby=["bus1", "carrier", "location", "unit"],
+    )
+
+    home_location = [
+        bus.split(" ")[0] for bus in list(all_oil.index.get_level_values("bus1"))
+    ]
+
+    all_oil = create_location_index_from_copperplate(all_oil, home_location)
+    all_oil = all_oil.groupby(kwargs["groupby"]).sum()
+
+    non_fossil_fraction = non_fossil_parts.div(all_oil)
+    zero_oil = all_oil.eq(0).reindex(non_fossil_fraction.index, fill_value=False)
+    non_fossil_fraction = non_fossil_fraction.mask(zero_oil, 1.0)
+
+    non_fossil_fraction = non_fossil_fraction.clip(upper=1)  # TODO: Issue #53
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING, level="unit")
+    non_fossil_fraction = non_fossil_fraction.groupby(
+        kwargs["groupby"]
+    ).mean()  # avoid double-indexing
+    total = total.rename(index=UNITS_MAPPING)
+    total = total.groupby(kwargs["groupby"]).sum()
+
+    # cover edge-case with no oil demand
+    if all_oil.empty:
+        non_fossil_fraction = total * 0.0 + 1.0
+    else:
+        non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0.0)
+
+    fossil_oil = total.mul(1 - non_fossil_fraction, axis=0)
+    return fossil_oil
+
+
+def Final_Energy_by_Carrier__Natural_Gas(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract natural-gas final energy from a PyPSA Network.
+
+    Returns the total final energy demand supplied by natural gas across
+    residential and commercial buildings and industry, while subtracting the
+    estimated non-fossil share of gas consumption.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including
+        ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    The function combines residential and commercial gas withdrawals with
+    industry gas demand, then scales the total by the fossil fraction of gas.
+    The fossil fraction is estimated from the ratio of non-fossil gas
+    production to total gas usage, excluding pipeline flows and limiting the
+    non-fossil share to at most 1.
+    Industry gas demand is reduced by a fixed non-energy-use share for EU-27 based on
+    Eurostat energy balance data.
+    """
+    # get fraction fossil-gas non-fossil-gas
+    # non-fossil-gas-production per region
+    non_fossil_gas_prod = n.statistics.supply(
+        bus_carrier="gas",
+        carrier=[
+            "Sabatier",
+            "biogas to gas",
+            "biogas to gas CC",
+            "BioSNG",
+            "BioSNG CC",
+        ],
+        at_port="bus1",
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # all gas-usage per region
+    all_gas = n.statistics.withdrawal(
+        bus_carrier="gas",
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs_filtering,
+    )
+    all_gas.index.get_level_values("carrier").unique()
+    forbidden_parts = ["pipeline"]
+    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
+
+    total_gas_usage_carriers = all_gas.index.get_level_values("carrier").astype(str)
+    forbidden_mask = total_gas_usage_carriers.str.contains(
+        forbidden_pattern, case=False, regex=True
+    )
+    total_gas_usage = all_gas[~forbidden_mask]
+    total_gas_usage = total_gas_usage.groupby(kwargs["groupby"]).sum()
+
+    # fraction of usage and production values
+    non_fossil_fraction = non_fossil_gas_prod / total_gas_usage
+    non_fossil_fraction = non_fossil_fraction.replace([np.inf, -np.inf], np.nan)
+    non_fossil_fraction = non_fossil_fraction.clip(upper=1)
+    non_fossil_fraction = non_fossil_fraction.groupby(kwargs["groupby"]).mean()
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
+
+    # Final Energy|Residential and Commercial|Natural Gas - urban decentral gas boiler
+    rescom = n.statistics.withdrawal(
+        bus_carrier="gas",
+        carrier=["urban decentral gas boiler", "rural gas boiler"],
+        components="Link",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Industry|Natural Gas - gas for industry
+    industry = n.statistics.withdrawal(
+        bus_carrier="gas for industry",
+        carrier=["gas for industry", "gas for industry CC"],
+        components="Load",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # get fraction of non-energetic use in industry -> TODO: #61
+    # data from Eurostat energy balance for 2024 | EU27 | in TWh
+    # online available (used 2026-04-28): https://ec.europa.eu/eurostat/cache/visualisations/energy-balances/enbal.html?geo=EU27_2020&unit=KTOE&language=EN&year=&fuel=fuelMainFuel&siec=TOTAL&details=1&chartOptions=0&stacking=normal&chartBal=&chart=&full=0&chartBalText=&order=DESC&siecs=&dataset=nrg_bal_c&decimals=0&agregates=0&share=false&fuelList=fuelElectricity%2CfuelCombustible%2CfuelNonCombustible%2CfuelOtherPetroleum%2CfuelMainPetroleum%2CfuelOil%2CfuelOtherFossil%2CfuelFossil%2CfuelCoal%2CfuelMainFuel
+    # Final consumption - energy use: 7 217 049
+    # Final consumption - non-energy use (fuels not combusted): 458 572
+    fc_energy = 7217049
+    fc_noenergy = 458572
+    energy_fraction_industry_gas = fc_energy / (fc_energy + fc_noenergy)
+    industry = industry.mul(energy_fraction_industry_gas)
+
+    series_list = [rescom, industry]
+    series_list = [series for series in series_list if not series.empty]
+
+    if not series_list:
+        return pd.Series(
+            dtype=float,
+            index=pd.MultiIndex.from_tuples([], names=kwargs["groupby"]),
+        )
+
+    total = pd.concat(series_list)
+    total = total.rename(index=UNITS_MAPPING).groupby(kwargs["groupby"]).sum()
+    non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0)
+    result = total.mul(1 - non_fossil_fraction, axis=0)
+    return result
 
 
 def Final_Energy_by_Sector__Transportation(

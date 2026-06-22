@@ -15,7 +15,9 @@ from pypsa_validation_processing.class_definitions import Network_Processor
 def _make_config(tmp_path: Path, extra: str = "") -> Path:
     defs_path = tmp_path / "definitions"
     defs_path.mkdir()
-    (defs_path / "variables.csv").write_text("variable\nFinal Energy [by Carrier]|Electricity\n")
+    (defs_path / "variables.csv").write_text(
+        "variable\nFinal Energy [by Carrier]|Electricity\n"
+    )
 
     nw_path = tmp_path / "networks"
     nw_path.mkdir(parents=True)
@@ -39,7 +41,9 @@ output_path: {tmp_path / 'output'}
 def processor(tmp_path: Path) -> Network_Processor:
     config_path = _make_config(tmp_path)
     with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
-        with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+        ):
             return Network_Processor(config_path=config_path)
 
 
@@ -48,8 +52,12 @@ class TestCommonDefinitionsConfiguration:
 
     def test_config_without_common_definitions_path(self, tmp_path: Path):
         config_path = _make_config(tmp_path)
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
-            with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
                 processor = Network_Processor(config_path=config_path)
         assert not hasattr(processor, "common_definitions_path")
         assert processor.common_dsd is not None
@@ -60,8 +68,12 @@ class TestCommonDefinitionsConfiguration:
         config_path = _make_config(
             tmp_path, extra=f"common_definitions_path: {common_defs}\n"
         )
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
-            with patch("pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
                 processor = Network_Processor(config_path=config_path)
         assert not hasattr(processor, "common_definitions_path")
         assert processor.common_dsd is not None
@@ -70,7 +82,9 @@ class TestCommonDefinitionsConfiguration:
         config_path = _make_config(tmp_path)
         common_dsd = MagicMock()
         definitions_dsd = MagicMock()
-        with patch("pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition",
                 side_effect=[common_dsd, definitions_dsd],
@@ -167,7 +181,9 @@ class TestConvertUnitsToCommonDefinitions:
         with pytest.raises(RuntimeError, match="not found in common definitions"):
             processor._convert_units_to_common_definitions(iam_df)
 
-    def test_raises_value_error_on_failed_conversion(self, processor: Network_Processor):
+    def test_raises_value_error_on_failed_conversion(
+        self, processor: Network_Processor
+    ):
         processor.common_dsd = MagicMock()
         processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
             {"variable": ["A"], "unit": ["TWh/yr"]}
@@ -223,7 +239,9 @@ class TestConvertUnitsToCommonDefinitions:
         )
         df = pd.DataFrame(
             {"2020": [1.0]},
-            index=pd.MultiIndex.from_tuples([("A", "EJ/yr")], names=["variable", "unit"]),
+            index=pd.MultiIndex.from_tuples(
+                [("A", "EJ/yr")], names=["variable", "unit"]
+            ),
         )
 
         iam_df = processor.structure_pyam_from_pandas(df)
