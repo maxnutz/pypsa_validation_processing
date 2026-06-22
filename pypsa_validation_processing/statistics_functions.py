@@ -170,7 +170,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
     The fossil fraction is estimated from the ratio of non-fossil gas
     production to total gas usage, excluding pipeline flows and limiting the
     non-fossil share to at most 1.
-    Industry gas demand is reduced by a fixed non-energy-use share based on
+    Industry gas demand is reduced by a fixed non-energy-use share for EU-27 based on
     Eurostat energy balance data.
     """
     # get fraction fossil-gas non-fossil-gas
@@ -233,7 +233,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         **kwargs,
     )
 
-    # get fraction of non-energetic use in industry
+    # get fraction of non-energetic use in industry -> TODO: #61
     # data from Eurostat energy balance for 2024 | EU27 | in TWh
     # online available (used 2026-04-28): https://ec.europa.eu/eurostat/cache/visualisations/energy-balances/enbal.html?geo=EU27_2020&unit=KTOE&language=EN&year=&fuel=fuelMainFuel&siec=TOTAL&details=1&chartOptions=0&stacking=normal&chartBal=&chart=&full=0&chartBalText=&order=DESC&siecs=&dataset=nrg_bal_c&decimals=0&agregates=0&share=false&fuelList=fuelElectricity%2CfuelCombustible%2CfuelNonCombustible%2CfuelOtherPetroleum%2CfuelMainPetroleum%2CfuelOil%2CfuelOtherFossil%2CfuelFossil%2CfuelCoal%2CfuelMainFuel
     # Final consumption - energy use: 7 217 049
