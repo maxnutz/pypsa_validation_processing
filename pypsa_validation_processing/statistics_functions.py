@@ -292,7 +292,7 @@ def Final_Energy_by_Carrier__Oil(
     non_fossil_fraction = non_fossil_fraction.mask(zero_oil, 1.0)
 
     non_fossil_fraction = non_fossil_fraction.clip(upper=1)  # TODO: Issue #53
-    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
+    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING, level="unit")
     non_fossil_fraction = non_fossil_fraction.groupby(
         kwargs["groupby"]
     ).mean()  # avoid double-indexing
