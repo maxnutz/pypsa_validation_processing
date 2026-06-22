@@ -23,6 +23,7 @@ pytest-cov = ">=4.0"
 pytest-mock = ">=3.0"
 openpyxl = ">=3.0"
 requests = ">=2.20"
+black = ">=26.5.1,<27"
 
 [pypi-dependencies]
 pandas = ">=1.0.0"

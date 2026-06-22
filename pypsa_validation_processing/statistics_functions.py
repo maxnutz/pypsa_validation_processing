@@ -32,8 +32,8 @@ from pypsa_validation_processing.utils import (
     UNITS_MAPPING,
 )
 from pypsa_validation_processing.utils import (
-    statistics_grouping_index,
     get_energy_totals_domestic_share,
+    create_location_index_from_copperplate,
 )
 
 
