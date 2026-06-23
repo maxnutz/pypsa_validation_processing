@@ -767,3 +767,131 @@ def Final_Energy_by_Sector__Agriculture(
         res = res.add(eff_loss, fill_value=0)
 
     return res
+
+
+def Final_Energy_by_Sector__Residential_and_Commercial(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract residential and commercial-sector final energy from a PyPSA Network.
+
+    Returns the total energy consumed by the transportation sector (excluding
+    transmission / distribution losses) across the pypsa-network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+
+    """
+    # Final Energy|Residential and Commercial|Electricity
+    # include home batteries
+    # include decentral heating technologies
+    # exclude central heating technologies
+    # exclude EV charging.
+    low_voltage_elec = n.statistics.withdrawal(
+        bus_carrier="low voltage",
+        carrier=[
+            "rural resistive heater",
+            "urban decentral resistive heater",
+            "home battery discharger",
+            "home battery charger",
+            "rural air heat pump",
+            "rural ground heat pump",
+            "urban decentral air heat pump",
+        ],
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Heat
+    # urban central heat as bus_carrier
+    # decentral solar thermal
+    # exclude urban central heat vent
+    # exclude low-temperature-teat for industry
+    # exclude decentral heating systems
+    urban_central_heat = n.statistics.withdrawal(
+        bus_carrier="urban central heat",
+        carrier=[
+            "urban central water pits charger",
+            "urban central water tanks charger",
+            "DAC",
+            "urban central heat",
+        ],
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Gases
+    # urban decentral gas boiler, rural gas boiler
+    rescom_gas = n.statistics.energy_balance(
+        carrier=["urban decentral gas boiler", "rural gas boiler"],
+        components="Link",
+        at_port="bus0",  # count gas not heat
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    ).mul(
+        -1
+    )  # positive Load
+
+    # Final Energy|Residential and Commercial|Liquids -> needs regionalization
+    raw_rescom = n.statistics.withdrawal(
+        bus_carrier="oil",
+        carrier=["rural oil boiler", "urban decentral oil boiler"],
+        groupby=kwargs_filtering["groupby"] + ["bus1"],
+        aggregate_time=aggregate_per_year,
+    )
+    if raw_rescom.empty:
+        rescom_liquids = raw_rescom
+    else:
+        raw_rescom = raw_rescom.drop("Store", errors="ignore")
+        usage_location = [
+            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+        ]
+        rescom_liquids = (
+            create_location_index_from_copperplate(raw_rescom, usage_location)
+            .groupby(kwargs["groupby"])
+            .sum()
+        )
+
+    # Final Energy|Residential and Commercial|Solids (Biomass)
+    solids_usage = n.statistics.energy_balance(
+        bus_carrier="solid biomass",
+        carrier=["rural biomass boiler", "urban decentral biomass boiler"],
+        components="Link",
+        at_port="bus0",  # account for biomass not for heat
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    ).mul(
+        -1
+    )  # positive Load
+
+    series_list = [
+        low_voltage_elec,
+        urban_central_heat,
+        rescom_gas,
+        rescom_liquids,
+        solids_usage,
+    ]
+    series_list = [
+        df.groupby(kwargs["groupby"]).sum() for df in series_list if not df.empty
+    ]
+    total = pd.concat(series_list)
+    return total

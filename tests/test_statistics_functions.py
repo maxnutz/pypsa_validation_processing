@@ -12,6 +12,7 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Carrier__Oil,
     Final_Energy_by_Sector__Industry,
     Final_Energy_by_Sector__Agriculture,
+    Final_Energy_by_Sector__Residential_and_Commercial,
     Final_Energy_by_Sector__Transportation,
 )
 
@@ -1276,6 +1277,181 @@ class TestFinalEnergyBySectorAgriculture:
         assert result.index.names == ["location", "unit"]
         # Result should still have valid data
         assert len(result) > 0
+
+
+# ---------------------------------------------------------------------------
+# Tests for Final_Energy_by_Sector__Residential_and_Commercial
+# ---------------------------------------------------------------------------
+
+
+class TestFinalEnergyBySectorResidentialAndCommercial:
+    """Test suite for Final_Energy_by_Sector__Residential_and_Commercial function."""
+
+    class _ResidentialAndCommercialStatisticsAccessor:
+        """Minimal accessor for residential and commercial sector tests."""
+
+        def __init__(self):
+            self.calls: list[dict] = []
+
+        @staticmethod
+        def _series_or_frame(
+            groupby: list[str],
+            locations: list[str],
+            values: list[float],
+            unit: str,
+            groupby_time: bool,
+        ) -> pd.Series | pd.DataFrame:
+            index_tuples = []
+            for location in locations:
+                idx_dict = {
+                    "name": f"{location} demand",
+                    "carrier": "mock carrier",
+                    "bus1": f"{location} bus",
+                    "bus0": f"{location} bus",
+                    "location": location,
+                    "unit": unit,
+                }
+                index_tuples.append(tuple(idx_dict.get(key, f"mock_{key}") for key in groupby))
+
+            index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
+            if groupby_time:
+                return pd.Series(values, index=index, dtype=float)
+
+            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+            return pd.DataFrame({ts: values for ts in timestamps}, index=index, dtype=float)
+
+        def energy_balance(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            direction: str = "withdrawal",
+            at_port: list[str] | None = None,
+            groupby_time: bool = True,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "groupby": groupby,
+                    "direction": direction,
+                    "at_port": at_port,
+                    "groupby_time": groupby_time,
+                }
+            )
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if carrier == ["rural biomass boiler", "urban decentral biomass boiler"]:
+                return self._series_or_frame(groupby, ["AT1", "AT2"], [21.0, 22.0], "MWh_th", groupby_time)
+
+            if bus_carrier == "low voltage":
+                return self._series_or_frame(groupby, ["AT1", "AT2"], [11.0, 12.0], "MWh_el", groupby_time)
+
+            if bus_carrier == "urban central heat":
+                return self._series_or_frame(groupby, ["AT1", "AT2"], [13.0, 14.0], "MWh_th", groupby_time)
+
+            if carrier == ["urban decentral gas boiler", "rural gas boiler"]:
+                return self._series_or_frame(groupby, ["AT1", "AT2"], [15.0, 16.0], "MWh_th", groupby_time)
+
+            return self._series_or_frame(groupby, ["AT1", "AT2"], [1.0, 2.0], "MWh_th", groupby_time)
+
+        def withdrawal(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            **kwargs: object,
+        ) -> pd.Series | pd.DataFrame:
+            kwargs.pop("groupby_time", None)
+            return self.energy_balance(
+                bus_carrier=bus_carrier,
+                carrier=carrier,
+                components=components,
+                groupby=groupby,
+                direction="withdrawal",
+                groupby_time=aggregate_time,
+                **kwargs,
+            )
+
+    class _ResidentialAndCommercialNetwork:
+        """Minimal network object exposing a residential/commercial statistics accessor."""
+
+        def __init__(self):
+            self.statistics = (
+                TestFinalEnergyBySectorResidentialAndCommercial._ResidentialAndCommercialStatisticsAccessor()
+            )
+
+    def _residential_and_commercial_network(self):
+        return self._ResidentialAndCommercialNetwork()
+
+    def test_returns_series(self):
+        """Test that the function returns a pandas Series."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+        assert isinstance(result, pd.Series)
+
+    def test_has_location_and_unit_multiindex(self):
+        """Test that result has MultiIndex with location and unit levels."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+
+    def test_not_empty(self):
+        """Test that result is not empty."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+        assert len(result) > 0
+
+    def test_numeric_values(self):
+        """Test that result values are numeric."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
+            result.dtype
+        )
+
+    def test_contains_multiple_locations(self):
+        """Test that result contains multiple locational data."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+        locations = result.index.get_level_values("location").unique()
+        assert len(locations) > 1
+        assert all(r.startswith("AT") for r in locations)
+
+    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
+        """Test processing multiple networks from collection."""
+        for _ in mock_network_collection:
+            result = Final_Energy_by_Sector__Residential_and_Commercial(
+                self._residential_and_commercial_network()
+            )
+            assert isinstance(result, pd.Series)
+            assert isinstance(result.index, pd.MultiIndex)
+            assert result.index.names == ["location", "unit"]
+            assert len(result) > 0
+
+    def test_returns_dataframe_when_not_aggregated(self):
+        """aggregate_per_year=False returns a DataFrame with snapshot columns."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network(), aggregate_per_year=False
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert any(isinstance(column, pd.Timestamp) for column in result.columns)
+        assert not result.empty
 
 
 # ---------------------------------------------------------------------------
