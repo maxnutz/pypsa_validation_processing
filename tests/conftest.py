@@ -127,24 +127,19 @@ class MockStatisticsAccessor:
         bus_carrier: str | None = None,
         carrier: list[str] | str | None = None,
         components: str | list[str] | None = None,
-        aggregate_time: bool = True,
+        groupby_time: bool = True,
         groupby: list[str] | None = None,
         nice_names: bool | None = None,
         **kwargs: object,
     ) -> pd.Series | pd.DataFrame:
-        """Mock withdrawal method forwarding to energy_balance.
-
-        PyPSA's statistics.withdrawal uses ``aggregate_time`` while
-        ``energy_balance`` uses ``groupby_time``. This adapter keeps tests
-        compatible with either call style.
-        """
+        """Mock withdrawal method forwarding to energy_balance."""
         return self.energy_balance(
             bus_carrier=bus_carrier,
             carrier=carrier,
             components=components,
             groupby=groupby,
             direction="withdrawal",
-            groupby_time=aggregate_time,
+            groupby_time=groupby_time,
             nice_names=nice_names,
             **kwargs,
         )
