@@ -588,9 +588,8 @@ class TestFinalEnergyByCarrierNaturalGas:
             carrier: list[str] | str | None = None,
             components: str | list[str] | None = None,
             at_port: str | list[str] | None = None,
-            # groupby_time: bool = True,
             groupby: list[str] | None = None,
-            groupby_time: bool | None = None,
+            groupby_time: bool = True,
             **_: object,
         ) -> pd.Series | pd.DataFrame:
             if groupby is None:
