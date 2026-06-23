@@ -1366,11 +1366,16 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
                 index_tuples.append(tuple(idx_dict.get(key, f"mock_{key}") for key in groupby))
 
             index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
+            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
             if groupby_time:
                 return pd.Series(values, index=index, dtype=float)
 
-            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
-            return pd.DataFrame({ts: values for ts in timestamps}, index=index, dtype=float)
+            per_snapshot_values = [value / len(timestamps) for value in values]
+            return pd.DataFrame(
+                {ts: per_snapshot_values for ts in timestamps},
+                index=index,
+                dtype=float,
+            )
 
         def energy_balance(
             self,
@@ -1379,8 +1384,9 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
             components: str | list[str] | None = None,
             groupby: list[str] | None = None,
             direction: str = "withdrawal",
-            at_port: list[str] | None = None,
+            at_port: str | list[str] | None = None,
             groupby_time: bool = True,
+            nice_names: bool | None = None,
             **_: object,
         ) -> pd.Series | pd.DataFrame:
             self.calls.append(
@@ -1392,11 +1398,15 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
                     "direction": direction,
                     "at_port": at_port,
                     "groupby_time": groupby_time,
+                    "nice_names": nice_names,
                 }
             )
 
             if groupby is None:
                 groupby = ["location", "unit"]
+
+            if components == "Link" and at_port not in ("bus0", ["bus0"]):
+                return self._series_or_frame(groupby, [], [], "MWh_th", groupby_time)
 
             if carrier == ["rural biomass boiler", "urban decentral biomass boiler"]:
                 return self._series_or_frame(groupby, ["AT1", "AT2"], [21.0, 22.0], "MWh_th", groupby_time)
@@ -1450,6 +1460,51 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
         )
         assert isinstance(result, pd.Series)
 
+    def test_uses_bus0_for_gas_and_biomass(self):
+        """Test that gas and biomass are queried on bus0."""
+        network = self._residential_and_commercial_network()
+
+        _ = Final_Energy_by_Sector__Residential_and_Commercial(network)
+
+        gas_calls = [
+            call
+            for call in network.statistics.calls
+            if call["carrier"] == ["urban decentral gas boiler", "rural gas boiler"]
+        ]
+        biomass_calls = [
+            call
+            for call in network.statistics.calls
+            if call["bus_carrier"] == "solid biomass"
+        ]
+
+        assert gas_calls
+        assert biomass_calls
+        assert all(call["at_port"] == "bus0" for call in gas_calls)
+        assert all(call["at_port"] == "bus0" for call in biomass_calls)
+
+    def test_aggregates_all_fuel_types_per_location(self):
+        """Test that all fuel types are combined correctly per location."""
+        result = Final_Energy_by_Sector__Residential_and_Commercial(
+            self._residential_and_commercial_network()
+        )
+
+        grouped_result = result.groupby(level=["location", "unit"]).sum().sort_index()
+        expected = pd.Series(
+            [11.0, 12.0, -22.0, -22.0],
+            index=pd.MultiIndex.from_tuples(
+                [
+                    ("AT1", "MWh_el"),
+                    ("AT2", "MWh_el"),
+                    ("AT1", "MWh_th"),
+                    ("AT2", "MWh_th"),
+                ],
+                names=["location", "unit"],
+            ),
+            dtype=float,
+        ).sort_index()
+
+        pd.testing.assert_series_equal(grouped_result, expected)
+
     def test_has_location_and_unit_multiindex(self):
         """Test that result has MultiIndex with location and unit levels."""
         result = Final_Energy_by_Sector__Residential_and_Commercial(
@@ -1496,14 +1551,18 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
 
     def test_returns_dataframe_when_not_aggregated(self):
         """aggregate_per_year=False returns a DataFrame with snapshot columns."""
+        network = self._residential_and_commercial_network()
         result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network(), aggregate_per_year=False
+            network, aggregate_per_year=False
         )
+        aggregated_result = Final_Energy_by_Sector__Residential_and_Commercial(network)
         assert isinstance(result, pd.DataFrame)
         assert isinstance(result.index, pd.MultiIndex)
         assert result.index.names == ["location", "unit"]
         assert any(isinstance(column, pd.Timestamp) for column in result.columns)
+        assert len(result.columns) == 4
         assert not result.empty
+        pd.testing.assert_series_equal(result.sum(axis=1), aggregated_result)
 
 
 # ---------------------------------------------------------------------------

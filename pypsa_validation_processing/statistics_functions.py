@@ -775,8 +775,8 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
 ) -> pd.Series | pd.DataFrame:
     """Extract residential and commercial-sector final energy from a PyPSA Network.
 
-    Returns the total energy consumed by the transportation sector (excluding
-    transmission / distribution losses) across the pypsa-network.
+    Returns the total energy consumed by the sector residentials and
+    commercials across the pypsa-network.
 
     Parameters
     ----------
@@ -799,7 +799,9 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
 
     Notes
     -----
-
+    excludes EV-charging, as covered by Sector Transportation. Concerning Carrier heat, the Function distinguishes between
+    central heating systems (Final Energy is Heat) and decentral heating systems (Final Energy is Electricity, Gas, Liquids
+    or Solids).
     """
     # Final Energy|Residential and Commercial|Electricity
     # include home batteries
