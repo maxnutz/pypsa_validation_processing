@@ -434,11 +434,11 @@ def Final_Energy_by_Carrier__Natural_Gas(
     non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
 
     # Final Energy|Residential and Commercial|Natural Gas - urban decentral gas boiler
-    rescom = n.statistics.withdrawal(
-        bus_carrier="gas",
+    rescom_gas = n.statistics.energy_balance(
         carrier=["urban decentral gas boiler", "rural gas boiler"],
         components="Link",
-        aggregate_time=aggregate_per_year,
+        at_port="bus0",  # count gas not heat
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -461,7 +461,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
     energy_fraction_industry_gas = fc_energy / (fc_energy + fc_noenergy)
     industry = industry.mul(energy_fraction_industry_gas)
 
-    series_list = [rescom, industry]
+    series_list = [rescom_gas, industry]
     series_list = [series for series in series_list if not series.empty]
 
     if not series_list:

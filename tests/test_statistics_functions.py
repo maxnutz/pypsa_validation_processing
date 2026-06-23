@@ -512,6 +512,7 @@ class TestFinalEnergyByCarrierNaturalGas:
 
         def __init__(self, scenario: str = "mixed"):
             self.scenario = scenario
+            self.calls: list[dict[str, object]] = []
 
         @staticmethod
         def _empty_series(groupby: list[str]) -> pd.Series:
@@ -578,6 +579,45 @@ class TestFinalEnergyByCarrierNaturalGas:
                 if groupby_time:
                     return self._series_from_groupby(groupby, [20.0])
                 return self._dataframe_from_groupby(groupby, [20.0, 20.0])
+
+            return self._empty_series(groupby)
+
+        def energy_balance(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            at_port: str | list[str] | None = None,
+            # groupby_time: bool = True,
+            groupby: list[str] | None = None,
+            groupby_time: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "at_port": at_port,
+                    "groupby_time": groupby_time,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                }
+            )
+
+            if (
+                carrier == ["urban decentral gas boiler", "rural gas boiler"]
+                and components == "Link"
+                and at_port == "bus0"
+            ):
+                if self.scenario == "no_gas":
+                    return self._empty_series(groupby)
+                if groupby_time:
+                    return self._series_from_groupby(groupby, [40.0])
+                return self._dataframe_from_groupby(groupby, [40.0, 40.0])
 
             return self._empty_series(groupby)
 
@@ -692,6 +732,19 @@ class TestFinalEnergyByCarrierNaturalGas:
         )
         # total=100, non-fossil share=20/100, result=100*(1-0.2)=80
         assert result.loc[("AT1", "MWh")] == pytest.approx(77.1322, 0.1)
+
+    def test_uses_energy_balance_for_residential_and_commercial_gas(self):
+        """Residential/commercial gas demand is now taken from energy_balance."""
+        network = self._natural_gas_network("mixed")
+
+        _ = Final_Energy_by_Carrier__Natural_Gas(network)
+
+        assert any(
+            call["carrier"] == ["urban decentral gas boiler", "rural gas boiler"]
+            and call["components"] == "Link"
+            and call["at_port"] == "bus0"
+            for call in network.statistics.calls
+        )
 
     def test_edge_case_no_gas_returns_empty_series(self):
         """No gas usage and no gas demand should return an empty result."""
