@@ -481,7 +481,36 @@ def Final_Energy_by_Carrier__District_Heat(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract heat from district heating facilities from a PyPSA Network."""
+    """Extract Final Energy of District Heat from PyPSA Network.
+
+    Returns the total final energy demand, district heating facilities
+    have to provide district heating.
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including
+        ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    The energy demand of district heating is calculated based on the
+    links from other carriers buses to the urban central heat buses.
+    This includes waste heat from eg. DAC. Taking the withdrawal from
+    the source bus of the link gives the energy in elem of the source carrier.
+    """
     # get all buses that are connected to central heat bus with links
     central_heat_buses = n.buses[n.buses.carrier == "urban central heat"].index
     central_heat_supply_links = n.links[
