@@ -541,7 +541,27 @@ def Final_Energy_by_Carrier__District_Heat(
         aggregate_time=aggregate_per_year,
         **kwargs,
     )
-    return res
+
+    # urban central heat vent is a generator on urban central heat bus,
+    # but not a component of Final Energy and needs to be substracted.
+    heat_vent = n.statistics.energy_balance(
+        bus_carrier="urban central heat",
+        carrier="urban central heat vent",
+        components="Generator",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    # units need to be mapped to MWh for correct summing of final values
+    # this is currently not a clean solution -> TODO: #73
+    idx_frame_res = res.index.to_frame(index=False)
+    idx_frame_heat_vent = heat_vent.index.to_frame(index=False)
+    idx_frame_res["unit"] = idx_frame_res["unit"].map(UNITS_MAPPING)
+    idx_frame_heat_vent["unit"] = idx_frame_heat_vent["unit"].map(UNITS_MAPPING)
+    res.index = pd.MultiIndex.from_frame(idx_frame_res)
+    heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
+    result = (res.groupby(["location", "unit"]).sum()).add(heat_vent, fill_value=0)
+
+    return result
 
 
 def Final_Energy_by_Sector__Transportation(

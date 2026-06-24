@@ -814,6 +814,50 @@ class TestFinalEnergyByCarrierDistrictHeat:
             )
             return pd.DataFrame([values[: len(columns)]], index=index, columns=columns)
 
+        def energy_balance(
+            self,
+            bus_carrier: str | list[str] | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "aggregate_time": aggregate_time,
+                    "groupby": groupby,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if (
+                bus_carrier == "urban central heat"
+                and carrier == "urban central heat vent"
+                and components == "Generator"
+            ):
+                if aggregate_time:
+                    return self._series_from_groupby(groupby, [5.0])
+                return self._dataframe_from_groupby(groupby, [5.0, 5.0])
+
+            if aggregate_time:
+                return pd.Series(
+                    dtype=float,
+                    index=pd.MultiIndex.from_tuples([], names=groupby),
+                )
+            return pd.DataFrame(
+                index=pd.MultiIndex.from_tuples([], names=groupby),
+                columns=pd.Index(pd.to_datetime([], name="snapshot")),
+                dtype=float,
+            )
+
         def withdrawal(
             self,
             bus_carrier: str | list[str] | None = None,
@@ -926,12 +970,15 @@ class TestFinalEnergyByCarrierDistrictHeat:
         _ = Final_Energy_by_Carrier__District_Heat(network)
 
         calls = network.statistics.calls
-        assert len(calls) == 1
+        assert len(calls) == 2
         queried_carriers = set(calls[0]["carrier"])
         assert queried_carriers == {
             "urban central resistive heater",
             "urban central gas boiler",
         }
+        assert calls[1]["bus_carrier"] == "urban central heat"
+        assert calls[1]["carrier"] == "urban central heat vent"
+        assert calls[1]["components"] == "Generator"
 
     def test_uses_supply_bus_carriers_from_bus0(self):
         """bus_carrier query uses carriers from bus0 of relevant central-heat links."""
@@ -941,6 +988,7 @@ class TestFinalEnergyByCarrierDistrictHeat:
         queried_bus_carriers = set(network.statistics.calls[0]["bus_carrier"])
         # Links via bus0 include AC, gas, biomass and hydrogen supply buses.
         assert queried_bus_carriers == {"AC", "gas", "biomass", "hydrogen"}
+        assert network.statistics.calls[1]["carrier"] == "urban central heat vent"
 
     def test_returns_dataframe_for_aggregate_per_year_false(self):
         """aggregate_per_year=False returns timeseries DataFrame output."""
