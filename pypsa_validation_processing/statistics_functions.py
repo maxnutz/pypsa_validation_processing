@@ -81,13 +81,13 @@ def Final_Energy_by_Carrier__Electricity(
     agri = n.statistics.withdrawal(
         carrier=["agriculture electricity", "agriculture machinery electric"],
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
     # get Final Energy|Residential and Commercial|Electricity
     lv = n.statistics.withdrawal(
-        bus_carrier="low voltage", aggregate_time=aggregate_per_year, **kwargs_filtering
+        bus_carrier="low voltage", groupby_time=aggregate_per_year, **kwargs_filtering
     )
     forbidden_parts = [
         "urban central",
@@ -106,7 +106,7 @@ def Final_Energy_by_Carrier__Electricity(
         bus_carrier="low voltage",
         carrier="BEV charger",
         components="Link",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -114,7 +114,7 @@ def Final_Energy_by_Carrier__Electricity(
     industry = n.statistics.withdrawal(
         carrier="industry electricity",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -123,7 +123,7 @@ def Final_Energy_by_Carrier__Electricity(
         bus_carrier="AC",
         carrier="DAC",
         components="Link",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -171,7 +171,7 @@ def Final_Energy_by_Carrier__Coal(
         bus_carrier="coal for industry",
         carrier="coal for industry",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
     return industry
@@ -238,7 +238,7 @@ def Final_Energy_by_Carrier__Oil(
     agri = n.statistics.withdrawal(
         carrier="agriculture machinery oil",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -247,7 +247,7 @@ def Final_Energy_by_Carrier__Oil(
         bus_carrier="oil",
         carrier=["rural oil boiler", "urban decentral oil boiler"],
         groupby=kwargs_filtering["groupby"] + ["bus1"],
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
     )
     if raw_rescom.empty:
         rescom = raw_rescom
@@ -266,7 +266,7 @@ def Final_Energy_by_Carrier__Oil(
     transpo = n.statistics.withdrawal(
         carrier="land transport oil",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -404,7 +404,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         ],
         at_port="bus1",
         components="Link",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -412,7 +412,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
     all_gas = n.statistics.withdrawal(
         bus_carrier="gas",
         components="Link",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs_filtering,
     )
     all_gas.index.get_level_values("carrier").unique()
@@ -434,11 +434,11 @@ def Final_Energy_by_Carrier__Natural_Gas(
     non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
 
     # Final Energy|Residential and Commercial|Natural Gas - urban decentral gas boiler
-    rescom = n.statistics.withdrawal(
-        bus_carrier="gas",
+    rescom_gas = n.statistics.energy_balance(
         carrier=["urban decentral gas boiler", "rural gas boiler"],
         components="Link",
-        aggregate_time=aggregate_per_year,
+        at_port="bus0",  # count gas not heat
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -447,7 +447,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         bus_carrier="gas for industry",
         carrier=["gas for industry", "gas for industry CC"],
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -461,7 +461,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
     energy_fraction_industry_gas = fc_energy / (fc_energy + fc_noenergy)
     industry = industry.mul(energy_fraction_industry_gas)
 
-    series_list = [rescom, industry]
+    series_list = [rescom_gas, industry]
     series_list = [series for series in series_list if not series.empty]
 
     if not series_list:
@@ -620,7 +620,7 @@ def Final_Energy_by_Sector__Transportation(
         bus_carrier="low voltage",
         carrier="BEV charger",
         components="Link",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     ).mul(
         1 / eff
@@ -630,7 +630,7 @@ def Final_Energy_by_Sector__Transportation(
     h2 = n.statistics.withdrawal(
         carrier="land transport fuel cell",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -639,7 +639,7 @@ def Final_Energy_by_Sector__Transportation(
         n.statistics.withdrawal(
             carrier="kerosene for aviation",
             components="Load",
-            aggregate_time=aggregate_per_year,
+            groupby_time=aggregate_per_year,
             **kwargs,
         )
         * domestic_aviation_fraction
@@ -649,7 +649,7 @@ def Final_Energy_by_Sector__Transportation(
         n.statistics.withdrawal(
             carrier=["shipping oil", "shipping methanol"],
             components="Load",
-            aggregate_time=aggregate_per_year,
+            groupby_time=aggregate_per_year,
             **kwargs,
         )
         * domestic_navigation_fraction
@@ -658,7 +658,7 @@ def Final_Energy_by_Sector__Transportation(
     land_transport_liquids = n.statistics.withdrawal(
         carrier="land transport oil",
         components="Load",
-        aggregate_time=aggregate_per_year,
+        groupby_time=aggregate_per_year,
         **kwargs,
     )
 
@@ -834,3 +834,136 @@ def Final_Energy_by_Sector__Agriculture(
         res = res.add(eff_loss, fill_value=0)
 
     return res
+
+
+def Final_Energy_by_Sector__Residential_and_Commercial(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract residential and commercial-sector final energy from a PyPSA Network.
+
+    Returns the total energy consumed by the sector residentials and
+    commercials across the pypsa-network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    excludes EV-charging, as covered by Sector Transportation. Concerning Carrier heat, the Function distinguishes between
+    central heating systems (Final Energy is Heat) and decentral heating systems (Final Energy is Electricity, Gas, Liquids
+    or Solids).
+    """
+    # Final Energy|Residential and Commercial|Electricity
+    # include home batteries
+    # include decentral heating technologies
+    # exclude central heating technologies
+    # exclude EV charging.
+    low_voltage_elec = n.statistics.withdrawal(
+        bus_carrier="low voltage",
+        carrier=[
+            "rural resistive heater",
+            "urban decentral resistive heater",
+            "home battery discharger",
+            "home battery charger",
+            "rural air heat pump",
+            "rural ground heat pump",
+            "urban decentral air heat pump",
+        ],
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Heat
+    # urban central heat as bus_carrier
+    # decentral solar thermal
+    # exclude urban central heat vent
+    # exclude low-temperature-teat for industry
+    # exclude decentral heating systems
+    urban_central_heat = n.statistics.withdrawal(
+        bus_carrier="urban central heat",
+        carrier=[
+            "urban central water pits charger",
+            "urban central water tanks charger",
+            "DAC",
+            "urban central heat",
+        ],
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # Final Energy|Residential and Commercial|Gases
+    # urban decentral gas boiler, rural gas boiler
+    rescom_gas = n.statistics.energy_balance(
+        carrier=["urban decentral gas boiler", "rural gas boiler"],
+        components="Link",
+        at_port="bus0",  # count gas not heat
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    ).mul(
+        -1
+    )  # positive Load
+
+    # Final Energy|Residential and Commercial|Liquids -> needs regionalization
+    raw_rescom = n.statistics.energy_balance(
+        bus_carrier="oil",
+        carrier=["rural oil boiler", "urban decentral oil boiler"],
+        groupby=kwargs_filtering["groupby"] + ["bus1"],
+        at_port="bus0",  # count oil not heat
+        groupby_time=aggregate_per_year,
+    ).mul(
+        -1
+    )  # positive Load
+    if raw_rescom.empty:
+        rescom_liquids = raw_rescom
+    else:
+        raw_rescom = raw_rescom.drop("Store", errors="ignore")
+        usage_location = [
+            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+        ]
+        rescom_liquids = (
+            create_location_index_from_copperplate(raw_rescom, usage_location)
+            .groupby(kwargs["groupby"])
+            .sum()
+        )
+
+    # Final Energy|Residential and Commercial|Solids (Biomass)
+    solids_usage = n.statistics.energy_balance(
+        bus_carrier="solid biomass",
+        carrier=["rural biomass boiler", "urban decentral biomass boiler"],
+        components="Link",
+        at_port="bus0",  # account for biomass not for heat
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    ).mul(
+        -1
+    )  # positive Load
+
+    series_list = [
+        low_voltage_elec,
+        urban_central_heat,
+        rescom_gas,
+        rescom_liquids,
+        solids_usage,
+    ]
+    series_list = [
+        df.groupby(kwargs["groupby"]).sum() for df in series_list if not df.empty
+    ]
+    total = pd.concat(series_list)
+    return total
