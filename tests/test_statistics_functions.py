@@ -1490,7 +1490,7 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
 
         grouped_result = result.groupby(level=["location", "unit"]).sum().sort_index()
         expected = pd.Series(
-            [11.0, 12.0, -22.0, -22.0],
+            [11.0, 12.0, -24.0, -26.0],
             index=pd.MultiIndex.from_tuples(
                 [
                     ("AT1", "MWh_el"),

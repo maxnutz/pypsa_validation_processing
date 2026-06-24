@@ -854,12 +854,15 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
     )  # positive Load
 
     # Final Energy|Residential and Commercial|Liquids -> needs regionalization
-    raw_rescom = n.statistics.withdrawal(
+    raw_rescom = n.statistics.energy_balance(
         bus_carrier="oil",
         carrier=["rural oil boiler", "urban decentral oil boiler"],
         groupby=kwargs_filtering["groupby"] + ["bus1"],
+        at_port="bus0",  # count oil not heat
         groupby_time=aggregate_per_year,
-    )
+    ).mul(
+        -1
+    )  # positive Load
     if raw_rescom.empty:
         rescom_liquids = raw_rescom
     else:
