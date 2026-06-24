@@ -477,6 +477,42 @@ def Final_Energy_by_Carrier__Natural_Gas(
     return result
 
 
+def Final_Energy_by_Carrier__District_Heat(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract heat from district heating facilities from a PyPSA Network."""
+    # get all buses that are connected to central heat bus with links
+    central_heat_buses = n.buses[n.buses.carrier == "urban central heat"].index
+    central_heat_supply_links = n.links[
+        (
+            n.links.bus1.isin(central_heat_buses)
+            | n.links.bus2.isin(central_heat_buses)
+            | n.links.bus3.isin(central_heat_buses)
+        )
+    ]
+    central_heat_supply_buses = n.buses[
+        n.buses.index.isin(central_heat_supply_links.bus0.values)
+    ]
+    supply_bus_carriers = central_heat_supply_buses.carrier.unique()
+
+    # get all carriers of links to central_heat_buses
+    pattern = r"charger|discharger"
+    central_heat_supply_links_without_chargers = [
+        x
+        for x in central_heat_supply_links.carrier.unique()
+        if not re.search(pattern, x, re.IGNORECASE)
+    ]
+
+    res = n.statistics.withdrawal(
+        bus_carrier=list(supply_bus_carriers),
+        carrier=list(central_heat_supply_links_without_chargers),
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    return res
+
+
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
