@@ -796,6 +796,9 @@ class TestFinalEnergyByCarrierDistrictHeat:
             self.statistics = (
                 TestFinalEnergyByCarrierDistrictHeat._DistrictHeatStatisticsAccessor()
             )
+            self.snapshots = pd.DatetimeIndex(
+                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+            )
             self.buses = pd.DataFrame(
                 {
                     "carrier": [
@@ -888,13 +891,16 @@ class TestFinalEnergyByCarrierDistrictHeat:
 
     def test_returns_dataframe_for_aggregate_per_year_false(self):
         """aggregate_per_year=False returns timeseries DataFrame output."""
+        network = self._district_heat_network()
         result = Final_Energy_by_Carrier__District_Heat(
-            self._district_heat_network(), aggregate_per_year=False
+            network, aggregate_per_year=False
         )
         assert isinstance(result, pd.DataFrame)
         assert isinstance(result.index, pd.MultiIndex)
         assert result.index.names == ["location", "unit"]
-        assert isinstance(result.columns, pd.Index)
+        assert isinstance(result.columns, pd.DatetimeIndex)
+        assert len(result.columns) == len(network.snapshots)
+        pd.testing.assert_index_equal(result.columns, network.snapshots)
 
 
 # ---------------------------------------------------------------------------

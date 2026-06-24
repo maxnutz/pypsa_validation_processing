@@ -527,11 +527,13 @@ def Final_Energy_by_Carrier__District_Heat(
 
     # get all carriers of links to central_heat_buses
     pattern = r"charger|discharger"
-    central_heat_supply_links_without_chargers = [
-        x
-        for x in central_heat_supply_links.carrier.unique()
-        if not re.search(pattern, x, re.IGNORECASE)
-    ]
+    carrier_series = central_heat_supply_links["carrier"].dropna().astype("string")
+    is_charger_or_discharger = carrier_series.str.contains(
+        pattern, case=False, regex=True
+    )
+    central_heat_supply_links_without_chargers = carrier_series[
+        ~is_charger_or_discharger
+    ].unique()
 
     res = n.statistics.withdrawal(
         bus_carrier=list(supply_bus_carriers),
