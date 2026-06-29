@@ -9,6 +9,7 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Carrier__Ambient_Heat,
     Final_Energy_by_Carrier__Electricity,
     Final_Energy_by_Carrier__Coal,
+    Final_Energy_by_Carrier__District_Heat,
     Final_Energy_by_Carrier__Natural_Gas,
     Final_Energy_by_Carrier__Oil,
     Final_Energy_by_Sector__Industry,
@@ -988,6 +989,239 @@ class TestFinalEnergyByCarrierNaturalGas:
             self._natural_gas_network("no_renewable")
         )
         assert result.loc[("AT1", "MWh")] == pytest.approx(96.41536, 0.1)
+
+
+# ---------------------------------------------------------------------------
+# Tests for Final_Energy_by_Carrier__District_Heat
+# ---------------------------------------------------------------------------
+
+
+class TestFinalEnergyByCarrierDistrictHeat:
+    """Test suite for Final_Energy_by_Carrier__District_Heat function."""
+
+    class _DistrictHeatStatisticsAccessor:
+        """Minimal accessor to verify district-heat extraction behavior."""
+
+        def __init__(self):
+            self.calls: list[dict] = []
+
+        @staticmethod
+        def _series_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_th",
+        ) -> pd.Series:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            return pd.Series(values, index=index, dtype=float)
+
+        @staticmethod
+        def _dataframe_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_th",
+        ) -> pd.DataFrame:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
+                names=groupby,
+            )
+            columns = pd.Index(
+                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+            )
+            return pd.DataFrame([values[: len(columns)]], index=index, columns=columns)
+
+        def energy_balance(
+            self,
+            bus_carrier: str | list[str] | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "aggregate_time": aggregate_time,
+                    "groupby": groupby,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if (
+                bus_carrier == "urban central heat"
+                and carrier == "urban central heat vent"
+                and components == "Generator"
+            ):
+                if aggregate_time:
+                    return self._series_from_groupby(groupby, [5.0])
+                return self._dataframe_from_groupby(groupby, [5.0, 5.0])
+
+            if aggregate_time:
+                return pd.Series(
+                    dtype=float,
+                    index=pd.MultiIndex.from_tuples([], names=groupby),
+                )
+            return pd.DataFrame(
+                index=pd.MultiIndex.from_tuples([], names=groupby),
+                columns=pd.Index(pd.to_datetime([], name="snapshot")),
+                dtype=float,
+            )
+
+        def withdrawal(
+            self,
+            bus_carrier: str | list[str] | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            aggregate_time: bool = True,
+            groupby: list[str] | None = None,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "aggregate_time": aggregate_time,
+                    "groupby": groupby,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            if aggregate_time:
+                return self._series_from_groupby(groupby, [55.0])
+            return self._dataframe_from_groupby(groupby, [55.0, 56.0])
+
+    class _DistrictHeatNetwork:
+        """Minimal network exposing district-heat buses/links and statistics."""
+
+        def __init__(self):
+            self.statistics = (
+                TestFinalEnergyByCarrierDistrictHeat._DistrictHeatStatisticsAccessor()
+            )
+            self.snapshots = pd.DatetimeIndex(
+                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+            )
+            self.buses = pd.DataFrame(
+                {
+                    "carrier": [
+                        "urban central heat",
+                        "urban central heat",
+                        "AC",
+                        "gas",
+                        "district heat storage",
+                        "biomass",
+                        "hydrogen",
+                    ]
+                },
+                index=[
+                    "AT1 urban central heat",
+                    "AT2 urban central heat",
+                    "AT1 AC",
+                    "AT2 gas",
+                    "AT1 heat storage",
+                    "AT2 biomass",
+                    "AT2 hydrogen",
+                ],
+            )
+            self.links = pd.DataFrame(
+                {
+                    "bus0": [
+                        "AT1 AC",
+                        "AT2 gas",
+                        "AT2 biomass",
+                        "AT2 hydrogen",
+                    ],
+                    "bus1": [
+                        "AT1 urban central heat",
+                        "AT2 urban central heat",
+                        "AT2 urban central heat",
+                        "AT2 urban central heat",
+                    ],
+                    "bus2": [
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                    ],
+                    "bus3": [
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                        "AT1 heat storage",
+                    ],
+                    "carrier": [
+                        "urban central resistive heater",
+                        "urban central gas boiler",
+                        "central heat charger",
+                        "central heat discharger",
+                    ],
+                },
+                index=["l1", "l2", "l3", "l4"],
+            )
+
+    def _district_heat_network(self):
+        return self._DistrictHeatNetwork()
+
+    def test_returns_series(self):
+        """Function returns a Series with expected output format."""
+        result = Final_Energy_by_Carrier__District_Heat(self._district_heat_network())
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+
+    def test_filters_charger_and_discharger_carriers(self):
+        """Carrier query excludes charger/discharger links connected to central heat."""
+        network = self._district_heat_network()
+        _ = Final_Energy_by_Carrier__District_Heat(network)
+
+        calls = network.statistics.calls
+        assert len(calls) == 2
+        queried_carriers = set(calls[0]["carrier"])
+        assert queried_carriers == {
+            "urban central resistive heater",
+            "urban central gas boiler",
+        }
+        assert calls[1]["bus_carrier"] == "urban central heat"
+        assert calls[1]["carrier"] == "urban central heat vent"
+        assert calls[1]["components"] == "Generator"
+
+    def test_uses_supply_bus_carriers_from_bus0(self):
+        """bus_carrier query uses carriers from bus0 of relevant central-heat links."""
+        network = self._district_heat_network()
+        _ = Final_Energy_by_Carrier__District_Heat(network)
+
+        queried_bus_carriers = set(network.statistics.calls[0]["bus_carrier"])
+        # Links via bus0 include AC, gas, biomass and hydrogen supply buses.
+        assert queried_bus_carriers == {"AC", "gas", "biomass", "hydrogen"}
+        assert network.statistics.calls[1]["carrier"] == "urban central heat vent"
+
+    def test_returns_dataframe_for_aggregate_per_year_false(self):
+        """aggregate_per_year=False returns timeseries DataFrame output."""
+        network = self._district_heat_network()
+        result = Final_Energy_by_Carrier__District_Heat(
+            network, aggregate_per_year=False
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert isinstance(result.columns, pd.DatetimeIndex)
+        assert len(result.columns) == len(network.snapshots)
+        pd.testing.assert_index_equal(result.columns, network.snapshots)
 
 
 # ---------------------------------------------------------------------------

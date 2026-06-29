@@ -557,6 +557,96 @@ def Final_Energy_by_Carrier__Natural_Gas(
     return result
 
 
+def Final_Energy_by_Carrier__District_Heat(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract Final Energy of District Heat from PyPSA Network.
+
+    Returns the total final energy demand, district heating facilities
+    have to provide district heating.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including
+        ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    The energy demand of district heating is calculated based on the
+    links from other carriers buses to the urban central heat buses.
+    This includes waste heat from eg. DAC. Taking the withdrawal from
+    the source bus of the link gives the energy in elem of the source carrier.
+    """
+    # get all buses that are connected to central heat bus with links
+    central_heat_buses = n.buses[n.buses.carrier == "urban central heat"].index
+    # get all carriers of links to central_heat_buses
+    central_heat_supply_links = n.links[
+        (
+            n.links.bus1.isin(central_heat_buses)
+            | n.links.bus2.isin(central_heat_buses)
+            | n.links.bus3.isin(central_heat_buses)
+        )
+    ]
+    central_heat_supply_buses = n.buses[
+        n.buses.index.isin(central_heat_supply_links.bus0.values)
+    ]
+    supply_bus_carriers = central_heat_supply_buses.carrier.unique()
+
+    pattern = r"charger|discharger"
+    carrier_series = central_heat_supply_links["carrier"].dropna().astype("string")
+    is_charger_or_discharger = carrier_series.str.contains(
+        pattern, case=False, regex=True
+    )
+    central_heat_supply_links_without_chargers = carrier_series[
+        ~is_charger_or_discharger
+    ].unique()
+
+    res = n.statistics.withdrawal(
+        bus_carrier=list(supply_bus_carriers),
+        carrier=list(central_heat_supply_links_without_chargers),
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    # urban central heat vent is a generator on urban central heat bus,
+    # but not a component of Final Energy and needs to be substracted.
+    heat_vent = n.statistics.energy_balance(
+        bus_carrier="urban central heat",
+        carrier="urban central heat vent",
+        components="Generator",
+        aggregate_time=aggregate_per_year,
+        **kwargs,
+    )
+    # units need to be mapped to MWh for correct summing of final values
+    # this is currently not a clean solution -> TODO: #73
+    res = remap_unit_index(res)
+    heat_vent = remap_unit_index(heat_vent)
+    # idx_frame_res = res.index.to_frame(index=False)
+    # idx_frame_heat_vent = heat_vent.index.to_frame(index=False)
+    # idx_frame_res["unit"] = idx_frame_res["unit"].map(UNITS_MAPPING)
+    # idx_frame_heat_vent["unit"] = idx_frame_heat_vent["unit"].map(UNITS_MAPPING)
+    # res.index = pd.MultiIndex.from_frame(idx_frame_res)
+    # heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
+    result = (res.groupby(["location", "unit"]).sum()).add(heat_vent, fill_value=0)
+
+    return result
+
+
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
