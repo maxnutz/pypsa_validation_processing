@@ -30,6 +30,7 @@ from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
     statistics_kwargs as kwargs,
     UNITS_MAPPING,
+    remap_unit_index,
 )
 from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
@@ -553,12 +554,14 @@ def Final_Energy_by_Carrier__District_Heat(
     )
     # units need to be mapped to MWh for correct summing of final values
     # this is currently not a clean solution -> TODO: #73
-    idx_frame_res = res.index.to_frame(index=False)
-    idx_frame_heat_vent = heat_vent.index.to_frame(index=False)
-    idx_frame_res["unit"] = idx_frame_res["unit"].map(UNITS_MAPPING)
-    idx_frame_heat_vent["unit"] = idx_frame_heat_vent["unit"].map(UNITS_MAPPING)
-    res.index = pd.MultiIndex.from_frame(idx_frame_res)
-    heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
+    res = remap_unit_index(res)
+    heat_vent = remap_unit_index(heat_vent)
+    # idx_frame_res = res.index.to_frame(index=False)
+    # idx_frame_heat_vent = heat_vent.index.to_frame(index=False)
+    # idx_frame_res["unit"] = idx_frame_res["unit"].map(UNITS_MAPPING)
+    # idx_frame_heat_vent["unit"] = idx_frame_heat_vent["unit"].map(UNITS_MAPPING)
+    # res.index = pd.MultiIndex.from_frame(idx_frame_res)
+    # heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
     result = (res.groupby(["location", "unit"]).sum()).add(heat_vent, fill_value=0)
 
     return result
