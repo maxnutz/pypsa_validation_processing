@@ -486,6 +486,7 @@ def Final_Energy_by_Carrier__District_Heat(
 
     Returns the total final energy demand, district heating facilities
     have to provide district heating.
+
     Parameters
     ----------
     n : pypsa.Network
@@ -514,6 +515,7 @@ def Final_Energy_by_Carrier__District_Heat(
     """
     # get all buses that are connected to central heat bus with links
     central_heat_buses = n.buses[n.buses.carrier == "urban central heat"].index
+    # get all carriers of links to central_heat_buses
     central_heat_supply_links = n.links[
         (
             n.links.bus1.isin(central_heat_buses)
@@ -526,7 +528,6 @@ def Final_Energy_by_Carrier__District_Heat(
     ]
     supply_bus_carriers = central_heat_supply_buses.carrier.unique()
 
-    # get all carriers of links to central_heat_buses
     pattern = r"charger|discharger"
     carrier_series = central_heat_supply_links["carrier"].dropna().astype("string")
     is_charger_or_discharger = carrier_series.str.contains(
