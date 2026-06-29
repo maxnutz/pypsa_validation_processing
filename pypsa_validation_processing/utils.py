@@ -130,6 +130,19 @@ UNITS_MAPPING = {
     "MWh": "MWh",
 }
 
+
+def remap_unit_index(
+    series: pd.Series, unit_mapping: dict = UNITS_MAPPING
+) -> pd.Series:
+    """Remaps unit index to standard value for statistics with need for
+    direct comparison of input-output flows."""
+    idx = series.index.to_frame(index=False)
+    idx["unit"] = idx["unit"].replace(unit_mapping)
+    out = series.copy()
+    out.index = pd.MultiIndex.from_frame(idx, names=series.index.names)
+    return out
+
+
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
