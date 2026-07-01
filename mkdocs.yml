@@ -1,0 +1,35 @@
+site_name: pypsa-validation-processing
+site_description: Processing PyPSA output to IAMC variables for validation workflows
+site_url: https://maxnutz.github.io/pypsa_validation_processing/
+repo_name: maxnutz/pypsa_validation_processing
+repo_url: https://github.com/maxnutz/pypsa_validation_processing
+
+theme:
+  name: mkdocs
+
+nav:
+  - Home: index.md
+  - API Reference:
+      - Package: api/package.md
+      - Workflow: api/workflow.md
+      - Class Definitions: api/class_definitions.md
+      - Statistics Functions: api/statistics_functions.md
+      - Utilities: api/utils.md
+  - Additional Information: additional-information.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - pypsa_validation_processing
+          options:
+            docstring_style: numpy
+            members: true
+            filters:
+              - "^_"
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: false
