@@ -15,6 +15,7 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Sector__Agriculture,
     Final_Energy_by_Sector__Residential_and_Commercial,
     Final_Energy_by_Sector__Transportation,
+    Net_Imports__Electricity,
 )
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
@@ -221,6 +222,134 @@ class TestFinalEnergyByCarrierElectricity:
         assert calls[4]["bus_carrier"] == "AC"
         assert calls[4]["carrier"] == "DAC"
         assert calls[4]["components"] == "Link"
+
+
+# ---------------------------------------------------------------------------
+# Tests for Net_Imports__Electricity
+# ---------------------------------------------------------------------------
+
+
+class TestNetImportsElectricity:
+    """Test suite for Net_Imports__Electricity function."""
+
+    class _ElectricityTradeStatisticsAccessor:
+        """Minimal accessor for electricity net-import tests."""
+
+        def __init__(self):
+            self.calls: list[dict[str, object]] = []
+
+        @staticmethod
+        def _transmission_rows(groupby_time: bool) -> pd.Series | pd.DataFrame:
+            if groupby_time:
+                index = pd.MultiIndex.from_tuples(
+                    [("AT0", "AT1", "MWh_el"), ("AT1", "AT0", "MWh_el")],
+                    names=["bus0", "bus1", "unit"],
+                )
+                return pd.Series([15.0, 4.0], index=index, dtype=float)
+
+            timestamps = pd.date_range(
+                "2019-01-01", periods=4, freq="6h", name="snapshot"
+            )
+            return pd.DataFrame(
+                [
+                    {
+                        "bus0": "AT0",
+                        "bus1": "AT1",
+                        "unit": "MWh_el",
+                        timestamps[0]: 10.0,
+                        timestamps[1]: 5.0,
+                        timestamps[2]: 0.0,
+                        timestamps[3]: 0.0,
+                    },
+                    {
+                        "bus0": "AT1",
+                        "bus1": "AT0",
+                        "unit": "MWh_el",
+                        timestamps[0]: 1.0,
+                        timestamps[1]: 1.0,
+                        timestamps[2]: 1.0,
+                        timestamps[3]: 1.0,
+                    },
+                ]
+            )
+
+        def transmission(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            groupby_time: bool = True,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                    "nice_names": nice_names,
+                }
+            )
+
+            if (
+                bus_carrier == ["AC", "DC"]
+                and carrier is None
+                and components == ["Link", "Line"]
+                and groupby == ["bus0", "bus1", "unit"]
+            ):
+                return self._transmission_rows(groupby_time)
+
+            return pd.DataFrame(columns=["bus0", "bus1", "unit", "value"])
+
+    class _ElectricityTradeNetwork:
+        """Minimal network exposing the custom electricity trade accessor."""
+
+        def __init__(self):
+            self.statistics = (
+                TestNetImportsElectricity._ElectricityTradeStatisticsAccessor()
+            )
+
+    def _electricity_trade_network(self):
+        return self._ElectricityTradeNetwork()
+
+    def test_returns_net_imports_in_expected_sign_convention(self):
+        """Net imports should equal imports minus exports."""
+        network = self._electricity_trade_network()
+
+        result = Net_Imports__Electricity(network)
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert result.loc[("AT1", "MWh_el")] == pytest.approx(11.0)
+        assert result.loc[("AT0", "MWh_el")] == pytest.approx(-11.0)
+
+        calls = network.statistics.calls
+        assert len(calls) == 1
+        assert calls[0]["bus_carrier"] == ["AC", "DC"]
+        assert calls[0]["components"] == ["Link", "Line"]
+        assert calls[0]["groupby"] == ["bus0", "bus1", "unit"]
+        assert calls[0]["groupby_time"] is True
+
+    def test_returns_dataframe_for_aggregate_per_year_false(self):
+        """aggregate_per_year=False returns a timeseries DataFrame."""
+        network = self._electricity_trade_network()
+
+        result = Net_Imports__Electricity(network, aggregate_per_year=False)
+        aggregated = Net_Imports__Electricity(network)
+
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert any(isinstance(column, pd.Timestamp) for column in result.columns)
+        assert result.shape[1] == 4
+        pd.testing.assert_series_equal(
+            result.sum(axis=1), aggregated, check_names=False
+        )
+
 
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Oil
