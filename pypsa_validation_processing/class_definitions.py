@@ -20,7 +20,26 @@ from pypsa_validation_processing.utils import (
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert timestamp-like columns to tz-aware pandas.Timestamp (+01:00)."""
+    """Normalize timestamp-like columns to tz-aware objects in UTC+01:00.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame whose columns may contain year strings, date strings, or
+        timestamp-like values.
+
+    Returns
+    -------
+    pd.DataFrame
+        The same DataFrame with columns converted to Python ``datetime``
+        objects localized to ``+01:00`` where possible.
+
+    Notes
+    -----
+    Columns that cannot be parsed as timestamps are left unchanged. Values
+    that can be parsed but cannot be localized are replaced with ``pd.NaT``
+    and reported via ``print`` warnings.
+    """
     fixed_tz = datetime.timezone(datetime.timedelta(hours=1))
     cols = list(df.columns)
     idx_name = df.columns.name
@@ -87,6 +106,30 @@ class Network_Processor:
         self,
         config_path: Path,
     ) -> None:
+        """Initialize the processor from a YAML configuration file.
+
+        Parameters
+        ----------
+        config_path : Path
+            Path to the YAML configuration file used to configure the
+            processor.
+
+        Notes
+        -----
+        The configuration is expected to define the network results path,
+        definitions path, country, model name, scenario name, and optional
+        settings such as mapping, aggregation, output, and unit conversion
+        behavior.
+
+        Raises
+        ------
+        ValueError
+            If required configuration entries are missing or invalid.
+        FileNotFoundError
+            If the configured network results or definitions directories do
+            not exist.
+        """
+
         self.config_path = config_path
         self.config = self._read_config()
 
@@ -518,7 +561,30 @@ class Network_Processor:
     def _convert_units_to_common_definitions(
         self, iam_df: pyam.IamDataFrame
     ) -> pyam.IamDataFrame:
-        """Convert variable units to units from ``self.common_dsd`` if configured."""
+        """Processes unit conversion from current unit to units defined in ``self.common_dsd`` if configured.
+        Leaves the structure unchanged. Leaves the IamDataFrame unchanged if ``self.common_dsd`` is not initialized.
+
+        Parameters
+        ----------
+        iam_df : pyam.IamDataFrame
+            The IamDataFrame to process for unit conversion.
+
+        Returns
+        -------
+        pyam.IamDataFrame
+            The processed IamDataFrame.
+
+        Raises
+        ------
+        ValueError
+            If the IamDataFrame contains multiple units for a single variable.
+        ValueError
+            If the IamDataFrame contains no units for a single variable.
+        ValueError
+            If the IamDataFrame contains no units for a single variable.
+        RuntimeError
+            If ``self.common_dsd`` is not initialized.
+        """
         if self.common_dsd is None:
             return iam_df
 
@@ -557,7 +623,33 @@ class Network_Processor:
         return pyam.concat(converted_parts)
 
     def _get_unit_from_common_definitions(self, variable: str) -> str:
-        """Return target unit from common definitions for a given variable."""
+        """Reads the unit from the common definitions and returns it for a given variable
+
+        Parameters
+        ----------
+        variable : str
+            The variable name for which to retrieve the unit.
+
+        Returns
+        -------
+        str
+            The unit for the given variable.
+
+        Raises
+        ------
+        KeyError
+            If the variable is not found in the common definitions.
+        KeyError
+            If the unit is not found for the variable in the common definitions.
+        RuntimeError
+            If ``self.common_dsd`` is not initialized.
+
+        Notes
+        -----
+        If multiple units are defined for one variable (in one entry of this variable!),
+        the first one of these variables is taken. If there are more then one definitions for
+        the searched variable, the first entry is taken and a warning is printed.
+        """
         if self.common_dsd is None:
             raise RuntimeError("Common definitions are not initialized.")
 
@@ -586,7 +678,24 @@ class Network_Processor:
         return str(target_unit)
 
     def _get_network_config(self, investment_year):
-        # Load network-results config for this investment year
+        """Loads the network configuration for a given investment year from the configs folder
+        of the respective network results path.
+
+        Parameters
+        ----------
+        investment_year : int
+            The investment year for which to load the network configuration.
+
+        Returns
+        -------
+        dict | None
+            The network configuration as a dictionary, or None if no matching config file is found.
+
+        Notes
+        -----
+        The method searches for a YAML configuration file in the 'configs' subdirectory of the network. If multiple matching
+        files are found, it uses the first one and prints a warning. If no matching file is found, it prints a warning and returns None.
+        """
         config_pattern = str(
             self.network_results_path / "configs" / f"config*{investment_year}.yaml"
         )
