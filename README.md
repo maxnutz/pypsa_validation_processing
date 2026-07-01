@@ -3,6 +3,8 @@
 # PyPSA-network processing for validation
 This repository is licensed under the [MIT License](https://github.com/maxnutz/pypsa_validation_processing/blob/main/LICENSE)
 
+Documentation: [https://maxnutz.github.io/pypsa_validation_processing/](https://maxnutz.github.io/pypsa_validation_processing/)
+
 > [!NOTE]  
 > This package is currently in an **early state of development**. Expect ongoing changes and updates. Documentation and Readme will be continuously updated with changes.
 
