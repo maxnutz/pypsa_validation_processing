@@ -1060,12 +1060,16 @@
 <p>Each function in this module corresponds to one IAMC variable and extracts
 the relevant value from a given PyPSA Network.  The functions are
 looked up by name via the mapping defined in <code>configs/mapping.default.yaml</code>.</p>
-<p>All functions share the same signature::</p>
-<pre><code>def &lt;function_name&gt;(network: pypsa.Network) -&gt; pd.Series:
-    ...
-</code></pre>
+<p>For statistics-functions, the fixed input is n = pypsa.Network (one network / investment year)
+and aggregate_per_year: bool = True to switch between yearly aggregation and full snapshot
+time series.</p>
+<p>If a variable-specific function needs additional settings, optional function parameters can be added.
+Currently, these include <code>config</code> and <code>energy totals</code>. The functions signature is identified
+automatically.</p>
 <p>Each function returns a :class:<code>pandas.Series</code> with MultiIndex, holding at
-least the indexes <code>location</code> and <code>unit</code>.</p>
+least the indexes <code>location</code> and <code>unit</code> (for aggregate_per_year = True)
+or a :class:<code>pandas.DataFrame</code> with MultiIndex and snapshots as columns
+(for aggregate_per_year = False).</p>
 <p><strong>Region Level:</strong>
 Regions in the returned Series correspond to the network's bus regions
 (e.g., "AT1", "AT2", "AT3" for pypsa-at). The postprocessing layer in
@@ -2386,7 +2390,7 @@ if the index cannot be reconstructed with the existing index names.</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.remap_unit_index" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">remap_unit_index</span><span class="p">(</span><span class="n">series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">unit_mapping</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">UNITS_MAPPING</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+            <code class="highlight language-python"><span class="n">remap_unit_index</span><span class="p">(</span><span class="n">series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">unit_mapping</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">UNITS_MAPPING</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
@@ -2395,6 +2399,80 @@ if the index cannot be reconstructed with the existing index names.</p>
 
         <p>Remaps unit index to standard value for statistics with need for
 direct comparison of input-output flows.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>series</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A series with a MultiIndex with a <code>unit</code> level.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>unit_mapping</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dictionary with old unit values as keys and new unit values as values, by default UNITS_MAPPING</p>
+              </div>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="UNITS_MAPPING = {'MWh_el': 'MWh', 'MWh_LHV': 'MWh', 'MWh_th': 'MWh', 'land transport': 'MWh', 't_co2': 't', '': '', 'MWh': 'MWh'}
+
+  
+      module-attribute
+   (pypsa_validation_processing.utils.UNITS_MAPPING)" href="../utils/#pypsa_validation_processing.utils.UNITS_MAPPING">UNITS_MAPPING</a></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A series with a MultiIndex with a <code>unit</code> level remapped.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>

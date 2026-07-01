@@ -1403,7 +1403,7 @@ if the index cannot be reconstructed with the existing index names.</p>
 
 
 <h3 id="pypsa_validation_processing.utils.remap_unit_index" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">remap_unit_index</span><span class="p">(</span><span class="n">series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">unit_mapping</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">UNITS_MAPPING</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+            <code class="highlight language-python"><span class="n">remap_unit_index</span><span class="p">(</span><span class="n">series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">unit_mapping</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">UNITS_MAPPING</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
@@ -1412,6 +1412,80 @@ if the index cannot be reconstructed with the existing index names.</p>
 
         <p>Remaps unit index to standard value for statistics with need for
 direct comparison of input-output flows.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>series</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A series with a MultiIndex with a <code>unit</code> level.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>unit_mapping</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dictionary with old unit values as keys and new unit values as values, by default UNITS_MAPPING</p>
+              </div>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="UNITS_MAPPING = {'MWh_el': 'MWh', 'MWh_LHV': 'MWh', 'MWh_th': 'MWh', 'land transport': 'MWh', 't_co2': 't', '': '', 'MWh': 'MWh'}
+
+  
+      module-attribute
+   (pypsa_validation_processing.utils.UNITS_MAPPING)" href="#pypsa_validation_processing.utils.UNITS_MAPPING">UNITS_MAPPING</a></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A series with a MultiIndex with a <code>unit</code> level remapped.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
