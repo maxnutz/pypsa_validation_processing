@@ -671,6 +671,16 @@ class Network_Processor:
             )
 
         target_unit = match.iloc[0][unit_col]
+        if "[" in target_unit:
+            print(
+                "Several possible units defined for variable '{variable}' in common definitions. Take first one:".format(
+                    variable=variable
+                )
+            )
+            import ast
+
+            target_unit = ast.literal_eval(target_unit)[0]
+            print(target_unit)
         if pd.isna(target_unit):
             raise KeyError(
                 f"Unit information not found for variable '{variable}' in common definitions."
