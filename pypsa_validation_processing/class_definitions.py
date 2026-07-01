@@ -694,14 +694,12 @@ class Network_Processor:
     def write_output_to_xlsx(self) -> Path:
         """Write the computed IAMC data to an Excel file (or files).
 
-        Parameters
-        ----------
-            - When ``aggregate_per_year=True``: writes a single file
-              ``<self.path_dsd_with_values>/PYPSA_{model}_{scenario}_{country}.xlsx``.
-            - When ``aggregate_per_year=False``: creates a sub-folder
-              ``<self.path_dsd_with_values>/PYPSA_timeseries_{model}_{scenario}_{country}/``
-              and writes one file per investment year named
-              ``PYPSA_{model}_{scenario}_{country}_{year}.xlsx``.
+        - When ``aggregate_per_year=True``: writes a single file
+          ``<self.path_dsd_with_values>/PYPSA_{model}_{scenario}_{country}.xlsx``.
+        - When ``aggregate_per_year=False``: creates a sub-folder
+          ``<self.path_dsd_with_values>/PYPSA_timeseries_{model}_{scenario}_{country}/``
+          and writes one file per investment year named
+          ``PYPSA_{model}_{scenario}_{country}_{year}.xlsx``.
 
         Returns
         -------

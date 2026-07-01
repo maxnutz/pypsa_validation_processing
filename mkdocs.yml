@@ -5,7 +5,31 @@ repo_name: maxnutz/pypsa_validation_processing
 repo_url: https://github.com/maxnutz/pypsa_validation_processing
 
 theme:
-  name: mkdocs
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
 
 nav:
   - Home: index.md
@@ -28,7 +52,7 @@ plugins:
             docstring_style: numpy
             members: true
             filters:
-              - "^_"
+              - "!^_"
             show_root_heading: true
             show_root_full_path: false
             show_signature_annotations: true
