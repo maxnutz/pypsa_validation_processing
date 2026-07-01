@@ -17,7 +17,7 @@ You are working as a senior software engineer on the PyPSA-AT project. PyPSA is 
 - Workflow entrypoint: `pypsa_validation_processing/workflow.py`
 - Root `workflow.py` is only a compatibility wrapper.
 - All Statistics-functions in `config/mapping.default.yaml` are executed.
-- All Functions in `pypsa_validation_processing/statistics_functions.py` are stand-alone. They can only rely on helpers-functions in `pypsa_validation_processing/utils.py` for general tasks, that need execution in multiple functions.
+- All functions in `pypsa_validation_processing/statistics_functions.py` are stand-alone. They can only rely on helper functions in `pypsa_validation_processing/utils.py` for general tasks that need to be executed in multiple functions.
 - **Blueprint:** [export_ariadne_variables.py](https://github.com/PyPSA/pypsa-de/blob/main/scripts/pypsa-de/export_ariadne_variables.py) serves as blueprint for evaluations, but use `pypsa.statistics` more extensively.
 
 ### Aggregation behavior
