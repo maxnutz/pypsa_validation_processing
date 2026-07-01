@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://maxnutz.github.io/pypsa_validation_processing/api/statistics_functions/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Statistics Functions - pypsa-validation-processing</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">pypsa-validation-processing</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">API Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../package/" class="dropdown-item">Package</a>
+</li>
+                                    
+<li>
+    <a href="../workflow/" class="dropdown-item">Workflow</a>
+</li>
+                                    
+<li>
+    <a href="../class_definitions/" class="dropdown-item">Class Definitions</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Statistics Functions</a>
+</li>
+                                    
+<li>
+    <a href="../utils/" class="dropdown-item">Utilities</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../additional-information/" class="nav-link">Additional Information</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../class_definitions/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../utils/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/maxnutz/pypsa_validation_processing/edit/master/docs/api/statistics_functions.md" class="nav-link">Edit on maxnutz/pypsa_validation_processing
+                                    </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#statistics-functions-api" class="nav-link">Statistics Functions API</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#pypsa_validation_processing.statistics_functions" class="nav-link">statistics_functions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="statistics-functions-api">Statistics Functions API</h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="pypsa_validation_processing.statistics_functions" class="doc doc-heading">
+            <code>statistics_functions</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Statistics functions for PyPSA validation processing.</p>
+<p>Each function in this module corresponds to one IAMC variable and extracts
+the relevant value from a given PyPSA Network.  The functions are
+looked up by name via the mapping defined in <code>configs/mapping.default.yaml</code>.</p>
+<p>All functions share the same signature::</p>
+<pre><code>def &lt;function_name&gt;(network: pypsa.Network) -&gt; pd.Series:
+    ...
+</code></pre>
+<p>Each function returns a :class:<code>pandas.Series</code> with MultiIndex, holding at
+least the indexes <code>location</code> and <code>unit</code>.</p>
+<p><strong>Region Level:</strong>
+Regions in the returned Series correspond to the network's bus regions
+(e.g., "AT1", "AT2", "AT3" for pypsa-at). The postprocessing layer in
+Network_Processor handles aggregation to country level or keeps regions
+based on the <code>aggregation_level</code> configuration by the name of the entries of <code>location</code>. All regions starting with the given country-entry are grouped together.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.UNITS_MAPPING" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">UNITS_MAPPING</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;MWh_el&#39;</span><span class="p">:</span> <span class="s1">&#39;MWh&#39;</span><span class="p">,</span> <span class="s1">&#39;MWh_LHV&#39;</span><span class="p">:</span> <span class="s1">&#39;MWh&#39;</span><span class="p">,</span> <span class="s1">&#39;MWh_th&#39;</span><span class="p">:</span> <span class="s1">&#39;MWh&#39;</span><span class="p">,</span> <span class="s1">&#39;land transport&#39;</span><span class="p">:</span> <span class="s1">&#39;MWh&#39;</span><span class="p">,</span> <span class="s1">&#39;t_co2&#39;</span><span class="p">:</span> <span class="s1">&#39;t&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;MWh&#39;</span><span class="p">:</span> <span class="s1">&#39;MWh&#39;</span><span class="p">}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.kwargs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;groupby&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;location&#39;</span><span class="p">,</span> <span class="s1">&#39;unit&#39;</span><span class="p">],</span> <span class="s1">&#39;nice_names&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.kwargs_filtering" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">kwargs_filtering</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;groupby&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;bus&#39;</span><span class="p">,</span> <span class="s1">&#39;carrier&#39;</span><span class="p">,</span> <span class="s1">&#39;location&#39;</span><span class="p">,</span> <span class="s1">&#39;unit&#39;</span><span class="p">],</span> <span class="s1">&#39;nice_names&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Coal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>This function includes only the Final Energy consumption of coal. This excludes
+coal for electricity or CHP, but only focuses on the carrier <code>coal for industry</code>
+as Final Energy of Coal. Return None, if this carrier is not present in the network.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__District_Heat" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__District_Heat</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract Final Energy of District Heat from PyPSA Network.</p>
+<p>Returns the total final energy demand, district heating facilities
+have to provide district heating.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex including
+<code>location</code> and <code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The energy demand of district heating is calculated based on the
+links from other carriers buses to the urban central heat buses.
+This includes waste heat from eg. DAC. Taking the withdrawal from
+the source bus of the link gives the energy in elem of the source carrier.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Electricity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Electricity</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract electricity-carrier final energy from a PyPSA Network.</p>
+<p>Returns the total final energy demand supplied by electricity across
+agriculture, residential and commercial, transportation, and industry
+and DAC.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Combines electricity withdrawals from the following contributions:
+agriculture electricity loads, residential/commercial low-voltage loads
+(excluding dedicated industry/agriculture/charger/distribution categories,
+BEV charging) industry electricity loads, and DAC electricity demand
+change in home battery is of magnitude 1e-9 compared to electricity demand.
+Concerning heat: rural air heat pump, rural ground heat pump, rural resisive
+heater and urban decentral heatings are included. Central heatings using
+electricity as fuel are NOT included.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Natural_Gas" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Natural_Gas</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract natural-gas final energy from a PyPSA Network.</p>
+<p>Returns the total final energy demand supplied by natural gas across
+residential and commercial buildings and industry, while subtracting the
+estimated non-fossil share of gas consumption.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex including
+<code>location</code> and <code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The function combines residential and commercial gas withdrawals with
+industry gas demand, then scales the total by the fossil fraction of gas.
+The fossil fraction is estimated from the ratio of non-fossil gas
+production to total gas usage, excluding pipeline flows and limiting the
+non-fossil share to at most 1.
+Industry gas demand is reduced by a fixed non-energy-use share for EU-27 based on
+Eurostat energy balance data.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Oil" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Oil</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract fossil final-energy oil demand from a PyPSA Network.</p>
+<p>Returns the final energy from oil carriers after removing an estimated
+renewable-oil share.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fossil oil final energy with MultiIndex including <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Total oil final energy is built from:
+- agriculture machinery oil (Load),
+- residential/commercial oil boiler demand (rural + urban decentral),
+- land transport oil (Load).</p>
+<p><code>naphtha for industry</code> is intentionally excluded because it is treated
+as non-energy use and therefore not part of Final Energy variables.</p>
+<p>Regionalization from the copperplate topology is performed by deriving a
+region code from demand- or production-bus names and applying
+:func:<code>create_location_index_from_copperplate</code> before regrouping to
+<code>kwargs["groupby"]</code>.</p>
+<p>The renewable-oil fraction is computed per region as:</p>
+<p><code>renewable oil production in region / total oil demand in region</code>.</p>
+<p>Renewable production is based on supply from selected renewable-oil
+carriers, while total oil demand is based on withdrawals from oil-using
+carriers. If the fraction exceeds 1 (i.e., renewable production is larger
+than regional oil demand), it is clipped to 1, so the fossil share becomes
+zero in that region. Cross-regional export/import effects of renewable oil
+are not represented in this statistic.</p>
+<p><code>UNITS_MAPPING</code> is applied inside this function to enable multiplication
+with demand-side units of the renewable-oil fraction.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Agriculture" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Agriculture</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract agriculture-sector final energy from a PyPSA Network.</p>
+<p>Returns the total energy consumed by the transportation sector (excluding
+transmission / distribution losses) across the pypsa-network.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Includes carriers ['agriculture electricity','agriculture heat','agriculture machinery electric',
+'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
+of Links and Buses, as Demand is assumed fixed. <em>Time series of Agriculture demand are assumed
+to be constant in PyPSA-EUR.</em>
+Theoretically, machinery oil is a single bus with load and links for energy flow. This bus could be
+sourced by a bus representing oil usage with carbon capture in agriculture. Therefore the "efficiency
+loss" of this link must be added.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Industry" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Industry</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract Industry-sector final energy from a PyPSA Network.</p>
+<p>Returns the total energy consumed by the Industry sector (excluding
+transmission / distribution losses)</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Includes all carriers directly connected to loads in the industry sector. Same Carrier
+names are also attached to some links, so components-grouping is needed!
+efficiency losses directly supplying industry loads for gas, biomass and coal carbon capture
+are included extra.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Residential_and_Commercial" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Residential_and_Commercial</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract residential and commercial-sector final energy from a PyPSA Network.</p>
+<p>Returns the total energy consumed by the sector residentials and
+commercials across the pypsa-network.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>excludes EV-charging, as covered by Sector Transportation. Concerning Carrier heat, the Function distinguishes between
+central heating systems (Final Energy is Heat) and decentral heating systems (Final Energy is Electricity, Gas, Liquids
+or Solids).</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Transportation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Transportation</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">energy_totals</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract transportation-sector final energy from a PyPSA Network.</p>
+<p>Returns the total energy consumed by the Transportation sector
+(excluding transmission / distribution losses) across the pypsa-network.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>energy_totals</code>
+            </td>
+            <td>
+                  <code><span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to an energy totals file used to determine domestic shares for
+aviation and navigation liquid fuels. If <code>None</code>, default domestic
+shares from :func:<code>get_energy_totals_domestic_share</code> are used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex including <code>location</code>
+and <code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Sums transportation final energy from electricity, hydrogen, and liquid
+fuels:
+- Electricity demand from BEV charging loads.
+- Additional EV charging losses computed from BEV charger link flows and
+  adjusted for V2G participation.
+- Hydrogen demand from fuel-cell land transport.
+- Liquid fuels for aviation and navigation scaled by domestic fractions,
+  plus land-transport oil.</p>
+</details>
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If BEV charging flow sign conventions are violated.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If intermediate statistics return mixed result types.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.create_location_index_from_copperplate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_location_index_from_copperplate</span><span class="p">(</span><span class="n">raw_input</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">usage_location_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Replace the <code>location</code> level values of an indexed object.</p>
+<p>This helper rebuilds the index of <code>raw_input</code> from its index frame and
+overwrites the <code>location</code> column with values from
+<code>usage_location_list</code>. It is mainly used when location information from
+a copperplate-carrier result must be mapped back to explicit regional labels.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_input</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> or <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input object with a (Multi)Index that includes a <code>location</code> level.
+The function preserves data values and index level order/names.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>usage_location_list</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>New location values to assign row-by-row. Must have the same length as
+<code>raw_input</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> or <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A copy of <code>raw_input</code> with the same data and a rebuilt index where
+the <code>location</code> level has been replaced.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>usage_location_list</code> length does not match the number of rows, or
+if the index cannot be reconstructed with the existing index names.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.get_energy_totals_domestic_share" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the domestic share of energy totals for a given kind.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>energy_totals</code>
+            </td>
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the energy totals csv file.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>kind</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The kind of energy totals to calculate the factor for.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The share of national aviation or navigation per country.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.remap_unit_index" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">remap_unit_index</span><span class="p">(</span><span class="n">series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">unit_mapping</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">UNITS_MAPPING</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Remaps unit index to standard value for statistics with need for
+direct comparison of input-output flows.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

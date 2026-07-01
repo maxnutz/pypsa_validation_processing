@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://maxnutz.github.io/pypsa_validation_processing/api/workflow/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Workflow - pypsa-validation-processing</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">pypsa-validation-processing</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">API Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../package/" class="dropdown-item">Package</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Workflow</a>
+</li>
+                                    
+<li>
+    <a href="../class_definitions/" class="dropdown-item">Class Definitions</a>
+</li>
+                                    
+<li>
+    <a href="../statistics_functions/" class="dropdown-item">Statistics Functions</a>
+</li>
+                                    
+<li>
+    <a href="../utils/" class="dropdown-item">Utilities</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../additional-information/" class="nav-link">Additional Information</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../package/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../class_definitions/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/maxnutz/pypsa_validation_processing/edit/master/docs/api/workflow.md" class="nav-link">Edit on maxnutz/pypsa_validation_processing
+                                    </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#workflow-api" class="nav-link">Workflow API</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#pypsa_validation_processing.workflow" class="nav-link">workflow</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="workflow-api">Workflow API</h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="pypsa_validation_processing.workflow" class="doc doc-heading">
+            <code>workflow</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="pypsa_validation_processing.workflow.Network_Processor" class="doc doc-heading">
+            <code>Network_Processor</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Processes a PyPSA NetworkCollection against IAMC variable definitions.</p>
+<p>Reads variable definitions from a definitions folder, executes the
+corresponding statistics functions to extract values from a given PyPSA
+NetworkCollection, and returns the results as a pyam.IamDataFrame.</p>
+<p>Outputs are converted to the units of common definitions, set in the
+definitions variable in <code>definitions_path</code> via
+:meth:<code>pyam.IamDataFrame.convert_unit</code> if <code>convert_units</code> is <code>True</code> in config.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._aggregate_to_country" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_aggregate_to_country</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Aggregate a regional Series/DataFrame to country level by summing regions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>result</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with MultiIndex containing at least <code>location</code>
+and <code>unit</code> levels</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>When <code>self.country</code> is a specific code: DataFrame with
+MultiIndex containing only the <code>unit</code> level (regions filtered to
+the configured country and summed).</p>
+<p>When <code>self.country == "all"</code>: DataFrame with MultiIndex
+<code>["country", "unit"]</code> where each country's regions are summed
+independently (country derived from the first two characters of the
+location identifier).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._convert_units_to_common_definitions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_convert_units_to_common_definitions</span><span class="p">(</span><span class="n">iam_df</span><span class="p">:</span> <span class="n">pyam</span><span class="o">.</span><span class="n">IamDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pyam</span><span class="o">.</span><span class="n">IamDataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Convert variable units to units from <code>self.common_dsd</code> if configured.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._execute_function_for_variable" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_execute_function_for_variable</span><span class="p">(</span><span class="n">variable</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Look up and execute the statistics function for a single variable.</p>
+<p>Looks up <em>variable</em> in <code>self.functions_dict</code>, imports the
+corresponding function from :mod:<code>pypsa_validation_processing.statistics_functions</code>,
+calls it with <code>self.network_collection</code>, and returns the result.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>variable</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>IAMC variable name to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Configuration dictionary loaded from the network results config file
+for the corresponding investment year. Passed to the statistics
+function only if the function's signature includes a <code>config</code>
+parameter.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Computed values for the variable, or <code>None</code> if no function
+is registered for it.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._filter_to_regions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_filter_to_regions</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Filter a regional Series to the all regions of the given country.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>result</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with MultiIndex containing at least <code>location</code> and <code>unit</code>
+levels, as returned by statistics functions.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Datafrme with MultiIndex containing levels <code>location</code> and <code>unit</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>When <code>self.country == "all"</code>, all regions are returned without
+filtering.  When a specific country code is configured, only regions
+whose location starts with that code are returned.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._get_unit_from_common_definitions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_get_unit_from_common_definitions</span><span class="p">(</span><span class="n">variable</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return target unit from common definitions for a given variable.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._is_valid_country_identifier" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_is_valid_country_identifier</span><span class="p">(</span><span class="n">country</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Check if country is a valid ISO code or the special value 'all'.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._map_unit_level" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_map_unit_level</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Map the <code>unit</code> index level using <code>UNITS_MAPPING</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._postprocess_group_levels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_postprocess_group_levels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return grouping levels based on configured aggregation granularity.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._postprocess_statistics_result" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_postprocess_statistics_result</span><span class="p">(</span><span class="n">variable</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Format a statistics-function result into a DataFrame.</p>
+<p>Applies aggregation based on <code>self.aggregation_level</code>:</p>
+<ul>
+<li><code>"country"</code>: sums all regions via :meth:<code>_aggregate_to_country</code>,
+  then returns a DataFrame grouped by <code>["variable", "unit"]</code>.</li>
+<li><code>"region"</code>: keeps all regions, returns a DataFrame grouped
+  by <code>["variable", "location", "unit"]</code>.</li>
+</ul>
+<p>When <code>self.aggregate_per_year</code> is <code>True</code> the input <em>result</em> is a
+:class:<code>pandas.Series</code> and a <code>"value"</code> column is produced.
+When <code>False</code> the input is a :class:<code>pandas.DataFrame</code> with snapshot
+timestamps as columns, which are preserved in the output.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>variable</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>IAMC variable name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>result</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex
+<code>["location", "unit"]</code> (plus possible extra levels) as returned
+by statistics functions.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with <code>variable</code>, <code>unit</code> (and <code>location</code> when
+<code>aggregation_level="region"</code>), and <code>value</code> column or snapshot
+columns, grouped accordingly.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._read_config" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_read_config</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read and return the YAML configuration file.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._read_mappings" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_read_mappings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read and return the YAML mapping file.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._read_pypsa_network_collection" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_read_pypsa_network_collection</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">NetworkCollection</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Reads in pypsa networks as NetworkCollection from network_results_path / networks</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._sanitize_path_token" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_sanitize_path_token</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Strip and replace whitespace runs with underscores for path safety.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="pypsa_validation_processing.workflow.Network_Processor._select_aggregation_result" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_select_aggregation_result</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return result at configured aggregation level (country or region).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.build_parser" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">build_parser</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build and return the CLI argument parser.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="argparse.ArgumentParser">ArgumentParser</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parser with <code>--config</code> argument.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.get_default_config_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_default_config_path</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the path to the packaged default configuration file.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.main" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse CLI arguments, run the Network_Processor pipeline, and write output.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.resolve_config_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_config_path</span><span class="p">(</span><span class="n">config_arg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve the configuration file path from the CLI argument.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_arg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path provided via <code>--config</code>. If <code>None</code>, the packaged default
+config is used.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolved path to the configuration file.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
