@@ -4806,13 +4806,16 @@ packages:
 - pypi: ./
   name: pypsa-validation-processing
   version: 0.1.0
-  sha256: 953024074c672e544f88c215336b71c52543773a54b84864023e2d54b870568d
+  sha256: 1c16fb99cedeb1c789a206102382fb5a4e29d2ec03b0007ccb818804bab4d4aa
   requires_dist:
   - pyyaml
   - pandas
   - pypsa
   - pyam-iamc
   - nomenclature-iamc
+  - mkdocs ; extra == 'docs'
+  - mkdocs-material ; extra == 'docs'
+  - mkdocstrings[python] ; extra == 'docs'
   requires_python: '>=3.11'
 - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyh09c184e_7.conda
   sha256: d016e04b0e12063fbee4a2d5fbb9b39a8d191b5a0042f0b8459188aedeabb0ca

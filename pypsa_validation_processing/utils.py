@@ -132,10 +132,22 @@ UNITS_MAPPING = {
 
 
 def remap_unit_index(
-    series: pd.Series, unit_mapping: dict = UNITS_MAPPING
-) -> pd.Series:
+    series: pd.Series | pd.DataFrame, unit_mapping: dict = UNITS_MAPPING
+) -> pd.Series | pd.DataFrame:
     """Remaps unit index to standard value for statistics with need for
-    direct comparison of input-output flows."""
+    direct comparison of input-output flows.
+
+    Parameters
+    ----------
+    series : pd.Series | pd.DataFrame
+        A series with a MultiIndex with a ``unit`` level.
+    unit_mapping : dict, optional
+        Dictionary with old unit values as keys and new unit values as values, by default UNITS_MAPPING
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        A series with a MultiIndex with a ``unit`` level remapped."""
     idx = series.index.to_frame(index=False)
     idx["unit"] = idx["unit"].replace(unit_mapping)
     out = series.copy()

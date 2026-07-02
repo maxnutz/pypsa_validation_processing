@@ -4,13 +4,18 @@ Each function in this module corresponds to one IAMC variable and extracts
 the relevant value from a given PyPSA Network.  The functions are
 looked up by name via the mapping defined in ``configs/mapping.default.yaml``.
 
-All functions share the same signature::
+For statistics-functions, the fixed input is n = pypsa.Network (one network / investment year)
+and aggregate_per_year: bool = True to switch between yearly aggregation and full snapshot
+time series.
 
-    def <function_name>(network: pypsa.Network) -> pd.Series:
-        ...
+If a variable-specific function needs additional settings, optional function parameters can be added.
+Currently, these include ``config`` and ``energy totals``. The functions signature is identified
+automatically.
 
 Each function returns a :class:`pandas.Series` with MultiIndex, holding at
-least the indexes ``location`` and ``unit``.
+least the indexes ``location`` and ``unit`` (for aggregate_per_year = True)
+or a :class:`pandas.DataFrame` with MultiIndex and snapshots as columns
+(for aggregate_per_year = False).
 
 **Region Level:**
 Regions in the returned Series correspond to the network's bus regions

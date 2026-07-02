@@ -19,6 +19,13 @@ dependencies = [
     "nomenclature-iamc",
 ]
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+
 [project.urls]
 Homepage = "https://github.com/maxnutz/pypsa_validation_processing"
 
