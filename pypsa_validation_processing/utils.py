@@ -200,7 +200,9 @@ def get_energy_totals_domestic_share(
 
 
 def create_location_index_from_copperplate(
-    raw_input: pd.Series | pd.DataFrame, usage_location_list: list
+    raw_input: pd.Series | pd.DataFrame,
+    usage_location_list: list,
+    column_name: str = "location",
 ):
     """
     Replace the ``location`` level values of an indexed object.
@@ -232,7 +234,7 @@ def create_location_index_from_copperplate(
         if the index cannot be reconstructed with the existing index names.
     """
     idx_df = raw_input.index.to_frame(index=False)
-    idx_df["location"] = pd.Index(usage_location_list).to_numpy()
+    idx_df[column_name] = pd.Index(usage_location_list).to_numpy()
     new_index = pd.MultiIndex.from_frame(idx_df, names=raw_input.index.names)
     output = raw_input.copy()
     output.index = new_index
