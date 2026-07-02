@@ -350,6 +350,15 @@ class TestNetImportsElectricity:
             result.sum(axis=1), aggregated, check_names=False
         )
 
+        timestamps = list(result.columns)
+        ts0, ts1 = timestamps[0], timestamps[1]
+
+        # AT0->AT1=10, AT1->AT0=1 at ts0; AT0->AT1=5, AT1->AT0=1 at ts1.
+        assert result.loc[("AT1", "MWh_el"), ts0] == pytest.approx(9.0)
+        assert result.loc[("AT0", "MWh_el"), ts0] == pytest.approx(-9.0)
+        assert result.loc[("AT1", "MWh_el"), ts1] == pytest.approx(4.0)
+        assert result.loc[("AT0", "MWh_el"), ts1] == pytest.approx(-4.0)
+
 
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Oil
