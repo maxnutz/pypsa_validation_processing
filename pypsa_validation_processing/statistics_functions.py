@@ -147,10 +147,8 @@ def Net_Imports__Electricity(
 ) -> pd.Series | pd.DataFrame:
     """Extract net imports of electricity from a PyPSA Network.
 
-    Net imports are computed as imports minus exports over AC lines and DC
-    links. The pypsa-statistics energy-balance accessor already carries the
-    sign convention, so summing the signed balances of the domestic ports
-    yields the net import result directly.
+    Evaluation of imports is performed on regional level, national
+    level is covered as a result of aggregation.
 
     Parameters
     ----------
@@ -173,8 +171,10 @@ def Net_Imports__Electricity(
 
     Notes
     -----
-    When ``aggregate_per_year`` is ``False``, the returned DataFrame keeps the
-    snapshot axis as columns and reports net imports per region and snapshot.
+    The evaluation pathway in this function strongly depnds on the input of the
+    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
+    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
+    (with ``aggregate_per_year`` is ``True``) are processed as they come.
     """
     imports_raw = (
         n.statistics.transmission(
