@@ -671,16 +671,22 @@ class Network_Processor:
             )
 
         target_unit = match.iloc[0][unit_col]
-        if "[" in target_unit:
+        if ("[" in target_unit) and ("]" in target_unit) and ("," in target_unit):
             print(
                 "Several possible units defined for variable '{variable}' in common definitions. Take first one:".format(
                     variable=variable
                 )
             )
-            import ast
+            try:
+                import ast
 
-            target_unit = ast.literal_eval(target_unit)[0]
-            print(target_unit)
+                target_unit = ast.literal_eval(target_unit)[0]
+                print(target_unit)
+            except Exception as exc:
+                print(
+                    f"WARNING: Failed to parse multiple units for variable '{variable}': {exc}. Using TJ as unit."
+                )
+                target_unit = "TJ"
         if pd.isna(target_unit):
             raise KeyError(
                 f"Unit information not found for variable '{variable}' in common definitions."

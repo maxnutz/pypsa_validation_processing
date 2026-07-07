@@ -141,6 +141,91 @@ def Final_Energy_by_Carrier__Electricity(
     return result
 
 
+def Net_Imports__Electricity(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract net imports of electricity from a PyPSA Network.
+
+    Evaluation of imports is performed on regional level, national
+    level is covered as a result of aggregation.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    The evaluation pathway in this function strongly depends on the input of the
+    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
+    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
+    (with ``aggregate_per_year`` is ``True``) are processed as they come.
+    """
+    imports_raw = (
+        n.statistics.transmission(
+            bus_carrier=["AC", "DC"],
+            components=["Link", "Line"],
+            groupby_time=aggregate_per_year,
+            **kwargs_imports,
+        )
+        .groupby(["bus0", "bus1", "unit"])
+        .sum()
+    )
+
+    # process non-aggregated data - stack to long format with single column
+    if isinstance(imports_raw, pd.DataFrame):
+        imports_long = (
+            imports_raw.stack(future_stack=True)
+            .rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
+            .reset_index()
+        )
+        groupby_columns = ["location", "unit", "snapshot"]
+    # process aggregated data - process single column as is
+    else:
+        imports_long = (
+            imports_raw.rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit"])
+            .reset_index()
+        )
+        groupby_columns = ["location", "unit"]
+
+    net_imports = pd.concat(
+        [
+            imports_long.assign(
+                location=imports_long["location_to"], value=imports_long["value"]
+            ),
+            imports_long.assign(
+                location=imports_long["location_from"], value=-imports_long["value"]
+            ),
+        ],
+        ignore_index=True,
+    )
+    net_imports_grouped = net_imports.groupby(groupby_columns, sort=False)[
+        "value"
+    ].sum()
+
+    if isinstance(imports_raw, pd.DataFrame):
+        return net_imports_grouped.unstack("snapshot")
+
+    return net_imports_grouped
+
+
 def Final_Energy_by_Carrier__Coal(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
