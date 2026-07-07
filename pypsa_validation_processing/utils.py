@@ -209,10 +209,11 @@ def create_location_index_from_copperplate(
     column_name: str = "location",
 ):
     """
-    Replace the ``location`` level values of an indexed object.
+    Replace the values of level ``column_name`` of an indexed object. Default
+    column_name to be replaced is "location" for backward compatibility.
 
     This helper rebuilds the index of ``raw_input`` from its index frame and
-    overwrites the ``location`` column with values from
+    overwrites the ``column_name`` column with values from
     ``usage_location_list``. It is mainly used when location information from
     a copperplate-carrier result must be mapped back to explicit regional labels.
 
@@ -224,12 +225,14 @@ def create_location_index_from_copperplate(
     usage_location_list : list
         New location values to assign row-by-row. Must have the same length as
         ``raw_input``.
+    column_name : str, optional
+        Name of the index level to replace, by default "location".
 
     Returns
     -------
     pandas.Series or pandas.DataFrame
         A copy of ``raw_input`` with the same data and a rebuilt index where
-        the ``location`` level has been replaced.
+        the ``column_name`` level has been replaced.
 
     Raises
     ------

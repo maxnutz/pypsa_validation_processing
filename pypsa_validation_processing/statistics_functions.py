@@ -475,6 +475,13 @@ def Net_Imports__Oil(
     All oil is distributed from cupperplate at "EU oil" bus. Oil link know both
     direction and multiple carriers are covered by these links, as these links are
     not just representing transmission, but also technologies with efficiencies.
+
+    Locations are derived from bus names and assigned to the respective bus columns.
+
+    The evaluation pathway in this function strongly depends on the input of the
+    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
+    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
+    (with ``aggregate_per_year`` is ``True``) are processed as they come.
     """
     # this is not transmission!
     raw_stat = n.statistics.energy_balance(
