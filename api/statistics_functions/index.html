@@ -606,6 +606,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.kwargs_imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kwargs_imports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Coal" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -698,6 +709,17 @@
     <span class="md-ellipsis">
       
         Final_Energy_by_Sector__Transportation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Net_Imports__Electricity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net_Imports__Electricity
       
     </span>
   </a>
@@ -885,6 +907,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.kwargs_imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kwargs_imports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Coal" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -977,6 +1010,17 @@
     <span class="md-ellipsis">
       
         Final_Energy_by_Sector__Transportation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Net_Imports__Electricity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net_Imports__Electricity
       
     </span>
   </a>
@@ -1139,6 +1183,26 @@ based on the <code>aggregation_level</code> configuration by the name of the ent
 
 <h3 id="pypsa_validation_processing.statistics_functions.kwargs_filtering" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">kwargs_filtering</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;groupby&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;bus&#39;</span><span class="p">,</span> <span class="s1">&#39;carrier&#39;</span><span class="p">,</span> <span class="s1">&#39;location&#39;</span><span class="p">,</span> <span class="s1">&#39;unit&#39;</span><span class="p">],</span> <span class="s1">&#39;nice_names&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.kwargs_imports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">kwargs_imports</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;groupby&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;bus0&#39;</span><span class="p">,</span> <span class="s1">&#39;bus1&#39;</span><span class="p">,</span> <span class="s1">&#39;unit&#39;</span><span class="p">],</span> <span class="s1">&#39;nice_names&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
@@ -2174,6 +2238,111 @@ fuels:
       </tbody>
     </table>
 
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Net_Imports__Electricity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Net_Imports__Electricity</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract net imports of electricity from a PyPSA Network.</p>
+<p>Evaluation of imports is performed on regional level, national
+level is covered as a result of aggregation.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
+<code>unit</code>.
+Returns data at regional level as provided by the PyPSA network.
+Country-level aggregation is handled by
+Network_Processor._aggregate_to_country() if configured.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The evaluation pathway in this function strongly depends on the input of the
+parameter <code>aggregate_per_year</code>. Non-aggregated data (with <code>aggregate_per_year</code> is <code>False</code>)
+are processed as :class:<code>pandas.DataFrame</code> in long-format, aggregated data
+(with <code>aggregate_per_year</code> is <code>True</code>) are processed as they come.</p>
+</details>
 
     </div>
 
