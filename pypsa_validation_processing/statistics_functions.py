@@ -171,7 +171,7 @@ def Net_Imports__Electricity(
 
     Notes
     -----
-    The evaluation pathway in this function strongly depnds on the input of the
+    The evaluation pathway in this function strongly depends on the input of the
     parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
     are processed as :class:`pandas.DataFrame` in long-format, aggregated data
     (with ``aggregate_per_year`` is ``True``) are processed as they come.
