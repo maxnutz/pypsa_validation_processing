@@ -1238,16 +1238,17 @@
 
 
 <h3 id="pypsa_validation_processing.utils.create_location_index_from_copperplate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">create_location_index_from_copperplate</span><span class="p">(</span><span class="n">raw_input</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">usage_location_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">create_location_index_from_copperplate</span><span class="p">(</span><span class="n">raw_input</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">usage_location_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">column_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;location&#39;</span><span class="p">)</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Replace the <code>location</code> level values of an indexed object.</p>
+        <p>Replace the values of level <code>column_name</code> of an indexed object. Default
+column_name to be replaced is "location" for backward compatibility.</p>
 <p>This helper rebuilds the index of <code>raw_input</code> from its index frame and
-overwrites the <code>location</code> column with values from
+overwrites the <code>column_name</code> column with values from
 <code>usage_location_list</code>. It is mainly used when location information from
 a copperplate-carrier result must be mapped back to explicit regional labels.</p>
 
@@ -1297,6 +1298,22 @@ The function preserves data values and index level order/names.</p>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the index level to replace, by default "location".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;location&#39;</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1317,7 +1334,7 @@ The function preserves data values and index level order/names.</p>
             <td>
               <div class="doc-md-description">
                 <p>A copy of <code>raw_input</code> with the same data and a rebuilt index where
-the <code>location</code> level has been replaced.</p>
+the <code>column_name</code> level has been replaced.</p>
               </div>
             </td>
           </tr>
@@ -1342,6 +1359,16 @@ the <code>location</code> level has been replaced.</p>
               <div class="doc-md-description">
                 <p>If <code>usage_location_list</code> length does not match the number of rows, or
 if the index cannot be reconstructed with the existing index names.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>column_name</code> is not found in the index levels of <code>raw_input</code>.</p>
               </div>
             </td>
           </tr>

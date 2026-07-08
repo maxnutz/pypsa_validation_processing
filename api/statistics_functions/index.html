@@ -727,6 +727,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Net_Imports__Oil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net_Imports__Oil
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.statistics_functions.create_location_index_from_copperplate" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1021,6 +1032,17 @@
     <span class="md-ellipsis">
       
         Net_Imports__Electricity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Net_Imports__Oil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net_Imports__Oil
       
     </span>
   </a>
@@ -2351,17 +2373,124 @@ are processed as :class:<code>pandas.DataFrame</code> in long-format, aggregated
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pypsa_validation_processing.statistics_functions.create_location_index_from_copperplate" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">create_location_index_from_copperplate</span><span class="p">(</span><span class="n">raw_input</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">usage_location_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span></code>
+<h3 id="pypsa_validation_processing.statistics_functions.Net_Imports__Oil" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Net_Imports__Oil</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Replace the <code>location</code> level values of an indexed object.</p>
+        <p>Extract net oil imports from a PyPSA Network.</p>
+<p>Calculates the net imports of oil by computing the difference between
+imports to and exports from each location based on Link components.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), aggregate over all snapshots and return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with net oil imports indexed by location
+and unit.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>All oil is distributed from cupperplate at "EU oil" bus. Oil link know both
+direction and multiple carriers are covered by these links, as these links are
+not just representing transmission, but also technologies with efficiencies.</p>
+<p>Locations are derived from bus names and assigned to the respective bus columns.</p>
+<p>The evaluation pathway in this function strongly depends on the input of the
+parameter <code>aggregate_per_year</code>. Non-aggregated data (with <code>aggregate_per_year</code> is <code>False</code>)
+are processed as :class:<code>pandas.DataFrame</code> in long-format, aggregated data
+(with <code>aggregate_per_year</code> is <code>True</code>) are processed as they come.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.create_location_index_from_copperplate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_location_index_from_copperplate</span><span class="p">(</span><span class="n">raw_input</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">usage_location_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">column_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;location&#39;</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Replace the values of level <code>column_name</code> of an indexed object. Default
+column_name to be replaced is "location" for backward compatibility.</p>
 <p>This helper rebuilds the index of <code>raw_input</code> from its index frame and
-overwrites the <code>location</code> column with values from
+overwrites the <code>column_name</code> column with values from
 <code>usage_location_list</code>. It is mainly used when location information from
 a copperplate-carrier result must be mapped back to explicit regional labels.</p>
 
@@ -2411,6 +2540,22 @@ The function preserves data values and index level order/names.</p>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the index level to replace, by default "location".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;location&#39;</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2431,7 +2576,7 @@ The function preserves data values and index level order/names.</p>
             <td>
               <div class="doc-md-description">
                 <p>A copy of <code>raw_input</code> with the same data and a rebuilt index where
-the <code>location</code> level has been replaced.</p>
+the <code>column_name</code> level has been replaced.</p>
               </div>
             </td>
           </tr>
@@ -2456,6 +2601,16 @@ the <code>location</code> level has been replaced.</p>
               <div class="doc-md-description">
                 <p>If <code>usage_location_list</code> length does not match the number of rows, or
 if the index cannot be reconstructed with the existing index names.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>column_name</code> is not found in the index levels of <code>raw_input</code>.</p>
               </div>
             </td>
           </tr>
