@@ -40,7 +40,8 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     that can be parsed but cannot be localized are replaced with ``pd.NaT``
     and reported via ``print`` warnings.
     """
-    fixed_tz = datetime.timezone(datetime.timedelta(hours=1))
+    fixed_tz = datetime.timezone(datetime.timedelta(hours=0))
+
     cols = list(df.columns)
     idx_name = df.columns.name
     try:
