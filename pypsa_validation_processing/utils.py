@@ -239,8 +239,14 @@ def create_location_index_from_copperplate(
     ValueError
         If ``usage_location_list`` length does not match the number of rows, or
         if the index cannot be reconstructed with the existing index names.
+    ValueError
+        If ``column_name`` is not found in the index levels of ``raw_input``.
     """
     idx_df = raw_input.index.to_frame(index=False)
+    if column_name not in idx_df.columns:
+        raise ValueError(
+            f"Column name '{column_name}' not found in index levels: {idx_df.index.names}"
+        )
     idx_df[column_name] = pd.Index(usage_location_list).to_numpy()
     new_index = pd.MultiIndex.from_frame(idx_df, names=raw_input.index.names)
     output = raw_input.copy()
