@@ -204,13 +204,16 @@ def get_energy_totals_domestic_share(
 
 
 def create_location_index_from_copperplate(
-    raw_input: pd.Series | pd.DataFrame, usage_location_list: list
+    raw_input: pd.Series | pd.DataFrame,
+    usage_location_list: list,
+    column_name: str = "location",
 ):
     """
-    Replace the ``location`` level values of an indexed object.
+    Replace the values of level ``column_name`` of an indexed object. Default
+    column_name to be replaced is "location" for backward compatibility.
 
     This helper rebuilds the index of ``raw_input`` from its index frame and
-    overwrites the ``location`` column with values from
+    overwrites the ``column_name`` column with values from
     ``usage_location_list``. It is mainly used when location information from
     a copperplate-carrier result must be mapped back to explicit regional labels.
 
@@ -222,21 +225,29 @@ def create_location_index_from_copperplate(
     usage_location_list : list
         New location values to assign row-by-row. Must have the same length as
         ``raw_input``.
+    column_name : str, optional
+        Name of the index level to replace, by default "location".
 
     Returns
     -------
     pandas.Series or pandas.DataFrame
         A copy of ``raw_input`` with the same data and a rebuilt index where
-        the ``location`` level has been replaced.
+        the ``column_name`` level has been replaced.
 
     Raises
     ------
     ValueError
         If ``usage_location_list`` length does not match the number of rows, or
         if the index cannot be reconstructed with the existing index names.
+    ValueError
+        If ``column_name`` is not found in the index levels of ``raw_input``.
     """
     idx_df = raw_input.index.to_frame(index=False)
-    idx_df["location"] = pd.Index(usage_location_list).to_numpy()
+    if column_name not in idx_df.columns:
+        raise ValueError(
+            f"Column name '{column_name}' not found in index levels: {idx_df.index.names}"
+        )
+    idx_df[column_name] = pd.Index(usage_location_list).to_numpy()
     new_index = pd.MultiIndex.from_frame(idx_df, names=raw_input.index.names)
     output = raw_input.copy()
     output.index = new_index
