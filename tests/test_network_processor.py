@@ -117,6 +117,114 @@ class TestNetworkProcessorInit:
                 assert "Network_Processor" in repr_str
                 assert "AT" in repr_str
 
+    def test_init_nonexistent_network_results_path_raises(
+        self, tmp_path: Path, mock_definitions_path: Path
+    ):
+        """Test that a missing network_results_path raises FileNotFoundError."""
+        missing_nw_path = tmp_path / "does_not_exist"
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: {mock_definitions_path}
+network_results_path: {missing_nw_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(FileNotFoundError, match="Network results folder"):
+            Network_Processor(config_path=config_file)
+
+    def test_init_missing_definitions_path_key_raises_value_error(
+        self, tmp_path: Path, mock_network_results_path: Path
+    ):
+        """Test that an unset definitions_path raises ValueError."""
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(ValueError, match="definition_path"):
+            Network_Processor(config_path=config_file)
+
+    def test_init_nonexistent_definitions_path_raises(
+        self, tmp_path: Path, mock_network_results_path: Path
+    ):
+        """Test that a missing definitions_path directory raises FileNotFoundError."""
+        missing_defs_path = tmp_path / "no_definitions_here"
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: {missing_defs_path}
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(FileNotFoundError, match="Definition folder"):
+            Network_Processor(config_path=config_file)
+
+    def test_init_null_model_name_raises_value_error(
+        self,
+        tmp_path: Path,
+        mock_definitions_path: Path,
+        mock_network_results_path: Path,
+    ):
+        """Test that a null model_name in config raises ValueError."""
+        config_content = f"""
+country: AT
+model_name:
+scenario_name: test_scenario
+definitions_path: {mock_definitions_path}
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(
+                    ValueError, match="model_name.*scenario_name.*must be set"
+                ):
+                    Network_Processor(config_path=config_file)
+
+    def test_init_null_scenario_name_raises_value_error(
+        self,
+        tmp_path: Path,
+        mock_definitions_path: Path,
+        mock_network_results_path: Path,
+    ):
+        """Test that a null scenario_name in config raises ValueError."""
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name:
+definitions_path: {mock_definitions_path}
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                with pytest.raises(
+                    ValueError, match="model_name.*scenario_name.*must be set"
+                ):
+                    Network_Processor(config_path=config_file)
+
 
 # ---------------------------------------------------------------------------
 # Tests for configuration reading
@@ -191,6 +299,31 @@ class TestNetworkProcessorFunctionExecution:
                     "Nonexistent Variable", mock_network
                 )
                 assert result is None
+
+    def test_execute_function_warns_when_function_name_not_in_module(
+        self, mock_config_file: Path, capsys
+    ):
+        """Test that a WARNING is printed and None returned for an unresolvable function name."""
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=mock_config_file)
+                processor.functions_dict = {
+                    "Bogus Variable": "This_Function_Does_Not_Exist"
+                }
+
+                mock_network = MockPyPSANetwork()
+                result = processor._execute_function_for_variable(
+                    "Bogus Variable", mock_network
+                )
+
+                captured = capsys.readouterr()
+                assert result is None
+                assert "WARNING" in captured.out
+                assert "This_Function_Does_Not_Exist" in captured.out
 
     def test_execute_function_passes_config_when_accepted(self, mock_config_file: Path):
         """Test that config is passed to functions that accept it."""
@@ -1409,3 +1542,185 @@ network_results_path: {tmp_path}
         assert Network_Processor._sanitize_path_token("") == ""
         assert Network_Processor._sanitize_path_token("   ") == ""
         assert Network_Processor._sanitize_path_token("NoWhitespace") == "NoWhitespace"
+
+
+# ---------------------------------------------------------------------------
+# Tests for _get_network_config
+# ---------------------------------------------------------------------------
+
+
+class TestGetNetworkConfig:
+    """Test _get_network_config() config-file discovery and loading."""
+
+    def _setup_processor(self, tmp_path: Path) -> Network_Processor:
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                return Network_Processor(config_path=config_file)
+
+    def test_warns_and_uses_first_of_multiple_matching_config_files(
+        self, tmp_path: Path, capsys
+    ):
+        """Test that multiple matching config files trigger an INFO message and use the first."""
+        processor = self._setup_processor(tmp_path)
+        configs_dir = processor.network_results_path / "configs"
+        configs_dir.mkdir(parents=True, exist_ok=True)
+        (configs_dir / "config_a_2020.yaml").write_text("foo: bar\n")
+        (configs_dir / "config_b_2020.yaml").write_text("foo: baz\n")
+
+        result = processor._get_network_config(2020)
+
+        captured = capsys.readouterr()
+        assert "INFO: Multiple config files found" in captured.out
+        assert result is not None
+
+    def test_warns_and_returns_none_on_malformed_yaml(self, tmp_path: Path, capsys):
+        """Test that malformed YAML in the matched config file triggers a WARNING."""
+        processor = self._setup_processor(tmp_path)
+        configs_dir = processor.network_results_path / "configs"
+        configs_dir.mkdir(parents=True, exist_ok=True)
+        (configs_dir / "config_2020.yaml").write_text("foo: [unclosed\n")
+
+        result = processor._get_network_config(2020)
+
+        captured = capsys.readouterr()
+        assert "WARNING: Could not load config file" in captured.out
+        assert result is None
+
+    def test_warns_and_returns_none_when_no_config_file_found(
+        self, tmp_path: Path, capsys
+    ):
+        """Test that no matching config file triggers a WARNING and returns None."""
+        processor = self._setup_processor(tmp_path)
+
+        result = processor._get_network_config(2020)
+
+        captured = capsys.readouterr()
+        assert "WARNING: No config file found" in captured.out
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Tests for calculate_variables_values aggregation branches
+# ---------------------------------------------------------------------------
+
+
+class TestCalculateVariablesValuesAggregation:
+    """Test calculate_variables_values() for aggregate_per_year branches."""
+
+    def _setup_processor(self, tmp_path: Path) -> Network_Processor:
+        defs_path = tmp_path / "definitions"
+        defs_path.mkdir(exist_ok=True)
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: {defs_path}
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output.xlsx'}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                return Network_Processor(config_path=config_file)
+
+    def test_raises_runtime_error_when_result_not_dataframe_and_not_aggregated(
+        self, tmp_path: Path
+    ):
+        """Test RuntimeError when aggregate_per_year=False and result isn't a DataFrame."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregate_per_year = False
+        processor.aggregation_level = "region"
+
+        network = MockPyPSANetwork()
+        processor.network_collection = MockNetworkCollection([network])
+
+        processor.dsd = MagicMock()
+        processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["Test Variable"]}
+        )
+
+        not_a_dataframe = pd.Series(
+            [1.0],
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh_el")], names=["location", "unit"]
+            ),
+        )
+
+        with patch.object(
+            processor,
+            "_execute_function_for_variable",
+            return_value=not_a_dataframe,
+        ):
+            with pytest.raises(RuntimeError, match="Expected DataFrame"):
+                processor.calculate_variables_values()
+
+    def test_merges_multiple_investment_years_when_aggregated(self, tmp_path: Path):
+        """calculate_variables_values merges per-year results into one wide table."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregate_per_year = True
+        processor.aggregation_level = "region"
+
+        network_2020 = MockPyPSANetwork(name="network_2020")
+        network_2020.meta["wildcards"]["planning_horizons"] = 2020
+        network_2030 = MockPyPSANetwork(name="network_2030")
+        network_2030.meta["wildcards"]["planning_horizons"] = 2030
+        processor.network_collection = MockNetworkCollection(
+            [network_2020, network_2030]
+        )
+
+        processor.dsd = MagicMock()
+        processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["Test Variable"]}
+        )
+
+        def fake_execute(variable, n, config=None):
+            year = n.meta["wildcards"]["planning_horizons"]
+            return pd.Series(
+                [float(year)],
+                index=pd.MultiIndex.from_tuples(
+                    [("AT1", "MWh_el")], names=["location", "unit"]
+                ),
+            )
+
+        with patch.object(
+            processor, "_execute_function_for_variable", side_effect=fake_execute
+        ):
+            with patch.object(
+                processor, "structure_pyam_from_pandas", side_effect=lambda df: df
+            ):
+                processor.calculate_variables_values()
+
+        result = processor.dsd_with_values
+        assert isinstance(result, pd.DataFrame)
+        assert "2020" in result.columns
+        assert "2030" in result.columns
+        assert len(result) == 1

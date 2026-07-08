@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import runpy
 import sys
 import io
 
@@ -149,6 +150,36 @@ class TestMainWorkflow:
                         except (SystemExit, FileNotFoundError):
                             # Expected if config doesn't exist
                             pass
+
+
+# ---------------------------------------------------------------------------
+# Tests for the __main__ execution guard
+# ---------------------------------------------------------------------------
+
+
+class TestMainGuard:
+    """Test the ``if __name__ == \"__main__\"`` module execution guard."""
+
+    def test_running_module_as_script_invokes_main(self, tmp_path: Path):
+        """Running workflow.py as __main__ should call main() end-to-end."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config\n")
+
+        mock_processor = MagicMock()
+        mock_processor_class = MagicMock(return_value=mock_processor)
+
+        with patch.object(sys, "argv", ["workflow.py", "--config", str(config_file)]):
+            with patch(
+                "pypsa_validation_processing.Network_Processor", mock_processor_class
+            ):
+                runpy.run_module(
+                    "pypsa_validation_processing.workflow", run_name="__main__"
+                )
+
+        mock_processor_class.assert_called_once_with(config_path=config_file)
+        mock_processor.read_definitions.assert_called_once()
+        mock_processor.calculate_variables_values.assert_called_once()
+        mock_processor.write_output_to_xlsx.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
