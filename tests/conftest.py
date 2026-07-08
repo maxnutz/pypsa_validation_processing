@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy as copy_module
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -180,6 +181,10 @@ class MockPyPSANetwork:
         # Set any additional attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    def copy(self) -> "MockPyPSANetwork":
+        """Mimic ``pypsa.Network.copy()`` by returning an independent deep copy."""
+        return copy_module.deepcopy(self)
 
 
 class MockNetworkCollection:

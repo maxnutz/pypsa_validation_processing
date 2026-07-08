@@ -539,6 +539,17 @@ class TestNetImportsOil:
             assert isinstance(result.index, pd.MultiIndex)
             assert result.index.names == ["location", "unit"]
 
+    def test_empty_network_returns_empty_series(self):
+        """Net_Imports__Oil should handle a network without oil trade links gracefully."""
+        # No rows at all, emulating a network without oil trade links.
+        empty_network = self._oil_trade_network([])
+
+        result = Net_Imports__Oil(empty_network)
+
+        # The function should not raise and should return an empty Series.
+        assert isinstance(result, pd.Series)
+        assert result.empty
+
 
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Oil
