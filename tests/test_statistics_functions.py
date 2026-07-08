@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from pypsa_validation_processing.statistics_functions import (
+    Final_Energy_by_Carrier__Ambient_Heat,
     Final_Energy_by_Carrier__Electricity,
     Final_Energy_by_Carrier__Coal,
     Final_Energy_by_Carrier__District_Heat,
@@ -358,6 +359,225 @@ class TestNetImportsElectricity:
         assert result.loc[("AT0", "MWh_el"), ts0] == pytest.approx(-9.0)
         assert result.loc[("AT1", "MWh_el"), ts1] == pytest.approx(4.0)
         assert result.loc[("AT0", "MWh_el"), ts1] == pytest.approx(-4.0)
+
+
+# ---------------------------------------------------------------------------
+# Tests for Final_Energy_by_Carrier__Ambient_Heat
+# ---------------------------------------------------------------------------
+
+
+class TestFinalEnergyByCarrierAmbientHeat:
+    """Test suite for Final_Energy_by_Carrier__Ambient_Heat function."""
+
+    class _AmbientHeatStatisticsAccessor:
+        """Minimal accessor to verify ambient-heat balance behavior."""
+
+        ambient_carriers = [
+            "urban central air heat pump",
+            "urban decentral air heat pump",
+            "rural air heat pump",
+            "rural ground heat pump",
+        ]
+
+        def __init__(self, scenario: str = "balanced"):
+            self.scenario = scenario
+            self.calls: list[dict[str, object]] = []
+
+        @staticmethod
+        def _series_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_th",
+        ) -> pd.Series:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[key] for key in groupby)],
+                names=groupby,
+            )
+            return pd.Series(values, index=index, dtype=float)
+
+        @staticmethod
+        def _dataframe_from_groupby(
+            groupby: list[str],
+            values: list[float],
+            location: str = "AT1",
+            unit: str = "MWh_th",
+        ) -> pd.DataFrame:
+            index = pd.MultiIndex.from_tuples(
+                [tuple({"location": location, "unit": unit}[key] for key in groupby)],
+                names=groupby,
+            )
+            columns = pd.DatetimeIndex(
+                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
+            )
+            return pd.DataFrame([values[: len(columns)]], index=index, columns=columns)
+
+        def energy_balance(
+            self,
+            bus_carrier: list[str] | str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            groupby_time: bool = True,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                }
+            )
+
+            if not (carrier == self.ambient_carriers and components == "Link"):
+                return pd.Series(
+                    dtype=float,
+                    index=pd.MultiIndex.from_tuples([], names=groupby),
+                )
+
+            if groupby_time:
+                if self.scenario in {"zero_heat", "zero_electric"}:
+                    values = [0.0]
+                elif bus_carrier == [
+                    "urban central heat",
+                    "urban decentral heat",
+                    "rural heat",
+                ]:
+                    values = [10.0]
+                else:
+                    values = [-10.0]
+                return self._series_from_groupby(groupby, values)
+
+            if self.scenario in {"zero_heat", "zero_electric"}:
+                values = [0.0, 0.0]
+            elif bus_carrier == [
+                "urban central heat",
+                "urban decentral heat",
+                "rural heat",
+            ]:
+                values = [10.0, 10.0]
+            else:
+                values = [-10.0, -10.0]
+            return self._dataframe_from_groupby(groupby, values)
+
+        def supply(
+            self,
+            bus_carrier: list[str] | str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            groupby: list[str] | None = None,
+            groupby_time: bool = True,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            if groupby is None:
+                groupby = ["location", "unit"]
+
+            self.calls.append(
+                {
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                }
+            )
+
+            if not (
+                bus_carrier
+                == ["urban central heat", "urban decentral heat", "rural heat"]
+                and carrier
+                == [
+                    "urban central solar thermal",
+                    "rural solar thermal",
+                    "urban decentral solar thermal",
+                ]
+                and components == "Generator"
+            ):
+                return pd.Series(
+                    dtype=float,
+                    index=pd.MultiIndex.from_tuples([], names=groupby),
+                )
+
+            if groupby_time:
+                values = (
+                    [0.0] if self.scenario in {"zero_heat", "zero_electric"} else [5.0]
+                )
+                return self._series_from_groupby(groupby, values, unit="MWh_th")
+
+            values = (
+                [0.0, 0.0]
+                if self.scenario in {"zero_heat", "zero_electric"}
+                else [5.0, 5.0]
+            )
+            return self._dataframe_from_groupby(groupby, values, unit="MWh_th")
+
+    class _AmbientHeatNetwork:
+        """Minimal network object exposing only the statistics accessor."""
+
+        def __init__(self, scenario: str = "balanced"):
+            self.statistics = (
+                TestFinalEnergyByCarrierAmbientHeat._AmbientHeatStatisticsAccessor(
+                    scenario=scenario
+                )
+            )
+
+    def _ambient_heat_network(self, scenario: str = "balanced"):
+        return self._AmbientHeatNetwork(scenario=scenario)
+
+    def test_returns_series_and_uses_expected_queries(self):
+        """Function returns a Series and queries both heat and electricity sides."""
+        network = self._ambient_heat_network("balanced")
+
+        result = Final_Energy_by_Carrier__Ambient_Heat(network)
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
+        assert result.loc[("AT1", "MWh_th")] == pytest.approx(5.0)
+        assert len(network.statistics.calls) == 3
+        assert network.statistics.calls[0]["bus_carrier"] == [
+            "urban central heat",
+            "urban decentral heat",
+            "rural heat",
+        ]
+        assert network.statistics.calls[1]["bus_carrier"] == "low voltage"
+        assert network.statistics.calls[2]["components"] == "Generator"
+
+    def test_zero_heat_output_also_has_zero_electric_input(self):
+        """If the heat-output side is zero, the electricity-input side is zero too."""
+        result = Final_Energy_by_Carrier__Ambient_Heat(
+            self._ambient_heat_network("zero_heat")
+        )
+
+        assert isinstance(result, pd.Series)
+        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
+
+    def test_zero_electric_input_also_has_zero_heat_output(self):
+        """If the electricity-input side is zero, the heat-output side is zero too."""
+        result = Final_Energy_by_Carrier__Ambient_Heat(
+            self._ambient_heat_network("zero_electric")
+        )
+
+        assert isinstance(result, pd.Series)
+        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
+
+    def test_returns_dataframe_for_aggregate_per_year_false(self):
+        """aggregate_per_year=False returns a DataFrame with snapshot columns."""
+        result = Final_Energy_by_Carrier__Ambient_Heat(
+            self._ambient_heat_network("balanced"),
+            aggregate_per_year=False,
+        )
+
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert isinstance(result.columns, pd.DatetimeIndex)
 
 
 # ---------------------------------------------------------------------------

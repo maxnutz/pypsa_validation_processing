@@ -444,6 +444,85 @@ def Final_Energy_by_Carrier__Oil(
     return fossil_oil
 
 
+def Final_Energy_by_Carrier__Ambient_Heat(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract ambient heat consumption of heat pumps and solar-thermal
+    from a PyPSA-Network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex including
+        ``location`` and ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    Heat pump CHP is temperature dependent. So the comparison of input
+    to heat output brings the surplus, as efficiency of these links
+    is set to 1.0.
+    """
+    ambient_technologies = [
+        "urban central air heat pump",
+        "urban decentral air heat pump",
+        "rural air heat pump",
+        "rural ground heat pump",
+    ]
+    # heat pumps
+    # restrict evaluation on heat output
+    e_out = n.statistics.energy_balance(
+        bus_carrier=["urban central heat", "urban decentral heat", "rural heat"],
+        carrier=ambient_technologies,
+        components="Link",
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+    # restrict evaluation on electricity input - no elec to elec, so no at_port needed.
+    e_in = n.statistics.energy_balance(
+        bus_carrier="low voltage",
+        carrier=ambient_technologies,
+        components="Link",
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    )
+
+    e_out = remap_unit_index(e_out)
+    e_in = remap_unit_index(e_in)
+    res_heat_pump = e_out.add(e_in, fill_value=0).groupby(kwargs["groupby"]).sum()
+
+    # solar thermal (NaN values for non-available input during nighttime.)
+    solar_thermal_carriers = [
+        "urban central solar thermal",
+        "rural solar thermal",
+        "urban decentral solar thermal",
+    ]
+    st = n.statistics.supply(
+        bus_carrier=["urban central heat", "urban decentral heat", "rural heat"],
+        carrier=solar_thermal_carriers,
+        components="Generator",
+        groupby_time=aggregate_per_year,
+        **kwargs,
+    ).replace(np.nan, 0)
+    res_series = [res_heat_pump, st]
+    res_series = [series for series in res_series if not series.empty]
+    res = pd.concat(res_series)
+    return res
+
+
 def Final_Energy_by_Carrier__Natural_Gas(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
