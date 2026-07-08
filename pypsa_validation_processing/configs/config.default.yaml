@@ -1,14 +1,14 @@
 # General section
-country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all" for all regions/countries
+country: all               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all" for all regions/countries
 definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder 
 convert_units: true # convert units from PyPSA to common definitions _optional, defaults to true_
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
 output_path: resources            # path the outputfile should be written to
 aggregation_level: "region"      # Options: "country" or "region"
 aggregate_per_year: true          # true: one value per investment year; false: full time series per year
-map_country_codes_to_names: true # true: map AT -> Austria in output regions; false: keep country/region codes
+map_country_codes_to_names: false # true: map AT -> Austria in output regions; false: keep country/region codes
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
-model_name: pypsa-at            # name of the PyPSA model
+model_name:  PyPSA-AT v0.0.1-8b8a616             # name of the PyPSA model
 scenario_name: KN2040test        # name of the PyPSA scenario
