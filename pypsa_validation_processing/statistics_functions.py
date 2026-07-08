@@ -444,6 +444,105 @@ def Final_Energy_by_Carrier__Oil(
     return fossil_oil
 
 
+def Net_Imports__Oil(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract net oil imports from a PyPSA Network.
+
+    Calculates the net imports of oil by computing the difference between
+    imports to and exports from each location based on Link components.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with net oil imports indexed by location
+        and unit.
+
+
+    Notes
+    -----
+    All oil is distributed from cupperplate at "EU oil" bus. Oil link know both
+    direction and multiple carriers are covered by these links, as these links are
+    not just representing transmission, but also technologies with efficiencies.
+
+    Locations are derived from bus names and assigned to the respective bus columns.
+
+    The evaluation pathway in this function strongly depends on the input of the
+    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
+    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
+    (with ``aggregate_per_year`` is ``True``) are processed as they come.
+    """
+    # this is not transmission!
+    raw_stat = n.statistics.energy_balance(
+        bus_carrier="oil",
+        components="Link",
+        groupby_time=aggregate_per_year,
+        **kwargs_imports,
+    ).mul(-1)
+
+    # address locations to respective buses
+    home_location = [
+        bus.split(" ")[0] for bus in list(raw_stat.index.get_level_values("bus1"))
+    ]
+    imports_raw = create_location_index_from_copperplate(
+        raw_stat, home_location, "bus1"
+    )
+    home_location = [
+        bus.split(" ")[0] for bus in list(imports_raw.index.get_level_values("bus0"))
+    ]
+    imports_raw = create_location_index_from_copperplate(
+        imports_raw, home_location, "bus0"
+    )
+
+    # process non-aggregated data - stack to long format with single column
+    if isinstance(imports_raw, pd.DataFrame):
+        imports_long = (
+            imports_raw.stack(future_stack=True)
+            .rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
+            .reset_index()
+        )
+        groupby_columns = ["location", "unit", "snapshot"]
+    # process aggregated data - process single column as is
+    else:
+        imports_long = (
+            imports_raw.rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit"])
+            .reset_index()
+        )
+        groupby_columns = ["location", "unit"]
+
+    net_imports = pd.concat(
+        [
+            imports_long.assign(
+                location=imports_long["location_to"], value=imports_long["value"]
+            ),
+            imports_long.assign(
+                location=imports_long["location_from"], value=-imports_long["value"]
+            ),
+        ],
+        ignore_index=True,
+    )
+    net_imports_grouped = net_imports.groupby(groupby_columns, sort=False)[
+        "value"
+    ].sum()
+
+    if isinstance(imports_raw, pd.DataFrame):
+        return net_imports_grouped.unstack("snapshot")
+    return net_imports_grouped
+
+
 def Final_Energy_by_Carrier__Natural_Gas(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
