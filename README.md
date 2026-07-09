@@ -189,7 +189,7 @@ To register a new variable, please first open a new Issue and select Issue Templ
 - add a comprehensive docstring to your function 
 - add the mapping variable_name <> function_name to [mapping.default.yaml](https://github.com/maxnutz/pypsa_validation_processing/blob/main/pypsa_validation_processing/configs/mapping.default.yaml) (and your personal mapping-file)
 - Add a testing routine for your Function to `tests/` - stick to the [testing-README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md)
-- make sure, that the newest version of main is merged into your feature Branch 
+- make sure that the newest version of main is merged into your feature branch
 - open a pull request and assign @maxnutz as reviewer
 
-**Note:** each page under `docs/api/` uses an explicit `members:` allowlist so that module-level constants and cross-module imports (e.g. `REGION_MAPPING`, `UNITS_MAPPING`, or a function/class imported from another module) don't leak into the rendered API docs. If you add a new public function, class, or statistics function, also add its name to the matching allowlist in `docs/api/*.md`.
+**Note:** `docs/api/utils.md`, `docs/api/class_definitions.md`, and `docs/api/workflow.md` each use an explicit `members:` allowlist so that module-level constants and cross-module imports (e.g. `REGION_MAPPING`, `UNITS_MAPPING`, or a function/class imported from another module) don't leak into the rendered API docs. If you add a new public function or class to `utils.py`, `class_definitions.py`, or `workflow.py`, also add its name to the matching allowlist in `docs/api/*.md`. `docs/api/statistics_functions.md` instead uses an exclude-`filters` list, so new statistics functions are picked up automatically — no doc update needed when registering a new variable.
