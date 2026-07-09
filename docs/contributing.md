@@ -2,7 +2,7 @@
 
 ## Project Context
 
-This package computes IAMC variables from PyPSA network results for the PyPSA-AT project — a nationally tailored, fully sector-coupled energy system model for Austria. The initial set of IAMC variables is defined in [energy-scenarios-at-workflow](https://github.com/iiasa/energy-scenarios-at-workflow).
+This package computes IAMC variables from PyPSA network results and is part of the PyPSA-AT project (PyPSA-AT – a nationally tailored, fully sector-coupled energy system model for Austria). The initial set of IAMC variables is defined in [energy-scenarios-at-workflow](https://github.com/iiasa/energy-scenarios-at-workflow).
 
 ## Code Style
 
@@ -44,7 +44,7 @@ def <function_name>(
     ...
 ```
 
-Additional optional parameters can be added when a variable needs them, e.g. `config: dict` or `energy_totals: Path`.
+Additional optional parameters can be added when a variable needs them, e.g. `config: dict` or `energy_totals: Path`. All class-Variables can be used as parameters. Additional parameters are identified automatically when processing the statistics-function.
 
 ### Return format
 
@@ -60,7 +60,6 @@ Additional optional parameters can be added when a variable needs them, e.g. `co
 
 - Tests live only in `tests/` — see the [testing README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md).
 - Write unit tests that test small, isolated logic.
-- Add or update tests only when behavior changes.
 - Every test for a function in `statistics_functions.py` must assert the output format: a `pandas.Series` with a MultiIndex containing at least `country` and `unit` (it can include more levels).
 
 ## Contribution Workflow
