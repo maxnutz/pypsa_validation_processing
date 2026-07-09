@@ -39,6 +39,7 @@ nav:
       - Class Definitions: api/class_definitions.md
       - Statistics Functions: api/statistics_functions.md
       - Utilities: api/utils.md
+  - Contributing: contributing.md
   - Additional Information: additional-information.md
 
 plugins:
