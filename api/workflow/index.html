@@ -517,22 +517,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor" class="md-nav__link">
+  <a href="#pypsa_validation_processing.workflow.get_default_config_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Network_Processor
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Network_Processor">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.calculate_variables_values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        calculate_variables_values
+        get_default_config_path
       
     </span>
   </a>
@@ -540,40 +528,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.read_definitions" class="md-nav__link">
+  <a href="#pypsa_validation_processing.workflow.resolve_config_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        read_definitions
+        resolve_config_path
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.structure_pyam_from_pandas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        structure_pyam_from_pandas
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.write_output_to_xlsx" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_output_to_xlsx
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -589,32 +550,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.get_default_config_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_default_config_path
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.workflow.main" class="md-nav__link">
     <span class="md-ellipsis">
       
         main
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.resolve_config_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        resolve_config_path
       
     </span>
   </a>
@@ -792,22 +731,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor" class="md-nav__link">
+  <a href="#pypsa_validation_processing.workflow.get_default_config_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Network_Processor
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Network_Processor">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.calculate_variables_values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        calculate_variables_values
+        get_default_config_path
       
     </span>
   </a>
@@ -815,40 +742,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.read_definitions" class="md-nav__link">
+  <a href="#pypsa_validation_processing.workflow.resolve_config_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        read_definitions
+        resolve_config_path
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.structure_pyam_from_pandas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        structure_pyam_from_pandas
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.Network_Processor.write_output_to_xlsx" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_output_to_xlsx
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -864,32 +764,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.get_default_config_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_default_config_path
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.workflow.main" class="md-nav__link">
     <span class="md-ellipsis">
       
         main
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.workflow.resolve_config_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        resolve_config_path
       
     </span>
   </a>
@@ -955,328 +833,6 @@
 
 
 
-<div class="doc doc-object doc-class">
-
-
-
-<h3 id="pypsa_validation_processing.workflow.Network_Processor" class="doc doc-heading">
-            <code>Network_Processor</code>
-
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-
-
-        <p>Processes a PyPSA NetworkCollection against IAMC variable definitions.</p>
-<p>Reads variable definitions from a definitions folder, executes the
-corresponding statistics functions to extract values from a given PyPSA
-NetworkCollection, and returns the results as a pyam.IamDataFrame.</p>
-<p>Outputs are converted to the units of common definitions, set in the
-definitions variable in <code>definitions_path</code> via
-:meth:<code>pyam.IamDataFrame.convert_unit</code> if <code>convert_units</code> is <code>True</code> in config.</p>
-
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="pypsa_validation_processing.workflow.Network_Processor.calculate_variables_values" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">calculate_variables_values</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Calculate values for all defined variables.</p>
-<p>Iterates over all variables in <code>self.dsd</code>, calls
-:meth:<code>_execute_function_for_variable</code> for each one, and assembles
-the results.</p>
-<p>When <code>self.aggregate_per_year</code> is <code>True</code> (default), assembles a
-single :class:<code>pyam.IamDataFrame</code> with one column per investment year
-and stores it in <code>self.dsd_with_values</code>.</p>
-<p>When <code>self.aggregate_per_year</code> is <code>False</code>, stores a
-<code>list[tuple[int, pyam.IamDataFrame]]</code> in <code>self.dsd_with_values</code>,
-one entry per investment year.  Each :class:<code>pyam.IamDataFrame</code>
-contains the full time-series for that year.</p>
-<p>Applies aggregation based on <code>self.aggregation_level</code> config.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="pypsa_validation_processing.workflow.Network_Processor.read_definitions" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">read_definitions</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">nomenclature</span><span class="o">.</span><span class="n">DataStructureDefinition</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Read IAMC variable definitions from the definitions folder.</p>
-<p>Populates <code>dsd</code> with a
-:class:<code>nomenclature.DataStructureDefinition</code> built from
-<code>self.definitions_path</code> and returns it.</p>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="nomenclature.DataStructureDefinition">DataStructureDefinition</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The loaded data structure definition.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="pypsa_validation_processing.workflow.Network_Processor.structure_pyam_from_pandas" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">structure_pyam_from_pandas</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pyam</span><span class="o">.</span><span class="n">IamDataFrame</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Creates a pyam.IamDataFrame from a pandas DataFrame.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>df</code>
-            </td>
-            <td>
-                  <code><span title="pandas.DataFrame">DataFrame</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>DataFrame with IAMC variables as columns and years as index.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="pyam.IamDataFrame">IamDataFrame</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A pyam.IamDataFrame with IAMC variables as columns and years as index.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>When <code>aggregation_level="country"</code>, region labels are country codes by
-default. If <code>map_country_codes_to_names</code> is <code>True</code> in config, country
-codes are mapped to full names via :data:<code>REGION_MAPPING</code>. For
-<code>country="all"</code>, the <code>country</code> column in <em>df</em> (populated by
-:meth:<code>_aggregate_to_country</code>) is used as the region dimension, one row
-per country. When <code>aggregation_level="region"</code>, the <code>location</code> column
-in <em>df</em> is used directly.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="pypsa_validation_processing.workflow.Network_Processor.write_output_to_xlsx" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">write_output_to_xlsx</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Write the computed IAMC data to an Excel file (or files).</p>
-<ul>
-<li>When <code>aggregate_per_year=True</code>: writes a single file
-  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_{model}_{scenario}_{country}.xlsx</code>.</li>
-<li>When <code>aggregate_per_year=False</code>: creates a sub-folder
-  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_timeseries_{model}_{scenario}_{country}/</code>
-  and writes one file per investment year named
-  <code>PYPSA_{model}_{scenario}_{country}_{year}.xlsx</code>.</li>
-</ul>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="pathlib.Path">Path</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Path to the written file (<code>aggregate_per_year=True</code>) or to the
-folder containing all per-year files (<code>aggregate_per_year=False</code>).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="RuntimeError">RuntimeError</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If :meth:<code>calculate_variables_values</code> has not been called yet.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pypsa_validation_processing.workflow.build_parser" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">build_parser</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Build and return the CLI argument parser.</p>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="argparse.ArgumentParser">ArgumentParser</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Parser with <code>--config</code> argument.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -1290,24 +846,6 @@ folder containing all per-year files (<code>aggregate_per_year=False</code>).</p
     <div class="doc doc-contents ">
 
         <p>Return the path to the packaged default configuration file.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pypsa_validation_processing.workflow.main" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Parse CLI arguments, run the Network_Processor pipeline, and write output.</p>
 
 
     </div>
@@ -1381,6 +919,65 @@ config is used.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.build_parser" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">build_parser</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build and return the CLI argument parser.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="argparse.ArgumentParser">ArgumentParser</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parser with <code>--config</code> argument.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.workflow.main" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse CLI arguments, run the Network_Processor pipeline, and write output.</p>
 
 
     </div>
