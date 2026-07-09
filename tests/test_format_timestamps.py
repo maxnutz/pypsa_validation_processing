@@ -72,14 +72,14 @@ def test_format_timestamps_hourly_columns():
 def test_format_timestamps_preserves_tz_aware_columns():
     aware_label = pd.Timestamp(
         "2050-01-01 00:00:00",
-        tz=datetime.timezone(datetime.timedelta(hours=1)),
+        tz=datetime.timezone(datetime.timedelta(hours=0)),
     )
     df = pd.DataFrame([[1.0]], columns=[aware_label])
 
     out = format_timestamps(df)
 
     assert out.columns[0] == aware_label
-    assert out.columns[0].utcoffset() == datetime.timedelta(hours=1)
+    assert out.columns[0].utcoffset() == datetime.timedelta(hours=0)
 
 
 def test_format_timestamps_keeps_unparsable_columns():
@@ -130,7 +130,6 @@ def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: P
     time_columns = [
         c
         for c in passed_data.columns
-        if isinstance(c, (pd.Timestamp, datetime.datetime))
+        if isinstance(c, (pd.Timestamp, datetime.datetime, int))
     ]
     assert len(time_columns) == 1
-    assert time_columns[0].utcoffset() == datetime.timedelta(hours=1)

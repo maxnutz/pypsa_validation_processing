@@ -20,7 +20,8 @@ from pypsa_validation_processing.utils import (
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize timestamp-like columns to tz-aware objects in UTC+01:00.
+    """Normalize timestamp-like columns to tz-aware objects or
+    formatted integers in UTC+00:00.
 
     Parameters
     ----------
@@ -32,15 +33,21 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         The same DataFrame with columns converted to Python ``datetime``
-        objects localized to ``+01:00`` where possible.
+        objects localized to ``+00:00`` where possible for timeseries. For
+        yearly aggregated data, columns are converted to integers.
 
     Notes
     -----
     Columns that cannot be parsed as timestamps are left unchanged. Values
     that can be parsed but cannot be localized are replaced with ``pd.NaT``
     and reported via ``print`` warnings.
+    Yearly aggregated data is identified by all column labels being
+    4-digit year strings only. In this case, the columns are converted to
+    integers. For non-aggregated data, columns are converted to Python
+    ``datetime`` objects localized to UTC+00:00.
     """
-    fixed_tz = datetime.timezone(datetime.timedelta(hours=1))
+    fixed_tz = datetime.timezone(datetime.timedelta(hours=0))
+
     cols = list(df.columns)
     idx_name = df.columns.name
     try:
@@ -51,40 +58,48 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     converted_list: list[object] = []
     nat_list: list[object] = []
 
-    for i, col in enumerate(cols):
-        is_year_only = isinstance(col, str) and re.match(r"^\d{4}$", col) is not None
-        parsed_value = parsed[i]
-
-        if pd.isna(parsed_value) and not is_year_only:
-            continue
-
-        ts = (
-            parsed_value
-            if not pd.isna(parsed_value)
-            else pd.Timestamp(f"{col}-01-01 00:00:00")
-        )
-
-        if ts.tz is not None:
-            cols[i] = ts
-            converted_list.append(col)
-            continue
-
-        try:
-            ts_tz = ts.tz_localize(fixed_tz)
-        except (TypeError, ValueError) as exc:
-            print(
-                f"WARNING: format_timestamps: failed to localize column {col!r}: {exc}. "
-                "Setting label to pd.NaT"
+    # for yearly aggregated data, use integers as column labels.
+    if all([(isinstance(elem, str) and re.match(r"^\d{4}$", elem)) for elem in cols]):
+        converted_list = [int(col) for col in cols]
+        df.columns = pd.Index(converted_list, name=idx_name)
+    # for non-aggregated data, use timestamps as column labels.
+    else:
+        for i, col in enumerate(cols):
+            is_year_only = (
+                isinstance(col, str) and re.match(r"^\d{4}$", col) is not None
             )
-            ts_tz = pd.NaT
-            nat_list.append(col)
+            parsed_value = parsed[i]
 
-        cols[i] = ts_tz
-        if not pd.isna(ts_tz):
-            converted_list.append(col)
+            if pd.isna(parsed_value) and not is_year_only:
+                continue
 
-    py_datetimes = pd.Index(cols, name=idx_name).to_pydatetime()
-    df.columns = pd.Index(py_datetimes, dtype="object", name=idx_name)
+            ts = (
+                parsed_value
+                if not pd.isna(parsed_value)
+                else pd.Timestamp(f"{col}-01-01 00:00:00")
+            )
+
+            if ts.tz is not None:
+                cols[i] = ts
+                converted_list.append(col)
+                continue
+
+            try:
+                ts_tz = ts.tz_localize(fixed_tz)
+            except (TypeError, ValueError) as exc:
+                print(
+                    f"WARNING: format_timestamps: failed to localize column {col!r}: {exc}. "
+                    "Setting label to pd.NaT"
+                )
+                ts_tz = pd.NaT
+                nat_list.append(col)
+
+            cols[i] = ts_tz
+            if not pd.isna(ts_tz):
+                converted_list.append(col)
+
+        py_datetimes = pd.Index(cols, name=idx_name).to_pydatetime()
+        df.columns = pd.Index(py_datetimes, dtype="object", name=idx_name)
     if nat_list:
         print("WARNING: format_timestamps: columns set to NaT:", nat_list)
     return df
