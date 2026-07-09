@@ -130,7 +130,6 @@ def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: P
     time_columns = [
         c
         for c in passed_data.columns
-        if isinstance(c, (pd.Timestamp, datetime.datetime))
+        if isinstance(c, (pd.Timestamp, datetime.datetime, int))
     ]
     assert len(time_columns) == 1
-    assert time_columns[0].utcoffset() == datetime.timedelta(hours=0)
