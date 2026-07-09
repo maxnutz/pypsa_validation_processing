@@ -1228,7 +1228,8 @@ folder containing all per-year files (<code>aggregate_per_year=False</code>).</p
 
     <div class="doc doc-contents ">
 
-        <p>Normalize timestamp-like columns to tz-aware objects in UTC+01:00.</p>
+        <p>Normalize timestamp-like columns to tz-aware objects or
+formatted integers in UTC+00:00.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1279,7 +1280,8 @@ timestamp-like values.</p>
             <td>
               <div class="doc-md-description">
                 <p>The same DataFrame with columns converted to Python <code>datetime</code>
-objects localized to <code>+01:00</code> where possible.</p>
+objects localized to <code>+00:00</code> where possible for timeseries. For
+yearly aggregated data, columns are converted to integers.</p>
               </div>
             </td>
           </tr>
@@ -1291,7 +1293,11 @@ objects localized to <code>+01:00</code> where possible.</p>
   <summary>Notes</summary>
   <p>Columns that cannot be parsed as timestamps are left unchanged. Values
 that can be parsed but cannot be localized are replaced with <code>pd.NaT</code>
-and reported via <code>print</code> warnings.</p>
+and reported via <code>print</code> warnings.
+Yearly aggregated data is identified by all column labels being
+4-digit year strings only. In this case, the columns are converted to
+integers. For non-aggregated data, columns are converted to Python
+<code>datetime</code> objects localized to UTC+00:00.</p>
 </details>
 
     </div>
