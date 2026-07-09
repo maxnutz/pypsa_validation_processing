@@ -20,7 +20,8 @@ from pypsa_validation_processing.utils import (
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize timestamp-like columns to tz-aware objects in UTC+00:00.
+    """Normalize timestamp-like columns to tz-aware objects or
+    formatted integers in UTC+00:00.
 
     Parameters
     ----------
@@ -32,13 +33,18 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         The same DataFrame with columns converted to Python ``datetime``
-        objects localized to ``+00:00`` where possible.
+        objects localized to ``+00:00`` where possible for timeseries. For
+        yearly aggregated data, columns are converted to integers.
 
     Notes
     -----
     Columns that cannot be parsed as timestamps are left unchanged. Values
     that can be parsed but cannot be localized are replaced with ``pd.NaT``
     and reported via ``print`` warnings.
+    Yearly aggregated data is identified by all column labels being
+    4-digit year strings only. In this case, the columns are converted to
+    integers. For non-aggregated data, columns are converted to Python
+    ``datetime`` objects localized to UTC+00:00.
     """
     fixed_tz = datetime.timezone(datetime.timedelta(hours=0))
 
