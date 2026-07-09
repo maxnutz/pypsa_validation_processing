@@ -192,4 +192,10 @@ To register a new variable, please first open a new Issue and select Issue Templ
 - make sure that the newest version of main is merged into your feature branch
 - open a pull request and assign @maxnutz as reviewer
 
-**Note:** `docs/api/utils.md`, `docs/api/class_definitions.md`, and `docs/api/workflow.md` each use an explicit `members:` allowlist so that module-level constants and cross-module imports (e.g. `REGION_MAPPING`, `UNITS_MAPPING`, or a function/class imported from another module) don't leak into the rendered API docs. If you add a new public function or class to `utils.py`, `class_definitions.py`, or `workflow.py`, also add its name to the matching allowlist in `docs/api/*.md`. `docs/api/statistics_functions.md` instead uses an exclude-`filters` list, so new statistics functions are picked up automatically — no doc update needed when registering a new variable.
+## Documentation Pages
+`docs/api/utils.md`, `docs/api/class_definitions.md`, and `docs/api/workflow.md` each use an explicit `members:` allowlist so that module-level constants and cross-module imports (e.g. `REGION_MAPPING`, `UNITS_MAPPING`, or a function/class imported from another module) don't leak into the rendered API docs. `docs/api/statistics_functions.md` instead uses an exclude-`filters` list, so new statistics functions are picked up automatically — no doc update needed when registering a new variable.
+
+> [!NOTE]
+> If you add a new public function or class to `utils.py`, `class_definitions.py`, or `workflow.py`, also add its name to the matching allowlist in `docs/api/*.md`. 
+
+To render the docs locally for testing, run `pixi run mkdocs serve`. Docs are then available locally under an URL provided.
