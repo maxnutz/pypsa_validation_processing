@@ -266,6 +266,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="additional-information/" class="md-tabs__link">
         
   
@@ -340,6 +359,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="." class="md-nav__link md-nav__link--active">
         
   
@@ -356,6 +393,58 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-explorer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario Explorer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -567,6 +656,33 @@
   
   
     <li class="md-nav__item">
+      <a href="contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="additional-information/" class="md-nav__link">
         
   
@@ -607,6 +723,47 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-explorer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario Explorer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -626,8 +783,23 @@
 
 
 <h1 id="pypsa-validation-processing">PyPSA Validation Processing</h1>
-<p>This documentation site contains the API reference generated from the package docstrings and a small space for project-specific notes.</p>
-<p>Use the API Reference section for the automatically rendered module documentation.</p>
+<p>This package processes PyPSA network results into IAMC-formatted variables for validation against the Eurostat Energy Balance, as part of the PyPSA-AT project.</p>
+<h2 id="scenario-explorer">Scenario Explorer</h2>
+<p>Processed output from this package is intended for submission to the <a href="https://pypsa-at-dev.apps.ece.iiasa.ac.at/">PyPSA-AT Scenario Explorer</a>. Submitting to the Explorer requires registering a user account on the site.</p>
+<p>Keep the following in mind when preparing a submission:</p>
+<ul>
+<li><strong>Model name:</strong> the Explorer currently only accepts model names starting with <code>"Pypsa-AT v1.0"</code> as this is the model registered. The <code>model_name</code> value in your config must exactly match one of the models defined in the <a href="https://github.com/iiasa/pypsa-at-dev-workflow/blob/d71aab41172992f020a3fb149b166dee548a4543/mappings/pypsa-at_v1.x.yaml#L2">pypsa-at-dev-workflow mappings file</a> — set it accordingly in <code>config.default.yaml</code> (or your own config) before running the workflow.</li>
+<li><strong>Submission time:</strong> large files can take a while to process; you will be notified by e-mail once the submission succeeds.</li>
+<li><strong>Output format:</strong> this package's exported Excel files are already formatted to fit Explorer submission requirements. A few config flags directly affect whether a submission validates:</li>
+<li><code>convert_units</code> — converts PyPSA units to the IAMC-valid units expected by the Explorer.</li>
+<li><code>map_country_codes_to_names</code> — controls whether output regions use country codes (<code>AT</code>) or full names (<code>Austria</code>); make sure this matches what the Explorer expects for your submission.</li>
+<li><code>aggregation_level</code> — controls whether output rows are aggregated to <code>country</code> or kept at <code>region</code> granularity.</li>
+<li><strong>Common definitions:</strong> The common definitions of variables and regions used in this processing step must be identical to the common definitions used for the pypsa-at-dev-workflow. This is currently enshured for by default.</li>
+</ul>
+<h2 id="api-reference">API Reference</h2>
+<p>Use the API Reference section (nav) for the automatically rendered module documentation.</p>
+<h2 id="contributing">Contributing</h2>
+<p>See <a href="contributing/">Contributing</a> for coding-style and participation guidelines.</p>
 
 
 
