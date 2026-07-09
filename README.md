@@ -191,3 +191,5 @@ To register a new variable, please first open a new Issue and select Issue Templ
 - Add a testing routine for your Function to `tests/` - stick to the [testing-README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md)
 - make sure, that the newest version of main is merged into your feature Branch 
 - open a pull request and assign @maxnutz as reviewer
+
+**Note:** each page under `docs/api/` uses an explicit `members:` allowlist so that module-level constants and cross-module imports (e.g. `REGION_MAPPING`, `UNITS_MAPPING`, or a function/class imported from another module) don't leak into the rendered API docs. If you add a new public function, class, or statistics function, also add its name to the matching allowlist in `docs/api/*.md`.

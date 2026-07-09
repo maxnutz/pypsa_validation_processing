@@ -30,3 +30,6 @@ pandas = ">=1.0.0"
 pyam-iamc = ">=2.0.0"
 nomenclature-iamc = ">=0.29"
 pypsa-validation-processing = { path = ".", editable = true }
+mkdocs = ">=1.6"
+mkdocs-material = ">=9.5"
+mkdocstrings = { version = ">=0.26", extras = ["python"] }
