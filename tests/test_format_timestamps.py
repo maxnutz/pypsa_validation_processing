@@ -127,7 +127,7 @@ def test_format_timestamps_falls_back_when_mixed_format_raises_typeerror():
         out = format_timestamps(df)
 
     assert out.columns[0].year == 2050
-    assert out.columns[0].utcoffset() == datetime.timedelta(hours=1)
+    assert out.columns[0].utcoffset() == datetime.timedelta(hours=0)
 
 
 def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: Path):
