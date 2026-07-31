@@ -25,6 +25,7 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 """
 
 from __future__ import annotations
+import logging
 import re
 from functools import reduce
 from pathlib import Path
@@ -42,6 +43,8 @@ from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
     create_location_index_from_copperplate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def Final_Energy_by_Carrier__Electricity(
@@ -138,6 +141,9 @@ def Final_Energy_by_Carrier__Electricity(
     series_list = [series for series in series_list if not series.empty]
 
     result = pd.concat(series_list)
+    logger.debug(
+        f"Final Energy by Carrier|Electricity finished. Resulting shape: {result.shape}. "
+    )
     return result
 
 
@@ -221,9 +227,12 @@ def Net_Imports__Electricity(
     ].sum()
 
     if isinstance(imports_raw, pd.DataFrame):
-        return net_imports_grouped.unstack("snapshot")
+        result = net_imports_grouped.unstack("snapshot")
+    else:
+        result = net_imports_grouped
 
-    return net_imports_grouped
+    logger.debug(f"Net Imports|Electricity finished. Resulting shape: {result.shape}. ")
+    return result
 
 
 def Final_Energy_by_Carrier__Coal(
@@ -265,6 +274,9 @@ def Final_Energy_by_Carrier__Coal(
         components="Load",
         groupby_time=aggregate_per_year,
         **kwargs,
+    )
+    logger.debug(
+        f"Final Energy by Carrier|Coal finished. Resulting shape: {industry.shape}. "
     )
     return industry
 
@@ -441,6 +453,9 @@ def Final_Energy_by_Carrier__Oil(
         non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0.0)
 
     fossil_oil = total.mul(1 - non_fossil_fraction, axis=0)
+    logger.debug(
+        f"Final Energy by Carrier|Oil finished. Resulting shape: {fossil_oil.shape}. "
+    )
     return fossil_oil
 
 
@@ -539,8 +554,12 @@ def Net_Imports__Oil(
     ].sum()
 
     if isinstance(imports_raw, pd.DataFrame):
-        return net_imports_grouped.unstack("snapshot")
-    return net_imports_grouped
+        result = net_imports_grouped.unstack("snapshot")
+    else:
+        result = net_imports_grouped
+
+    logger.debug(f"Net Imports|Oil finished. Resulting shape: {result.shape}. ")
+    return result
 
 
 def Final_Energy_by_Carrier__Natural_Gas(
@@ -656,15 +675,22 @@ def Final_Energy_by_Carrier__Natural_Gas(
     series_list = [series for series in series_list if not series.empty]
 
     if not series_list:
-        return pd.Series(
+        result = pd.Series(
             dtype=float,
             index=pd.MultiIndex.from_tuples([], names=kwargs["groupby"]),
         )
+        logger.debug(
+            f"Final Energy by Carrier|Natural Gas finished. Resulting shape: {result.shape}. "
+        )
+        return result
 
     total = pd.concat(series_list)
     total = total.rename(index=UNITS_MAPPING).groupby(kwargs["groupby"]).sum()
     non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0)
     result = total.mul(1 - non_fossil_fraction, axis=0)
+    logger.debug(
+        f"Final Energy by Carrier|Natural Gas finished. Resulting shape: {result.shape}. "
+    )
     return result
 
 
@@ -755,6 +781,9 @@ def Final_Energy_by_Carrier__District_Heat(
     # heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
     result = (res.groupby(["location", "unit"]).sum()).add(heat_vent, fill_value=0)
 
+    logger.debug(
+        f"Final Energy by Carrier|District Heat finished. Resulting shape: {result.shape}. "
+    )
     return result
 
 
@@ -826,8 +855,9 @@ def Final_Energy_by_Sector__Transportation(
         eff = bev_charger_efficiencies.iloc[0]
     else:
         eff = bev_charger_efficiencies.mean()
-        print(
-            "WARNING: Network includes different efficiencies for BEV chargers. Using mean value for variable Final_Energy_by_Sector__Transportation"
+        logger.warning(
+            "Network includes different efficiencies for BEV chargers. "
+            "Using mean value for variable Final_Energy_by_Sector__Transportation"
         )
 
     elec = n.statistics.withdrawal(
@@ -886,6 +916,9 @@ def Final_Energy_by_Sector__Transportation(
     series_list = [series for series in series_list if not series.empty]
 
     total = pd.concat(series_list)
+    logger.debug(
+        f"Final Energy by Sector|Transportation finished. Resulting shape: {total.shape}. "
+    )
     return total
 
 
@@ -969,6 +1002,9 @@ def Final_Energy_by_Sector__Industry(
     eff_loss = abs(cc_in) - abs(cc_out)
     eff_loss = eff_loss.groupby(["location", "unit"]).sum()
     res = load_statistics.add(eff_loss, fill_value=0)
+    logger.debug(
+        f"Final Energy by Sector|Industry finished. Resulting shape: {res.shape}. "
+    )
     return res
 
 
@@ -1047,6 +1083,9 @@ def Final_Energy_by_Sector__Agriculture(
         eff_loss = eff_loss.groupby(["location", "unit"]).sum()
         res = res.add(eff_loss, fill_value=0)
 
+    logger.debug(
+        f"Final Energy by Sector|Agriculture finished. Resulting shape: {res.shape}. "
+    )
     return res
 
 
@@ -1180,4 +1219,8 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
         df.groupby(kwargs["groupby"]).sum() for df in series_list if not df.empty
     ]
     total = pd.concat(series_list)
+    logger.debug(
+        "Final Energy by Sector|Residential and Commercial finished. "
+        f"Resulting shape: {total.shape}. "
+    )
     return total

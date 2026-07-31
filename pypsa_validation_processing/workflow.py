@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from pypsa_validation_processing import Network_Processor
+from pypsa_validation_processing.utils import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_default_config_path() -> Path:
@@ -27,7 +31,7 @@ def resolve_config_path(config_arg: str | None) -> Path:
     """
     if config_arg:
         return Path(config_arg).expanduser().resolve()
-    print("WARNING: no config-file provided. Using default config.")
+    logger.warning("no config-file provided. Using default config.")
     return get_default_config_path()
 
 
@@ -47,12 +51,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to YAML config file. Defaults to packaged config.",
     )
+    parser.add_argument(
+        "--log-level",
+        default="DEBUG",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level. Defaults to WARNING.",
+    )
     return parser
 
 
 def main() -> None:
     """Parse CLI arguments, run the Network_Processor pipeline, and write output."""
     args = build_parser().parse_args()
+    setup_logging(level=args.log_level)
+    if args.log_level == "DEBUG":
+        logger.info(
+            f"Importing pypsa-Network with logger level {args.log_level} prints several network tables."
+        )
     config_path = resolve_config_path(args.config)
 
     processor = Network_Processor(config_path=config_path)
