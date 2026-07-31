@@ -10,5 +10,5 @@ map_country_codes_to_names: false # true: map AT -> Austria in output regions; f
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
-model_name:  PyPSA-AT v0.0.1-8b8a616             # name of the PyPSA model
+model_name:  Pypsa-AT v1.0             # name of the PyPSA model
 scenario_name: KN2040test        # name of the PyPSA scenario
