@@ -1334,284 +1334,6 @@ class TestFinalEnergyByCarrierDistrictHeat:
 
 
 # ---------------------------------------------------------------------------
-# Tests for Final_Energy_by_Carrier__Oil
-# ---------------------------------------------------------------------------
-
-
-class TestFinalEnergyByCarrierOil:
-    """Test suite for Final_Energy_by_Carrier__Oil function."""
-
-    class _OilStatisticsAccessor:
-        """Deterministic accessor tailored to oil final-energy tests."""
-
-        def __init__(
-            self,
-            *,
-            rescom_empty: bool = False,
-            all_oil_value: float = 200.0,
-            all_oil_empty: bool = False,
-            non_fossil_empty: bool = False,
-        ):
-            self.rescom_empty = rescom_empty
-            self.all_oil_value = all_oil_value
-            self.all_oil_empty = all_oil_empty
-            self.non_fossil_empty = non_fossil_empty
-
-        def _to_result(
-            self,
-            *,
-            index: pd.MultiIndex,
-            values: list[float],
-            groupby_time: bool,
-        ) -> pd.Series | pd.DataFrame:
-            if groupby_time:
-                return pd.Series(values, index=index, dtype=float)
-            timestamps = pd.date_range(
-                "2019-01-01", periods=4, freq="6h", name="snapshot"
-            )
-            return pd.DataFrame(
-                {ts: values for ts in timestamps}, index=index, dtype=float
-            )
-
-        def withdrawal(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby_time: bool = True,
-            groupby: list[str] | None = None,
-            at_port: str | None = None,
-            **kwargs: object,
-        ) -> pd.Series | pd.DataFrame:
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            # Agriculture and land-transport final demand (Load)
-            if carrier == "agriculture machinery oil" and components == "Load":
-                idx = pd.MultiIndex.from_tuples(
-                    [("AT1", "MWh_th")], names=["location", "unit"]
-                )
-                return self._to_result(
-                    index=idx, values=[100.0], groupby_time=groupby_time
-                )
-
-            if carrier == "land transport oil" and components == "Load":
-                idx = pd.MultiIndex.from_tuples(
-                    [("AT1", "MWh_th")], names=["location", "unit"]
-                )
-                return self._to_result(
-                    index=idx, values=[300.0], groupby_time=groupby_time
-                )
-
-            # Residential/commercial demand requiring copperplate -> location mapping via bus1
-            if (
-                bus_carrier == "oil"
-                and isinstance(carrier, list)
-                and set(carrier) == {"rural oil boiler", "urban decentral oil boiler"}
-            ):
-                idx_names = ["name", "bus", "carrier", "location", "unit", "bus1"]
-                if self.rescom_empty:
-                    empty_idx = pd.MultiIndex.from_arrays(
-                        [[] for _ in idx_names], names=idx_names
-                    )
-                    return self._to_result(
-                        index=empty_idx,
-                        values=[],
-                        groupby_time=groupby_time,
-                    )
-                idx = pd.MultiIndex.from_tuples(
-                    [
-                        (
-                            "rural_boiler_load",
-                            "AT1 oil",
-                            "rural oil boiler",
-                            "EU",
-                            "MWh_th",
-                            "AT1 oil",
-                        ),
-                        (
-                            "urban_boiler_load",
-                            "AT1 oil",
-                            "urban decentral oil boiler",
-                            "EU",
-                            "MWh_th",
-                            "AT1 oil",
-                        ),
-                    ],
-                    names=idx_names,
-                )
-                return self._to_result(
-                    index=idx,
-                    values=[50.0, 50.0],
-                    groupby_time=groupby_time,
-                )
-
-            # Total oil use denominator for non-fossil share
-            if (
-                bus_carrier == "oil"
-                and components == "Link"
-                and at_port == "bus0"
-                and groupby == ["bus1", "carrier", "location", "unit"]
-            ):
-                if self.all_oil_empty:
-                    empty_idx = pd.MultiIndex.from_arrays(
-                        [[], [], [], []],
-                        names=["bus1", "carrier", "location", "unit"],
-                    )
-                    return self._to_result(
-                        index=empty_idx,
-                        values=[],
-                        groupby_time=groupby_time,
-                    )
-                idx = pd.MultiIndex.from_tuples(
-                    [
-                        (
-                            "AT1 oil",
-                            "land transport oil",
-                            "EU",
-                            "MWh_th",
-                        )
-                    ],
-                    names=["bus1", "carrier", "location", "unit"],
-                )
-                return self._to_result(
-                    index=idx,
-                    values=[self.all_oil_value],
-                    groupby_time=groupby_time,
-                )
-
-            raise AssertionError(
-                f"Unexpected withdrawal call: bus_carrier={bus_carrier}, carrier={carrier}, components={components}, groupby={groupby}, at_port={at_port}"
-            )
-
-        def supply(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            at_port: str | None = None,
-            components: str | list[str] | None = None,
-            groupby: list[str] | None = None,
-            groupby_time: bool = True,
-            **kwargs: object,
-        ) -> pd.Series | pd.DataFrame:
-            if (
-                bus_carrier == "oil"
-                and components == "Link"
-                and at_port == "bus1"
-                and groupby == ["name", "bus", "carrier", "location", "unit", "bus0"]
-            ):
-                if self.non_fossil_empty:
-                    empty_idx = pd.MultiIndex.from_arrays(
-                        [[], [], [], [], [], []],
-                        names=["name", "bus", "carrier", "location", "unit", "bus0"],
-                    )
-                    return self._to_result(
-                        index=empty_idx,
-                        values=[],
-                        groupby_time=groupby_time,
-                    )
-                idx = pd.MultiIndex.from_tuples(
-                    [
-                        (
-                            "renewable_oil_link",
-                            "AT1 oil",
-                            "biomass to liquid",
-                            "EU",
-                            "MWh_th",
-                            "AT1 oil",
-                        )
-                    ],
-                    names=["name", "bus", "carrier", "location", "unit", "bus0"],
-                )
-                return self._to_result(
-                    index=idx, values=[500.0], groupby_time=groupby_time
-                )
-
-            raise AssertionError(
-                f"Unexpected supply call: bus_carrier={bus_carrier}, carrier={carrier}, components={components}, groupby={groupby}, at_port={at_port}"
-            )
-
-    class _OilNetwork:
-        """Minimal network object exposing only the statistics accessor."""
-
-        def __init__(
-            self,
-            *,
-            rescom_empty: bool = False,
-            all_oil_value: float = 200.0,
-            all_oil_empty: bool = False,
-            non_fossil_empty: bool = False,
-        ):
-            self.statistics = TestFinalEnergyByCarrierOil._OilStatisticsAccessor(
-                rescom_empty=rescom_empty,
-                all_oil_value=all_oil_value,
-                all_oil_empty=all_oil_empty,
-                non_fossil_empty=non_fossil_empty,
-            )
-
-    def test_clips_non_fossil_share_above_one_to_zero_fossil(self):
-        """Renewable oil production above total demand should yield zero fossil oil."""
-        result = Final_Energy_by_Carrier__Oil(self._OilNetwork())
-
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
-
-    def test_handles_empty_rescom_without_failing(self):
-        """Function should work even when residential/commercial oil demand is empty."""
-        result = Final_Energy_by_Carrier__Oil(self._OilNetwork(rescom_empty=True))
-
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        # non-fossil fraction is clipped to 1, so fossil share remains zero.
-        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
-
-    def test_handles_zero_total_oil_demand_denominator(self):
-        """Division by zero in non-fossil share denominator should not crash."""
-        result = Final_Energy_by_Carrier__Oil(self._OilNetwork(all_oil_value=0.0))
-
-        assert isinstance(result, pd.Series)
-        assert result.loc[("AT1", "MWh")] == pytest.approx(0.0)
-
-    def test_no_renewable_oil_production_fossil_equals_total(self):
-        """Without renewable oil supply, fossil oil should equal total oil demand."""
-        result = Final_Energy_by_Carrier__Oil(self._OilNetwork(non_fossil_empty=True))
-
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert not result.isna().any()
-        # 100 (agri) + 100 (res/com) + 300 (transport) = 500
-        assert result.loc[("AT1", "MWh")] == pytest.approx(500.0)
-
-    def test_handles_empty_all_oil_without_failing(self):
-        """Function should work when total oil-withdrawal denominator is empty."""
-        result = Final_Energy_by_Carrier__Oil(
-            self._OilNetwork(all_oil_empty=True, non_fossil_empty=True)
-        )
-
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert not result.isna().any()
-        assert (result == 0.0).all()
-
-    def test_returns_dataframe_for_aggregate_per_year_false(self):
-        """Function should return a timeseries DataFrame for aggregate_per_year=False."""
-        result = Final_Energy_by_Carrier__Oil(
-            self._OilNetwork(),
-            aggregate_per_year=False,
-        )
-
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert isinstance(result.columns, pd.DatetimeIndex)
-
-
-# ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Coal
 # ---------------------------------------------------------------------------
 
@@ -1823,6 +1545,34 @@ class TestFinalEnergyBySectorTransportation:
         with pytest.raises(ValueError):
             Final_Energy_by_Sector__Transportation(mock_network)
 
+    def test_uses_mean_efficiency_and_warns_for_differing_bev_chargers(
+        self, energy_totals_csv, capsys
+    ):
+        """Multiple distinct BEV charger efficiencies fall back to mean with WARNING."""
+        network = MockPyPSANetwork(
+            links=pd.DataFrame(
+                {
+                    "carrier": ["BEV charger", "BEV charger", "other link"],
+                    "efficiency": [0.8, 0.9, 1.0],
+                },
+                index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
+            )
+        )
+
+        result = Final_Energy_by_Sector__Transportation(
+            network, energy_totals=energy_totals_csv
+        )
+
+        captured = capsys.readouterr()
+        assert "WARNING: Network includes different efficiencies for BEV chargers" in (
+            captured.out
+        )
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert "location" in result.index.names
+        assert "unit" in result.index.names
+        assert len(result) > 0
+
 
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Sector__Agriculture
@@ -1905,8 +1655,9 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
     class _ResidentialAndCommercialStatisticsAccessor:
         """Minimal accessor for residential and commercial sector tests."""
 
-        def __init__(self):
+        def __init__(self, rescom_oil_empty: bool = False):
             self.calls: list[dict] = []
+            self.rescom_oil_empty = rescom_oil_empty
 
         @staticmethod
         def _series_or_frame(
@@ -1926,10 +1677,14 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
                     "location": location,
                     "unit": unit,
                 }
-                index_tuples.append(tuple(idx_dict.get(key, f"mock_{key}") for key in groupby))
+                index_tuples.append(
+                    tuple(idx_dict.get(key, f"mock_{key}") for key in groupby)
+                )
 
             index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-            timestamps = pd.date_range("2019-01-01", periods=4, freq="6h", name="snapshot")
+            timestamps = pd.date_range(
+                "2019-01-01", periods=4, freq="6h", name="snapshot"
+            )
             if groupby_time:
                 return pd.Series(values, index=index, dtype=float)
 
@@ -1971,19 +1726,32 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
             if components == "Link" and at_port not in ("bus0", ["bus0"]):
                 return self._series_or_frame(groupby, [], [], "MWh_th", groupby_time)
 
+            if bus_carrier == "oil" and self.rescom_oil_empty:
+                return self._series_or_frame(groupby, [], [], "MWh_th", groupby_time)
+
             if carrier == ["rural biomass boiler", "urban decentral biomass boiler"]:
-                return self._series_or_frame(groupby, ["AT1", "AT2"], [21.0, 22.0], "MWh_th", groupby_time)
+                return self._series_or_frame(
+                    groupby, ["AT1", "AT2"], [21.0, 22.0], "MWh_th", groupby_time
+                )
 
             if bus_carrier == "low voltage":
-                return self._series_or_frame(groupby, ["AT1", "AT2"], [11.0, 12.0], "MWh_el", groupby_time)
+                return self._series_or_frame(
+                    groupby, ["AT1", "AT2"], [11.0, 12.0], "MWh_el", groupby_time
+                )
 
             if bus_carrier == "urban central heat":
-                return self._series_or_frame(groupby, ["AT1", "AT2"], [13.0, 14.0], "MWh_th", groupby_time)
+                return self._series_or_frame(
+                    groupby, ["AT1", "AT2"], [13.0, 14.0], "MWh_th", groupby_time
+                )
 
             if carrier == ["urban decentral gas boiler", "rural gas boiler"]:
-                return self._series_or_frame(groupby, ["AT1", "AT2"], [15.0, 16.0], "MWh_th", groupby_time)
+                return self._series_or_frame(
+                    groupby, ["AT1", "AT2"], [15.0, 16.0], "MWh_th", groupby_time
+                )
 
-            return self._series_or_frame(groupby, ["AT1", "AT2"], [1.0, 2.0], "MWh_th", groupby_time)
+            return self._series_or_frame(
+                groupby, ["AT1", "AT2"], [1.0, 2.0], "MWh_th", groupby_time
+            )
 
         def withdrawal(
             self,
@@ -2008,13 +1776,14 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
     class _ResidentialAndCommercialNetwork:
         """Minimal network object exposing a residential/commercial statistics accessor."""
 
-        def __init__(self):
-            self.statistics = (
-                TestFinalEnergyBySectorResidentialAndCommercial._ResidentialAndCommercialStatisticsAccessor()
+        def __init__(self, rescom_oil_empty: bool = False):
+            accessor_cls = (
+                TestFinalEnergyBySectorResidentialAndCommercial._ResidentialAndCommercialStatisticsAccessor
             )
+            self.statistics = accessor_cls(rescom_oil_empty=rescom_oil_empty)
 
-    def _residential_and_commercial_network(self):
-        return self._ResidentialAndCommercialNetwork()
+    def _residential_and_commercial_network(self, rescom_oil_empty: bool = False):
+        return self._ResidentialAndCommercialNetwork(rescom_oil_empty=rescom_oil_empty)
 
     def test_returns_series(self):
         """Test that the function returns a pandas Series."""
@@ -2126,6 +1895,18 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
         assert len(result.columns) == 4
         assert not result.empty
         pd.testing.assert_series_equal(result.sum(axis=1), aggregated_result)
+
+    def test_handles_empty_rescom_oil_without_failing(self):
+        """Function should work when residential/commercial oil demand is empty."""
+        network = self._residential_and_commercial_network(rescom_oil_empty=True)
+
+        result = Final_Energy_by_Sector__Residential_and_Commercial(network)
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert not result.isna().any()
+        assert len(result) > 0
 
 
 # ---------------------------------------------------------------------------

@@ -686,6 +686,10 @@ class Network_Processor:
             )
 
         target_unit = match.iloc[0][unit_col]
+        if pd.isna(target_unit):
+            raise KeyError(
+                f"Unit information not found for variable '{variable}' in common definitions."
+            )
         if ("[" in target_unit) and ("]" in target_unit) and ("," in target_unit):
             print(
                 "Several possible units defined for variable '{variable}' in common definitions. Take first one:".format(
@@ -702,10 +706,6 @@ class Network_Processor:
                     f"WARNING: Failed to parse multiple units for variable '{variable}': {exc}. Using TJ as unit."
                 )
                 target_unit = "TJ"
-        if pd.isna(target_unit):
-            raise KeyError(
-                f"Unit information not found for variable '{variable}' in common definitions."
-            )
         return str(target_unit)
 
     def _get_network_config(self, investment_year):

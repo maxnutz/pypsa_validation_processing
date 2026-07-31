@@ -114,6 +114,72 @@ class TestGetUnitFromCommonDefinitions:
         with pytest.raises(KeyError, match="not defined"):
             processor._get_unit_from_common_definitions("B")
 
+    def test_warns_and_uses_first_match_for_multiple_definitions(
+        self, processor: Network_Processor, capsys
+    ):
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A", "A"], "unit": ["EJ/yr", "TWh/yr"]}
+        )
+        assert processor._get_unit_from_common_definitions("A") == "EJ/yr"
+        captured = capsys.readouterr()
+        assert "WARNING: Multiple definitions found for variable" in captured.out
+
+    def test_raises_runtime_error_when_common_dsd_not_initialized(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = None
+        with pytest.raises(RuntimeError, match="not initialized"):
+            processor._get_unit_from_common_definitions("A")
+
+    def test_raises_keyerror_when_variable_column_missing(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"unit": ["EJ/yr"]}
+        )
+        with pytest.raises(KeyError, match="Variable column not found"):
+            processor._get_unit_from_common_definitions("A")
+
+    def test_raises_keyerror_when_unit_column_missing(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"]}
+        )
+        with pytest.raises(KeyError, match="Unit column not found"):
+            processor._get_unit_from_common_definitions("A")
+
+    def test_parses_first_unit_from_multi_unit_bracket_string(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": ["['GWh', 'TJ']"]}
+        )
+        assert processor._get_unit_from_common_definitions("A") == "GWh"
+
+    def test_falls_back_to_tj_for_malformed_multi_unit_string(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": ["[TJ, GWh]"]}
+        )
+        assert processor._get_unit_from_common_definitions("A") == "TJ"
+
+    def test_raises_keyerror_for_nan_unit(self, processor: Network_Processor):
+        """The NaN check runs before the bracket-parsing check, so a NaN unit
+        raises the documented KeyError rather than TypeError."""
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": [float("nan")]}
+        )
+        with pytest.raises(KeyError, match="Unit information not found"):
+            processor._get_unit_from_common_definitions("A")
+
 
 class TestConvertUnitsToCommonDefinitions:
     """Tests for _convert_units_to_common_definitions()."""
@@ -156,6 +222,32 @@ class TestConvertUnitsToCommonDefinitions:
 
         converted = processor._convert_units_to_common_definitions(iam_df)
         assert converted.unit == ["TWh/yr"]
+
+    def test_raises_value_error_when_no_unit_found_for_variable(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        iam_df = MagicMock()
+        iam_df.variable = ["A"]
+        var_df = MagicMock()
+        var_df.unit = []
+        iam_df.filter.return_value = var_df
+
+        with pytest.raises(ValueError, match="No unit found for variable"):
+            processor._convert_units_to_common_definitions(iam_df)
+
+    def test_raises_value_error_when_variable_has_multiple_units(
+        self, processor: Network_Processor
+    ):
+        processor.common_dsd = MagicMock()
+        iam_df = MagicMock()
+        iam_df.variable = ["A"]
+        var_df = MagicMock()
+        var_df.unit = ["EJ/yr", "TWh/yr"]
+        iam_df.filter.return_value = var_df
+
+        with pytest.raises(ValueError, match="multiple units"):
+            processor._convert_units_to_common_definitions(iam_df)
 
     def test_raises_runtime_error_for_missing_variable_definition(
         self, processor: Network_Processor

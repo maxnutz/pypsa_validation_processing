@@ -12,7 +12,7 @@ workflow_test = """python workflow.py --config pypsa_validation_processing/confi
                 python workflow.py --config pypsa_validation_processing/configs/config.region-timeseries.yaml&&
                 python workflow.py --config pypsa_validation_processing/configs/config.region-year.yaml&&
                 pytest tests/ -v"""
-test = "pytest tests/ -v"
+test = "pytest tests/ -v --cov=pypsa_validation_processing --cov-report=term-missing --cov-fail-under=90"
 
 [dependencies]
 python = ">=3.11"

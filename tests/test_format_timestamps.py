@@ -110,6 +110,26 @@ def test_format_timestamps_sets_nat_on_localization_failure(capsys):
     assert "WARNING: format_timestamps: failed to localize column" in captured.out
 
 
+def test_format_timestamps_falls_back_when_mixed_format_raises_typeerror():
+    real_to_datetime = pd.to_datetime
+
+    def fake_to_datetime(cols, errors=None, format=None):
+        if format == "mixed":
+            raise TypeError("format='mixed' not supported")
+        return real_to_datetime(cols, errors=errors)
+
+    df = pd.DataFrame([[1.0]], columns=["2050-01-01 00:00:00"])
+
+    with patch(
+        "pypsa_validation_processing.class_definitions.pd.to_datetime",
+        side_effect=fake_to_datetime,
+    ):
+        out = format_timestamps(df)
+
+    assert out.columns[0].year == 2050
+    assert out.columns[0].utcoffset() == datetime.timedelta(hours=0)
+
+
 def test_structure_pyam_from_pandas_formats_time_columns_before_pyam(tmp_path: Path):
     processor = _make_processor(tmp_path)
     processor.aggregation_level = "country"
