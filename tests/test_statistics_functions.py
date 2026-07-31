@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -1546,7 +1548,7 @@ class TestFinalEnergyBySectorTransportation:
             Final_Energy_by_Sector__Transportation(mock_network)
 
     def test_uses_mean_efficiency_and_warns_for_differing_bev_chargers(
-        self, energy_totals_csv, capsys
+        self, energy_totals_csv, caplog
     ):
         """Multiple distinct BEV charger efficiencies fall back to mean with WARNING."""
         network = MockPyPSANetwork(
@@ -1559,13 +1561,14 @@ class TestFinalEnergyBySectorTransportation:
             )
         )
 
-        result = Final_Energy_by_Sector__Transportation(
-            network, energy_totals=energy_totals_csv
-        )
+        with caplog.at_level(logging.WARNING):
+            result = Final_Energy_by_Sector__Transportation(
+                network, energy_totals=energy_totals_csv
+            )
 
-        captured = capsys.readouterr()
-        assert "WARNING: Network includes different efficiencies for BEV chargers" in (
-            captured.out
+        assert any(
+            "Network includes different efficiencies for BEV chargers" in record.message
+            for record in caplog.records
         )
         assert isinstance(result, pd.Series)
         assert isinstance(result.index, pd.MultiIndex)
