@@ -56,6 +56,12 @@ Additional optional parameters can be added when a variable needs them, e.g. `co
 
 `configs/mapping.default.yaml` maps each IAMC variable name to its corresponding function name in `statistics_functions.py`. At runtime, `Network_Processor` looks up the function for each defined variable via this mapping. Variables without a mapping entry are silently skipped.
 
+## Logging
+
+- Use the standard library `logging` module.
+- Each module gets its own `logger = logging.getLogger(__name__)` near the top of the file.
+- `pypsa_validation_processing/workflow.py::main()` configures logging once via `utils.setup_logging()`; statistics functions and helpers must not call it themselves.
+
 ## Testing
 
 - Tests live only in `tests/` — see the [testing README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md).
