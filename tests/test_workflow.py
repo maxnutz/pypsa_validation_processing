@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import runpy
@@ -116,6 +117,31 @@ class TestBuildParser:
         args = parser.parse_args(["--config", "/path/to/config.yaml"])
         assert args.config == "/path/to/config.yaml"
 
+    def test_parser_has_log_level_argument(self):
+        """Test that parser has --log-level argument."""
+        parser = build_parser()
+        args = parser.parse_args(["--log-level", "INFO"])
+        assert args.log_level == "INFO"
+
+    def test_parser_log_level_defaults_to_warning(self):
+        """Test that --log-level defaults to WARNING."""
+        parser = build_parser()
+        args = parser.parse_args([])
+        assert args.log_level == "WARNING"
+
+    def test_parser_log_level_accepts_all_documented_choices(self):
+        """Test that --log-level accepts each of its documented choices."""
+        parser = build_parser()
+        for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            args = parser.parse_args(["--log-level", level])
+            assert args.log_level == level
+
+    def test_parser_log_level_rejects_invalid_choice(self):
+        """Test that an unsupported --log-level value raises an error."""
+        parser = build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--log-level", "TRACE"])
+
 
 # ---------------------------------------------------------------------------
 # Tests for main workflow
@@ -150,6 +176,78 @@ class TestMainWorkflow:
                         except (SystemExit, FileNotFoundError):
                             # Expected if config doesn't exist
                             pass
+
+    @patch("pypsa_validation_processing.workflow.Network_Processor")
+    def test_main_passes_log_level_to_setup_logging(
+        self, mock_processor_class, tmp_path: Path
+    ):
+        """Test that main() configures logging with the parsed --log-level."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config\n")
+        mock_processor_class.return_value = MagicMock()
+
+        from pypsa_validation_processing.workflow import main
+
+        with patch.object(
+            sys,
+            "argv",
+            ["workflow.py", "--config", str(config_file), "--log-level", "ERROR"],
+        ):
+            with patch(
+                "pypsa_validation_processing.workflow.setup_logging"
+            ) as mock_setup_logging:
+                main()
+
+        mock_setup_logging.assert_called_once_with(level="ERROR")
+
+    @patch("pypsa_validation_processing.workflow.Network_Processor")
+    def test_main_logs_warning_when_log_level_is_debug(
+        self, mock_processor_class, tmp_path: Path, caplog
+    ):
+        """Test that main() logs a WARNING hint when --log-level is DEBUG."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config\n")
+        mock_processor_class.return_value = MagicMock()
+
+        from pypsa_validation_processing.workflow import main
+
+        with patch.object(
+            sys,
+            "argv",
+            ["workflow.py", "--config", str(config_file), "--log-level", "DEBUG"],
+        ):
+            with caplog.at_level(logging.WARNING):
+                main()
+
+        assert any(
+            record.levelno == logging.WARNING
+            and "Importing pypsa-Network" in record.message
+            for record in caplog.records
+        )
+
+    @pytest.mark.parametrize("log_level", ["INFO", "WARNING", "ERROR", "CRITICAL"])
+    @patch("pypsa_validation_processing.workflow.Network_Processor")
+    def test_main_skips_warning_hint_for_non_debug_log_level(
+        self, mock_processor_class, log_level: str, tmp_path: Path, caplog
+    ):
+        """Test that main() does not log the WARNING-specific hint for other levels."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config\n")
+        mock_processor_class.return_value = MagicMock()
+
+        from pypsa_validation_processing.workflow import main
+
+        with patch.object(
+            sys,
+            "argv",
+            ["workflow.py", "--config", str(config_file), "--log-level", log_level],
+        ):
+            with caplog.at_level(logging.DEBUG):
+                main()
+
+        assert not any(
+            "Importing pypsa-Network" in record.message for record in caplog.records
+        )
 
 
 # ---------------------------------------------------------------------------

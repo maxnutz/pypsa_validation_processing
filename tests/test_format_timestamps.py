@@ -113,6 +113,11 @@ def test_format_timestamps_sets_nat_on_localization_failure(caplog):
         and "format_timestamps: failed to localize column" in record.message
         for record in caplog.records
     )
+    assert any(
+        record.levelno == logging.WARNING
+        and "columns set to NaT" in record.message
+        for record in caplog.records
+    )
 
 
 def test_format_timestamps_falls_back_when_mixed_format_raises_typeerror():
