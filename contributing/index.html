@@ -732,6 +732,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -909,6 +920,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1009,6 +1031,12 @@
 </ul>
 <h3 id="mapping-file">Mapping file</h3>
 <p><code>configs/mapping.default.yaml</code> maps each IAMC variable name to its corresponding function name in <code>statistics_functions.py</code>. At runtime, <code>Network_Processor</code> looks up the function for each defined variable via this mapping. Variables without a mapping entry are silently skipped.</p>
+<h2 id="logging">Logging</h2>
+<ul>
+<li>Use the standard library <code>logging</code> module.</li>
+<li>Each module gets its own <code>logger = logging.getLogger(__name__)</code> near the top of the file.</li>
+<li><code>pypsa_validation_processing/workflow.py::main()</code> configures logging once via <code>utils.setup_logging()</code>; statistics functions and helpers must not call it themselves.</li>
+</ul>
 <h2 id="testing">Testing</h2>
 <ul>
 <li>Tests live only in <code>tests/</code> — see the <a href="https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md">testing README</a>.</li>

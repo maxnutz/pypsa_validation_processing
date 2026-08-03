@@ -1293,7 +1293,7 @@ yearly aggregated data, columns are converted to integers.</p>
   <summary>Notes</summary>
   <p>Columns that cannot be parsed as timestamps are left unchanged. Values
 that can be parsed but cannot be localized are replaced with <code>pd.NaT</code>
-and reported via <code>print</code> warnings.
+and reported via logger warnings.
 Yearly aggregated data is identified by all column labels being
 4-digit year strings only. In this case, the columns are converted to
 integers. For non-aggregated data, columns are converted to Python
