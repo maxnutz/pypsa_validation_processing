@@ -186,7 +186,7 @@ At runtime, `Network_Processor` reads this mapping, looks up the function for ea
 To register a new variable, please first open a new Issue and select Issue Template "New Variable Statistics". In this issue, the following steps are prepared: 
 - Create a new branch linked to the respective issue
 - Write your pypsa-statistics and add it as a separate function to [statistics_functions.py](https://github.com/maxnutz/pypsa_validation_processing/blob/main/pypsa_validation_processing/statistics_functions.py) (please note the [naming and structural conventions](https://github.com/maxnutz/pypsa_validation_processing/tree/main#variables-statistics---functions)!)
-- add a comprehensive docstring to your function and implement loggings
+- add a comprehensive docstring to your function and add appropriate logging
 - add the mapping variable_name <> function_name to [mapping.default.yaml](https://github.com/maxnutz/pypsa_validation_processing/blob/main/pypsa_validation_processing/configs/mapping.default.yaml) (and your personal mapping-file)
 - Add a testing routine for your Function to `tests/` - stick to the [testing-README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md)
 - make sure that the newest version of main is merged into your feature branch
