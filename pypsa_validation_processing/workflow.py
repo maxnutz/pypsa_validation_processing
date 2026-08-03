@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--log-level",
-        default="DEBUG",
+        default="WARNING",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level. Defaults to WARNING.",
     )
@@ -65,7 +65,7 @@ def main() -> None:
     args = build_parser().parse_args()
     setup_logging(level=args.log_level)
     if args.log_level == "DEBUG":
-        logger.info(
+        logger.warning(
             f"Importing pypsa-Network with logger level {args.log_level} prints several network tables."
         )
     config_path = resolve_config_path(args.config)
