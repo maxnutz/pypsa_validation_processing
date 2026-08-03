@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -115,15 +116,18 @@ class TestGetUnitFromCommonDefinitions:
             processor._get_unit_from_common_definitions("B")
 
     def test_warns_and_uses_first_match_for_multiple_definitions(
-        self, processor: Network_Processor, capsys
+        self, processor: Network_Processor, caplog
     ):
         processor.common_dsd = MagicMock()
         processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
             {"variable": ["A", "A"], "unit": ["EJ/yr", "TWh/yr"]}
         )
-        assert processor._get_unit_from_common_definitions("A") == "EJ/yr"
-        captured = capsys.readouterr()
-        assert "WARNING: Multiple definitions found for variable" in captured.out
+        with caplog.at_level(logging.WARNING):
+            assert processor._get_unit_from_common_definitions("A") == "EJ/yr"
+        assert any(
+            "Multiple definitions found for variable" in record.message
+            for record in caplog.records
+        )
 
     def test_raises_runtime_error_when_common_dsd_not_initialized(
         self, processor: Network_Processor

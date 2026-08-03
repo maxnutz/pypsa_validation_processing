@@ -1,5 +1,6 @@
 """Static information and general utility functions for pypsa_validation_processing."""
 
+import logging
 import pandas as pd
 from pathlib import Path
 
@@ -252,3 +253,16 @@ def create_location_index_from_copperplate(
     output = raw_input.copy()
     output.index = new_index
     return output
+
+
+def setup_logging(level: int | str = logging.WARNING) -> None:
+    """Configure root logging once for the package entrypoint.
+
+    Parameters
+    ----------
+    level : int or str, optional
+        Logging level to configure, by default ``logging.WARNING``.
+    """
+    logging.basicConfig(
+        level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )

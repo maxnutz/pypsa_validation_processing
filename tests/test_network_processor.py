@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -301,9 +302,9 @@ class TestNetworkProcessorFunctionExecution:
                 assert result is None
 
     def test_execute_function_warns_when_function_name_not_in_module(
-        self, mock_config_file: Path, capsys
+        self, mock_config_file: Path, caplog
     ):
-        """Test that a WARNING is printed and None returned for an unresolvable function name."""
+        """Test that a WARNING is logged and None returned for an unresolvable function name."""
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -316,14 +317,17 @@ class TestNetworkProcessorFunctionExecution:
                 }
 
                 mock_network = MockPyPSANetwork()
-                result = processor._execute_function_for_variable(
-                    "Bogus Variable", mock_network
-                )
+                with caplog.at_level(logging.WARNING):
+                    result = processor._execute_function_for_variable(
+                        "Bogus Variable", mock_network
+                    )
 
-                captured = capsys.readouterr()
                 assert result is None
-                assert "WARNING" in captured.out
-                assert "This_Function_Does_Not_Exist" in captured.out
+                assert any(
+                    record.levelno == logging.WARNING
+                    and "This_Function_Does_Not_Exist" in record.message
+                    for record in caplog.records
+                )
 
     def test_execute_function_passes_config_when_accepted(self, mock_config_file: Path):
         """Test that config is passed to functions that accept it."""
@@ -1578,7 +1582,7 @@ output_path: {tmp_path / 'output.xlsx'}
                 return Network_Processor(config_path=config_file)
 
     def test_warns_and_uses_first_of_multiple_matching_config_files(
-        self, tmp_path: Path, capsys
+        self, tmp_path: Path, caplog
     ):
         """Test that multiple matching config files trigger an INFO message and use the first."""
         processor = self._setup_processor(tmp_path)
@@ -1587,35 +1591,41 @@ output_path: {tmp_path / 'output.xlsx'}
         (configs_dir / "config_a_2020.yaml").write_text("foo: bar\n")
         (configs_dir / "config_b_2020.yaml").write_text("foo: baz\n")
 
-        result = processor._get_network_config(2020)
+        with caplog.at_level(logging.INFO):
+            result = processor._get_network_config(2020)
 
-        captured = capsys.readouterr()
-        assert "INFO: Multiple config files found" in captured.out
+        assert any(
+            "Multiple config files found" in record.message for record in caplog.records
+        )
         assert result is not None
 
-    def test_warns_and_returns_none_on_malformed_yaml(self, tmp_path: Path, capsys):
+    def test_warns_and_returns_none_on_malformed_yaml(self, tmp_path: Path, caplog):
         """Test that malformed YAML in the matched config file triggers a WARNING."""
         processor = self._setup_processor(tmp_path)
         configs_dir = processor.network_results_path / "configs"
         configs_dir.mkdir(parents=True, exist_ok=True)
         (configs_dir / "config_2020.yaml").write_text("foo: [unclosed\n")
 
-        result = processor._get_network_config(2020)
+        with caplog.at_level(logging.WARNING):
+            result = processor._get_network_config(2020)
 
-        captured = capsys.readouterr()
-        assert "WARNING: Could not load config file" in captured.out
+        assert any(
+            "Could not load config file" in record.message for record in caplog.records
+        )
         assert result is None
 
     def test_warns_and_returns_none_when_no_config_file_found(
-        self, tmp_path: Path, capsys
+        self, tmp_path: Path, caplog
     ):
         """Test that no matching config file triggers a WARNING and returns None."""
         processor = self._setup_processor(tmp_path)
 
-        result = processor._get_network_config(2020)
+        with caplog.at_level(logging.WARNING):
+            result = processor._get_network_config(2020)
 
-        captured = capsys.readouterr()
-        assert "WARNING: No config file found" in captured.out
+        assert any(
+            "No config file found" in record.message for record in caplog.records
+        )
         assert result is None
 
 

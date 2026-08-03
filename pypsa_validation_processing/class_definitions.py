@@ -3,6 +3,7 @@ import datetime
 import glob
 import importlib
 import inspect
+import logging
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,8 @@ from pypsa_validation_processing.utils import (
     REGION_MAPPING,
     UNITS_MAPPING,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
@@ -40,7 +43,7 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     -----
     Columns that cannot be parsed as timestamps are left unchanged. Values
     that can be parsed but cannot be localized are replaced with ``pd.NaT``
-    and reported via ``print`` warnings.
+    and reported via logger warnings.
     Yearly aggregated data is identified by all column labels being
     4-digit year strings only. In this case, the columns are converted to
     integers. For non-aggregated data, columns are converted to Python
@@ -87,9 +90,11 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
             try:
                 ts_tz = ts.tz_localize(fixed_tz)
             except (TypeError, ValueError) as exc:
-                print(
-                    f"WARNING: format_timestamps: failed to localize column {col!r}: {exc}. "
-                    "Setting label to pd.NaT"
+                logger.warning(
+                    "format_timestamps: failed to localize column %r: %s. "
+                    "Setting label to pd.NaT",
+                    col,
+                    exc,
                 )
                 ts_tz = pd.NaT
                 nat_list.append(col)
@@ -101,7 +106,7 @@ def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
         py_datetimes = pd.Index(cols, name=idx_name).to_pydatetime()
         df.columns = pd.Index(py_datetimes, dtype="object", name=idx_name)
     if nat_list:
-        print("WARNING: format_timestamps: columns set to NaT:", nat_list)
+        logger.warning("format_timestamps: columns set to NaT: %s", nat_list)
     return df
 
 
@@ -332,8 +337,10 @@ class Network_Processor:
         )
         func = getattr(stats_module, func_name, None)
         if func is None:
-            print(
-                f"WARNING: Variable {variable}: Function '{func_name}' not found in statistics_functions.py"
+            logger.warning(
+                "Variable %s: Function '%s' not found in statistics_functions.py",
+                variable,
+                func_name,
             )
             return None
 
@@ -663,7 +670,7 @@ class Network_Processor:
         -----
         If multiple units are defined for one variable (in one entry of this variable!),
         the first one of these variables is taken. If there are more then one definitions for
-        the searched variable, the first entry is taken and a warning is printed.
+        the searched variable, the first entry is taken and a warning is logged.
         """
         if self.common_dsd is None:
             raise RuntimeError("Common definitions are not initialized.")
@@ -681,8 +688,10 @@ class Network_Processor:
         if match.empty:
             raise KeyError(f"Variable '{variable}' not defined in common definitions.")
         if len(match) > 1:
-            print(
-                f"WARNING: Multiple definitions found for variable '{variable}' in common definitions. Take first one: {match.iloc[0]}"
+            logger.warning(
+                "Multiple definitions found for variable '%s' in common definitions. Take first one: %s",
+                variable,
+                match.iloc[0],
             )
 
         target_unit = match.iloc[0][unit_col]
@@ -691,19 +700,20 @@ class Network_Processor:
                 f"Unit information not found for variable '{variable}' in common definitions."
             )
         if ("[" in target_unit) and ("]" in target_unit) and ("," in target_unit):
-            print(
-                "Several possible units defined for variable '{variable}' in common definitions. Take first one:".format(
-                    variable=variable
-                )
+            logger.info(
+                "Several possible units defined for variable '%s' in common definitions. Take first one:",
+                variable,
             )
             try:
                 import ast
 
                 target_unit = ast.literal_eval(target_unit)[0]
-                print(target_unit)
+                logger.info(target_unit)
             except Exception as exc:
-                print(
-                    f"WARNING: Failed to parse multiple units for variable '{variable}': {exc}. Using TJ as unit."
+                logger.warning(
+                    "Failed to parse multiple units for variable '%s': %s. Using TJ as unit.",
+                    variable,
+                    exc,
                 )
                 target_unit = "TJ"
         return str(target_unit)
@@ -725,7 +735,7 @@ class Network_Processor:
         Notes
         -----
         The method searches for a YAML configuration file in the 'configs' subdirectory of the network. If multiple matching
-        files are found, it uses the first one and prints a warning. If no matching file is found, it prints a warning and returns None.
+        files are found, it uses the first one and logs a warning. If no matching file is found, it logs a warning and returns None.
         """
         config_pattern = str(
             self.network_results_path / "configs" / f"config*{investment_year}.yaml"
@@ -735,21 +745,23 @@ class Network_Processor:
         if matching_files:
             selected_config_file = matching_files[0]
             if len(matching_files) > 1:
-                print(
-                    f"INFO: Multiple config files found for investment year {investment_year}; "
-                    f"using '{selected_config_file}'"
+                logger.info(
+                    "Multiple config files found for investment year %s; using '%s'",
+                    investment_year,
+                    selected_config_file,
                 )
             try:
                 with open(selected_config_file, "r") as f:
                     network_config = yaml.safe_load(f)
             except Exception as exc:
-                print(
-                    f"WARNING: Could not load config file '{selected_config_file}': {exc}"
+                logger.warning(
+                    "Could not load config file '%s': %s", selected_config_file, exc
                 )
         else:
-            print(
-                f"WARNING: No config file found for investment year {investment_year} "
-                f"at pattern '{config_pattern}'"
+            logger.warning(
+                "No config file found for investment year %s at pattern '%s'",
+                investment_year,
+                config_pattern,
             )
         return network_config
 

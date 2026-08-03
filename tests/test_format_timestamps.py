@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -89,7 +90,7 @@ def test_format_timestamps_keeps_unparsable_columns():
         format_timestamps(df)
 
 
-def test_format_timestamps_sets_nat_on_localization_failure(capsys):
+def test_format_timestamps_sets_nat_on_localization_failure(caplog):
     class FakeTimestamp:
         tz = None
         tzinfo = None
@@ -99,15 +100,24 @@ def test_format_timestamps_sets_nat_on_localization_failure(capsys):
 
     df = pd.DataFrame([[1.0]], columns=["2050-01-01 00:00:00"])
 
-    with patch(
-        "pypsa_validation_processing.class_definitions.pd.to_datetime",
-        return_value=[FakeTimestamp()],
-    ):
-        out = format_timestamps(df)
+    with caplog.at_level(logging.WARNING):
+        with patch(
+            "pypsa_validation_processing.class_definitions.pd.to_datetime",
+            return_value=[FakeTimestamp()],
+        ):
+            out = format_timestamps(df)
 
-    captured = capsys.readouterr()
     assert pd.isna(out.columns[0])
-    assert "WARNING: format_timestamps: failed to localize column" in captured.out
+    assert any(
+        record.levelno == logging.WARNING
+        and "format_timestamps: failed to localize column" in record.message
+        for record in caplog.records
+    )
+    assert any(
+        record.levelno == logging.WARNING
+        and "columns set to NaT" in record.message
+        for record in caplog.records
+    )
 
 
 def test_format_timestamps_falls_back_when_mixed_format_raises_typeerror():
