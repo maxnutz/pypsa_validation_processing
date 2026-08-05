@@ -36,12 +36,14 @@ from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
     statistics_kwargs as kwargs,
     statistics_kwargs_for_imports as kwargs_imports,
+    statistics_grouping_index,
     UNITS_MAPPING,
     remap_unit_index,
 )
 from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
     create_location_index_from_copperplate,
+    trace_non_fossil_fraction,
 )
 
 logger = logging.getLogger(__name__)
@@ -691,6 +693,150 @@ def Final_Energy_by_Carrier__Natural_Gas(
     logger.debug(
         f"Final Energy by Carrier|Natural Gas finished. Resulting shape: {result.shape}. "
     )
+    return result
+
+
+def Net_Imports__Natural_Gas(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract net imports of fossil natural gas from a PyPSA Network.
+
+    Evaluation of imports is performed on regional level. Non-fossil gas (biogas,
+    BioSNG, Sabatier methane) is excluded: each pipeline flow is scaled by
+    the fossil share of the gas pool at its sending bus, traced through the
+    whole pipeline network (see ``trace_non_fossil_fraction``), before net
+    imports are computed.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), aggregate over all snapshots and return a
+        :class:`pandas.Series`. If ``False``, return a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Pandas Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
+        ``unit``.
+        Returns data at regional level as provided by the PyPSA network.
+        Country-level aggregation is handled by
+        Network_Processor._aggregate_to_country() if configured.
+
+    Notes
+    -----
+    pypsas transmission-statistics defaults at_port to ``all`` when bus_carrier is
+    specified. ``at_port`` needs to be specified for net transmission values.
+    The port specified sets the sign convention in the ``pd.concat`` statement.
+    The fossil/non-fossil split is computed at snapshot resolution for timeseries
+    and at yearly resolution for yearly aggregated data.
+    """
+    imports_raw = (
+        n.statistics.transmission(
+            bus_carrier="gas",
+            at_port="bus1",
+            groupby_time=aggregate_per_year,
+            **kwargs_imports,
+        )
+        .groupby(["bus0", "bus1", "unit"])
+        .sum()
+    )
+
+    # scale each pipeline flow by the fossil share of its sending bus, so
+    # only fossil natural gas is counted as a net import
+    non_fossil_fraction = trace_non_fossil_fraction(
+        n,
+        bus_carrier="gas",
+        pipeline_carriers=["gas pipeline", "gas pipeline new"],
+        non_fossil_carriers=[
+            "Sabatier",
+            "biogas to gas",
+            "biogas to gas CC",
+            "BioSNG",
+            "BioSNG CC",
+        ],
+        fossil_carriers=["lng gas", "pipeline gas", "production gas"],
+    )
+    fossil_share = 1 - non_fossil_fraction
+
+    # multiply with fraction of fossil gas at sending bus - depending on timely resolution
+    # each positive value has to be multiplied with the corresponding value of snapshot t and bus0
+    # each negative value has to be multiplied with the corresponding value of snapshot t and bus1
+
+    if isinstance(imports_raw, pd.DataFrame):
+        # prepare for concat afterwards
+        imports_long = (
+            imports_raw.stack(future_stack=True)
+            .rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
+            .reset_index()
+        )
+        # fossil_share_long = (
+        #     fossil_share.stack(future_stack=True)
+        #     .rename("fossil_fraction")
+        #     .rename_axis(index=["location", "snapshot"])
+        #     .reset_index()
+        # )
+
+        # # create lookup for in/out multiplication with fossil fraction
+        # lookup = fossil_share_long.set_index(["location", "snapshot"])[
+        #     "fossil_fraction"
+        # ]
+        # from_key = pd.MultiIndex.from_frame(imports_long[["location_from", "snapshot"]])
+        # to_key = pd.MultiIndex.from_frame(imports_long[["location_to", "snapshot"]])
+
+        # imports_long["fossil_share"] = np.where(
+        #     imports_long["value"] > 0,
+        #     lookup.reindex(from_key).to_numpy(),
+        #     lookup.reindex(to_key).to_numpy(),
+        # )
+        groupby_columns = ["location", "unit", "snapshot"]
+    else:
+        # prepare for concat afterwards
+        imports_long = (
+            imports_raw.rename("value")
+            .rename_axis(index=["location_from", "location_to", "unit"])
+            .reset_index()
+        )
+        # fossil_share_yearly = fossil_share.mean(axis=1)
+        # imports_long["fossil_share"] = np.where(
+        #     imports_long["value"] > 0,
+        #     imports_long["location_from"].map(fossil_share_yearly),
+        #     imports_long["location_to"].map(fossil_share_yearly),
+        # )
+        # imports_long["value"] = imports_long["value"] * imports_long["fossil_share"]
+
+        groupby_columns = ["location", "unit"]
+
+    net_imports = pd.concat(
+        [
+            imports_long.assign(
+                location=imports_long["location_to"], value=-imports_long["value"]
+            ),
+            imports_long.assign(
+                location=imports_long["location_from"], value=imports_long["value"]
+            ),
+        ],
+        ignore_index=True,
+    )
+    net_imports_grouped = net_imports.groupby(groupby_columns, sort=False)[
+        "value"
+    ].sum()
+    if isinstance(imports_raw, pd.DataFrame):
+        result = net_imports_grouped.unstack("snapshot")
+    else:
+        result = net_imports_grouped
+    logger.debug(
+        f"Net Imports|Natural Gas finished. Resulting shape: {net_imports_grouped.shape}. "
+    )
+    index = result.index.to_frame()
+    index.location = index.location.apply(lambda x: x.split(" ")[0])
+    result.index = pd.MultiIndex.from_frame(index)
+    logger.debug(f"Net Imports|Natural Gas finished. Resulting shape: {result.shape}. ")
     return result
 
 
