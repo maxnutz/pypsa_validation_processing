@@ -1,7 +1,10 @@
 """Static information and general utility functions for pypsa_validation_processing."""
 
+from __future__ import annotations
 import logging
+import numpy as np
 import pandas as pd
+import pypsa
 from pathlib import Path
 
 EU27_COUNTRY_CODES: dict[str, str] = {
@@ -253,6 +256,148 @@ def create_location_index_from_copperplate(
     output = raw_input.copy()
     output.index = new_index
     return output
+
+
+def trace_non_fossil_fraction(
+    n: pypsa.Network,
+    bus_carrier: str,
+    pipeline_carriers: list[str],
+    non_fossil_carriers: list[str],
+    fossil_carriers: list[str],
+) -> pd.DataFrame:
+    """Trace the non-fossil content share of a piped bus_carrier pool.
+
+    Uses the proportional-sharing flow-tracing principle: at every snapshot
+    a bus's pool (local non-fossil and fossil supply, plus pipeline inflows
+    weighted by the sending bus's own share) is assumed well-mixed, so all
+    outflows from a bus carry the same non-fossil fraction. The resulting
+    per-snapshot linear system is solved directly, which correctly handles
+    cyclic/mesh pipeline topologies (e.g. a bus with two-way pipelines to
+    several neighbours).
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    bus_carrier : str
+        Bus carrier of the piped network, e.g. ``"gas"``.
+    pipeline_carriers : list of str
+        Link carriers that form the piped network's edges.
+    non_fossil_carriers : list of str
+        Link carriers whose supply into the network counts as non-fossil - To NOT include
+        transmission pipelines but sector-coupling links!
+    fossil_carriers : list of str
+        Generator carriers whose supply into the network counts as fossil.
+
+    Returns
+    -------
+    pd.DataFrame
+        Non-fossil fraction indexed by ``bus``, with snapshots as columns.
+        Buses with zero total inflow at a snapshot are ``NaN``.
+
+    Notes
+    -----
+    Storage attached to the network (e.g. gas Stores) is not modelled as a
+    source; a bus discharging from storage with no other inflow at a given
+    snapshot is treated as having zero non-fossil content for that flow.
+    """
+    non_fossil_local = (
+        n.statistics.supply(
+            bus_carrier=bus_carrier,
+            carrier=non_fossil_carriers,  # sector-coupling links
+            components="Link",
+            at_port="bus1",
+            groupby=["bus", "unit"],
+            groupby_time=False,
+            nice_names=False,
+        )
+        .groupby("bus")
+        .sum()
+    )
+    fossil_local = (
+        n.statistics.supply(
+            bus_carrier=bus_carrier,
+            carrier=fossil_carriers,  # fossil generators
+            components="Generator",
+            groupby=["bus", "unit"],
+            groupby_time=False,
+            nice_names=False,
+        )
+        .groupby("bus")
+        .sum()
+    )
+    flows = (
+        n.statistics.transmission(
+            bus_carrier=bus_carrier,
+            carrier=pipeline_carriers,
+            at_port="bus1",
+            groupby=["bus0", "bus1", "unit"],
+            groupby_time=False,
+            nice_names=False,
+        )
+        .groupby(["bus0", "bus1"])
+        .sum()
+        .fillna(0.0)
+    )
+
+    buses = sorted(
+        set(non_fossil_local.index)
+        | set(fossil_local.index)
+        | set(flows.index.get_level_values("bus0"))
+        | set(flows.index.get_level_values("bus1"))
+    )
+    bus_pos = {bus: i for i, bus in enumerate(buses)}
+    n_buses = len(buses)
+
+    non_fossil_local = non_fossil_local.reindex(
+        index=buses, columns=n.snapshots, fill_value=0.0
+    ).to_numpy()
+    fossil_local = fossil_local.reindex(
+        index=buses, columns=n.snapshots, fill_value=0.0
+    ).to_numpy()
+    total_local = non_fossil_local + fossil_local
+
+    bus0_idx = flows.index.get_level_values("bus0").map(bus_pos).to_numpy(dtype=np.intp)
+    bus1_idx = flows.index.get_level_values("bus1").map(bus_pos).to_numpy(dtype=np.intp)
+    flow_values = flows.reindex(columns=n.snapshots, fill_value=0.0).to_numpy()
+
+    identity = np.eye(n_buses)
+    result = pd.DataFrame(index=buses, columns=n.snapshots, dtype=float)
+    for i, t in enumerate(n.snapshots):
+        forward = np.clip(flow_values[:, i], 0, None)  # flows bus0 -> bus 1
+        backward = np.clip(-flow_values[:, i], 0, None)  # reversed flows bus1 -> bus 0
+
+        # total values at time t
+        inflow = total_local[:, i].copy()  # prepare array holding total values
+        np.add.at(inflow, bus1_idx, forward)  # add inflows
+        np.add.at(inflow, bus0_idx, backward)  # add inflows from reversed
+
+        # gas flow allocation - total values from neighbour flows
+        allocation = np.zeros((n_buses, n_buses))
+        allocation[bus1_idx, bus0_idx] += forward  # rows where to | column where from
+        allocation[
+            bus0_idx, bus1_idx
+        ] += (
+            backward  # rows where to | columns where from - sign flipped at "backwards"
+        )
+
+        # get shares of arrivals from total bus production
+        valid = inflow > 0
+        allocation_shares = np.zeros((n_buses, n_buses))
+        allocation_shares[valid] = allocation[valid] / inflow[valid, None]  #
+
+        # get share of local non-fossil production to total inflow at bus
+        source = np.zeros(n_buses)
+        source[valid] = non_fossil_local[valid, i] / inflow[valid]
+
+        # assumtion: well-mixed pool assumption
+        # x[i] = source[i] + sum(allocation_shares[i,j] for all j) * x[j]
+        solved = np.linalg.solve(identity - allocation_shares, source)
+        fraction = np.full(n_buses, np.nan)
+        fraction[valid] = solved[valid]
+        result[t] = fraction
+
+    return result.clip(lower=0.0, upper=1.0)
 
 
 def setup_logging(level: int | str = logging.WARNING) -> None:
