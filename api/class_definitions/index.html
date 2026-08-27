@@ -957,6 +957,11 @@ NetworkCollection, and returns the results as a pyam.IamDataFrame.</p>
 <p>Outputs are converted to the units of common definitions, set in the
 definitions variable in <code>definitions_path</code> via
 :meth:<code>pyam.IamDataFrame.convert_unit</code> if <code>convert_units</code> is <code>True</code> in config.</p>
+<p>If <code>definitions_path</code> is set to <code>False</code> (as a YAML bool or the string
+<code>"False"</code>/<code>"false"</code>), definitions are disabled entirely: every
+variable in the mapping file (<code>mapping_path</code>) is evaluated regardless
+of whether it has a definitions-folder entry, and unit conversion is
+skipped.</p>
 
 
 
@@ -991,9 +996,10 @@ definitions variable in <code>definitions_path</code> via
     <div class="doc doc-contents ">
 
         <p>Calculate values for all defined variables.</p>
-<p>Iterates over all variables in <code>self.dsd</code>, calls
-:meth:<code>_execute_function_for_variable</code> for each one, and assembles
-the results.</p>
+<p>Iterates over all variables in <code>self.dsd</code> (or, when
+<code>self.use_definitions</code> is <code>False</code>, over every variable in
+<code>self.functions_dict</code>), calls :meth:<code>_execute_function_for_variable</code>
+for each one, and assembles the results.</p>
 <p>When <code>self.aggregate_per_year</code> is <code>True</code> (default), assembles a
 single :class:<code>pyam.IamDataFrame</code> with one column per investment year
 and stores it in <code>self.dsd_with_values</code>.</p>
