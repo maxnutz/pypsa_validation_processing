@@ -35,7 +35,7 @@ The file `config.default.yaml` provides a guideline for the two config sections 
 ```yaml
 # General section
 country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all"
-definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder
+definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder; set to False to evaluate all mapping-file variables and skip unit conversion
 convert_units: true       # convert output units to units from definitions_path
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
 output_path: resources            # path the outputfile should be written to
