@@ -18,6 +18,7 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Sector__Residential_and_Commercial,
     Final_Energy_by_Sector__Transportation,
     Net_Imports__Electricity,
+    Net_Imports__Natural_Gas,
     Net_Imports__Oil,
 )
 
@@ -551,6 +552,191 @@ class TestNetImportsOil:
         # The function should not raise and should return an empty Series.
         assert isinstance(result, pd.Series)
         assert result.empty
+
+
+# ---------------------------------------------------------------------------
+# Tests for Net_Imports__Natural_Gas
+# ---------------------------------------------------------------------------
+
+
+class TestNetImportsNaturalGas:
+    """Test suite for Net_Imports__Natural_Gas function."""
+
+    class _NaturalGasTradeStatisticsAccessor:
+        """Minimal accessor for gas net-import tests.
+
+        ``non_fossil_local``/``fossil_local`` model local production at each
+        bus (feeding trace_non_fossil_fraction), ``transmission_rows`` model
+        the pipeline network (used both for the direct net-import query and,
+        via the same underlying network, for the flow trace).
+        """
+
+        def __init__(
+            self,
+            non_fossil_local: dict[str, float],
+            fossil_local: dict[str, float],
+            transmission_rows: list[tuple[str, str, str, float]],
+            n_snapshots: int = 1,
+        ):
+            self.non_fossil_local = non_fossil_local
+            self.fossil_local = fossil_local
+            self.transmission_rows = transmission_rows
+            self.snapshots = pd.date_range(
+                "2019-01-01", periods=n_snapshots, freq="6h", name="snapshot"
+            )
+            self.calls: list[dict[str, object]] = []
+
+        def supply(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            components: str | list[str] | None = None,
+            at_port: str | None = None,
+            groupby: list[str] | None = None,
+            groupby_time: bool = True,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.DataFrame:
+            self.calls.append(
+                {
+                    "method": "supply",
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "components": components,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                }
+            )
+            source = (
+                self.non_fossil_local if components == "Link" else self.fossil_local
+            )
+            index = pd.MultiIndex.from_tuples(
+                [(bus, "MWh_LHV") for bus in source], names=["bus", "unit"]
+            )
+            data = {t: list(source.values()) for t in self.snapshots}
+            return pd.DataFrame(data, index=index)
+
+        def transmission(
+            self,
+            bus_carrier: str | None = None,
+            carrier: list[str] | str | None = None,
+            at_port: str | None = None,
+            groupby: list[str] | None = None,
+            groupby_time: bool = True,
+            nice_names: bool | None = None,
+            **_: object,
+        ) -> pd.Series | pd.DataFrame:
+            self.calls.append(
+                {
+                    "method": "transmission",
+                    "bus_carrier": bus_carrier,
+                    "carrier": carrier,
+                    "at_port": at_port,
+                    "groupby": groupby,
+                    "groupby_time": groupby_time,
+                }
+            )
+            index = pd.MultiIndex.from_tuples(
+                [(b0, b1, unit) for b0, b1, unit, _ in self.transmission_rows],
+                names=["bus0", "bus1", "unit"],
+            )
+            data = {
+                t: [value for *_, value in self.transmission_rows]
+                for t in self.snapshots
+            }
+            result = pd.DataFrame(data, index=index)
+            # mirror pypsa.statistics: truthy groupby_time collapses snapshots
+            # into a single aggregated Series, matching real accessor behavior
+            return result.sum(axis=1) if groupby_time else result
+
+    class _NaturalGasTradeNetwork:
+        """Minimal network exposing the custom gas trade accessor."""
+
+        def __init__(self, accessor):
+            self.statistics = accessor
+            self.snapshots = accessor.snapshots
+
+    def _gas_trade_network(
+        self,
+        non_fossil_local: dict[str, float],
+        fossil_local: dict[str, float],
+        transmission_rows: list[tuple[str, str, str, float]],
+        n_snapshots: int = 1,
+    ):
+        accessor = self._NaturalGasTradeStatisticsAccessor(
+            non_fossil_local, fossil_local, transmission_rows, n_snapshots
+        )
+        return self._NaturalGasTradeNetwork(accessor)
+
+    def test_negative_pypsa_value_yields_positive_import(self):
+        """pypsa.statistics.transmission(at_port="bus1") reports a receiving
+        bus's own inflow as a *negative* value (sign flipped relative to a
+        'positive = import' convention). Both buses are kept fully fossil
+        here so the fossil-share scaling is a no-op (factor 1) and cannot
+        mask a sign bug - this isolates the sign handling on its own,
+        independent of the fossil-share logic, so it stays valid for
+        refactoring either piece separately."""
+        network = self._gas_trade_network(
+            non_fossil_local={"DE gas": 0.0, "AT1 gas": 0.0},
+            fossil_local={"DE gas": 100.0, "AT1 gas": 100.0},
+            transmission_rows=[("DE gas", "AT1 gas", "MWh_LHV", -100.0)],
+        )
+        result = Net_Imports__Natural_Gas(network)
+
+        # raw pypsa value is negative -> AT1 (bus1) is the importer and must
+        # be positive; DE (bus0) is the exporter and must be negative.
+        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(100.0)
+        assert result.loc[("DE", "MWh_LHV")] == pytest.approx(-100.0)
+
+    def test_scales_import_by_fossil_share_of_sending_bus(self):
+        """Only the fossil share of the sending ('location_from') bus's gas
+        pool is counted as a net import - non-fossil gas is excluded."""
+        network = self._gas_trade_network(
+            non_fossil_local={"DE gas": 40.0, "AT1 gas": 0.0},
+            fossil_local={"DE gas": 60.0, "AT1 gas": 0.0},
+            transmission_rows=[("DE gas", "AT1 gas", "MWh_LHV", 100.0)],
+        )
+        result = Net_Imports__Natural_Gas(network)
+
+        assert isinstance(result, pd.Series)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        # DE is 60% fossil -> 100 * 0.6 = 60 fossil MWh imported by AT1
+        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(-60.0)
+        assert result.loc[("DE", "MWh_LHV")] == pytest.approx(60.0)
+
+    def test_fully_non_fossil_sender_yields_zero_import(self):
+        """A sending bus with 100% non-fossil local supply contributes zero
+        to fossil net imports, even though the raw pipeline flow is nonzero."""
+        network = self._gas_trade_network(
+            non_fossil_local={"DE gas": 100.0, "AT1 gas": 0.0},
+            fossil_local={"DE gas": 0.0, "AT1 gas": 0.0},
+            transmission_rows=[("DE gas", "AT1 gas", "MWh_LHV", 100.0)],
+        )
+        result = Net_Imports__Natural_Gas(network)
+        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(0.0)
+        assert result.loc[("DE", "MWh_LHV")] == pytest.approx(0.0)
+
+    def test_returns_dataframe_for_aggregate_per_year_false(self):
+        """aggregate_per_year=False returns a timeseries DataFrame consistent with the aggregate."""
+        network = self._gas_trade_network(
+            non_fossil_local={"DE gas": 40.0, "AT1 gas": 0.0},
+            fossil_local={"DE gas": 60.0, "AT1 gas": 0.0},
+            transmission_rows=[("DE gas", "AT1 gas", "MWh_LHV", 100.0)],
+            n_snapshots=2,
+        )
+
+        result = Net_Imports__Natural_Gas(network, aggregate_per_year=False)
+        aggregated = Net_Imports__Natural_Gas(network)
+
+        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.names == ["location", "unit"]
+        assert result.shape[1] == 2
+        pd.testing.assert_series_equal(
+            result.sum(axis=1), aggregated, check_names=False
+        )
+        assert result.loc[("AT1", "MWh_LHV")].iloc[0] == pytest.approx(-60.0)
 
 
 # ---------------------------------------------------------------------------

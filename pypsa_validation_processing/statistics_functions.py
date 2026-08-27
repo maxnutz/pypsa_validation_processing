@@ -734,6 +734,13 @@ def Net_Imports__Natural_Gas(
     The port specified sets the sign convention in the ``pd.concat`` statement.
     The fossil/non-fossil split is computed at snapshot resolution for timeseries
     and at yearly resolution for yearly aggregated data.
+
+    Warnings
+    ---------
+    Sign-convention for n.statistics.transmission: "the power p at bus1 of a branch
+    is positive if the branch is withdrawing power from bus1, and negative if the
+    branch is injecting into bus1.", means for ``at_port='bus1'`` the sign of the flow
+    needs to be flipped for bus ``location_from -> location_to``
     """
     imports_raw = (
         n.statistics.transmission(
@@ -775,25 +782,26 @@ def Net_Imports__Natural_Gas(
             .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
             .reset_index()
         )
-        # fossil_share_long = (
-        #     fossil_share.stack(future_stack=True)
-        #     .rename("fossil_fraction")
-        #     .rename_axis(index=["location", "snapshot"])
-        #     .reset_index()
-        # )
+        fossil_share_long = (
+            fossil_share.stack(future_stack=True)
+            .rename("fossil_fraction")
+            .rename_axis(index=["location", "snapshot"])
+            .reset_index()
+        )
 
-        # # create lookup for in/out multiplication with fossil fraction
-        # lookup = fossil_share_long.set_index(["location", "snapshot"])[
-        #     "fossil_fraction"
-        # ]
-        # from_key = pd.MultiIndex.from_frame(imports_long[["location_from", "snapshot"]])
-        # to_key = pd.MultiIndex.from_frame(imports_long[["location_to", "snapshot"]])
+        # create lookup for in/out multiplication with fossil fraction
+        lookup = fossil_share_long.set_index(["location", "snapshot"])[
+            "fossil_fraction"
+        ]
+        from_key = pd.MultiIndex.from_frame(imports_long[["location_from", "snapshot"]])
+        to_key = pd.MultiIndex.from_frame(imports_long[["location_to", "snapshot"]])
 
-        # imports_long["fossil_share"] = np.where(
-        #     imports_long["value"] > 0,
-        #     lookup.reindex(from_key).to_numpy(),
-        #     lookup.reindex(to_key).to_numpy(),
-        # )
+        imports_long["fossil_share"] = np.where(
+            imports_long["value"] > 0,
+            lookup.reindex(from_key).to_numpy(),
+            lookup.reindex(to_key).to_numpy(),
+        )
+        imports_long["value"] *= imports_long["fossil_share"]
         groupby_columns = ["location", "unit", "snapshot"]
     else:
         # prepare for concat afterwards
@@ -802,16 +810,16 @@ def Net_Imports__Natural_Gas(
             .rename_axis(index=["location_from", "location_to", "unit"])
             .reset_index()
         )
-        # fossil_share_yearly = fossil_share.mean(axis=1)
-        # imports_long["fossil_share"] = np.where(
-        #     imports_long["value"] > 0,
-        #     imports_long["location_from"].map(fossil_share_yearly),
-        #     imports_long["location_to"].map(fossil_share_yearly),
-        # )
-        # imports_long["value"] = imports_long["value"] * imports_long["fossil_share"]
+        fossil_share_yearly = fossil_share.mean(axis=1)
+        imports_long["fossil_share"] = np.where(
+            imports_long["value"] > 0,
+            imports_long["location_from"].map(fossil_share_yearly),
+            imports_long["location_to"].map(fossil_share_yearly),
+        )
+        imports_long["value"] *= imports_long["fossil_share"]
 
         groupby_columns = ["location", "unit"]
-
+    # TODO: recheck sign convention for transmission direction
     net_imports = pd.concat(
         [
             imports_long.assign(
