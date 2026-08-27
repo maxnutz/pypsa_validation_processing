@@ -120,6 +120,12 @@ class Network_Processor:
     Outputs are converted to the units of common definitions, set in the
     definitions variable in ``definitions_path`` via
     :meth:`pyam.IamDataFrame.convert_unit` if ``convert_units`` is ``True`` in config.
+
+    If ``definitions_path`` is set to ``False`` (as a YAML bool or the string
+    ``"False"``/``"false"``), definitions are disabled entirely: every
+    variable in the mapping file (``mapping_path``) is evaluated regardless
+    of whether it has a definitions-folder entry, and unit conversion is
+    skipped.
     """
 
     def __init__(
@@ -141,10 +147,16 @@ class Network_Processor:
         settings such as mapping, aggregation, output, and unit conversion
         behavior.
 
+        ``definitions_path`` may also be set to ``False`` (YAML bool, or the
+        string ``"False"``/``"false"``) to disable definitions entirely: all
+        variables from the mapping file are evaluated and unit conversion is
+        skipped.
+
         Raises
         ------
         ValueError
-            If required configuration entries are missing or invalid.
+            If required configuration entries are missing or invalid, or if
+            ``definitions_path`` is unset/empty.
         FileNotFoundError
             If the configured network results or definitions directories do
             not exist.
@@ -165,20 +177,34 @@ class Network_Processor:
             )
 
         definitions_path = self.config.get("definitions_path", None)
-        if definitions_path is None:
+        is_empty = definitions_path is None or (
+            isinstance(definitions_path, str) and definitions_path.strip() == ""
+        )
+        if is_empty:
             raise ValueError(
-                f"'definition_path' not set in config at {self.config_path}"
-            )
-        self.definitions_path: Path = Path(definitions_path)
-        if not self.definitions_path.exists():
-            raise FileNotFoundError(
-                f"Definition folder does not exist: {self.definitions_path}"
+                f"'definitions_path' not set in config at {self.config_path}. "
+                "Set it to a valid definitions folder path, or to False to "
+                "evaluate all variables from the mapping file without unit "
+                "conversion."
             )
 
-        if self.config.get("convert_units", True):
+        self.use_definitions: bool = not self._is_definitions_disabled(definitions_path)
+
+        if self.use_definitions:
+            self.definitions_path: Path | None = Path(definitions_path)
+            if not self.definitions_path.exists():
+                raise FileNotFoundError(
+                    f"Definition folder does not exist: {self.definitions_path}"
+                )
+        else:
+            self.definitions_path = None
+
+        if self.use_definitions and self.config.get("convert_units", True):
             self.common_dsd: nomenclature.DataStructureDefinition | None = (
                 nomenclature.DataStructureDefinition(self.definitions_path)
             )
+        else:
+            self.common_dsd = None
 
         default_mappings_path = (
             Path(__file__).resolve().parent / "configs" / "mapping.default.yaml"
@@ -206,7 +232,9 @@ class Network_Processor:
         )
         self.country_path_token: str = self._sanitize_path_token(self.country)
         self.network_collection = self._read_pypsa_network_collection()
-        self.dsd: nomenclature.DataStructureDefinition = self.read_definitions()
+        self.dsd: nomenclature.DataStructureDefinition | None = (
+            self.read_definitions() if self.use_definitions else None
+        )
         self.functions_dict: dict[str, str | list] = self._read_mappings()
         self.aggregation_level: str = self.config.get("aggregation_level", "country")
         if self.aggregation_level not in ["country", "region"]:
@@ -256,7 +284,7 @@ class Network_Processor:
             f"  country: {self.country}\n"
             f"  aggregation_level: {self.aggregation_level}\n"
             f"  network_results_path: {self.network_results_path}\n"
-            f"  definitions_path: {self.definitions_path}\n"
+            f"  definitions_path: {self.definitions_path if self.use_definitions else 'False (all variables, no unit conversion)'}\n"
         )
 
     @staticmethod
@@ -267,6 +295,15 @@ class Network_Processor:
     def _is_valid_country_identifier(self, country: str) -> bool:
         """Check if country is a valid ISO code or the special value 'all'."""
         return country == "all" or country in EU27_COUNTRY_CODES
+
+    @staticmethod
+    def _is_definitions_disabled(value: object) -> bool:
+        """Check whether a definitions_path config value requests disabling definitions."""
+        if isinstance(value, bool):
+            return value is False
+        if isinstance(value, str):
+            return value.strip().lower() == "false"
+        return False
 
     def _read_config(self) -> dict:
         """Read and return the YAML configuration file."""
@@ -768,9 +805,10 @@ class Network_Processor:
     def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
 
-        Iterates over all variables in ``self.dsd``, calls
-        :meth:`_execute_function_for_variable` for each one, and assembles
-        the results.
+        Iterates over all variables in ``self.dsd`` (or, when
+        ``self.use_definitions`` is ``False``, over every variable in
+        ``self.functions_dict``), calls :meth:`_execute_function_for_variable`
+        for each one, and assembles the results.
 
         When ``self.aggregate_per_year`` is ``True`` (default), assembles a
         single :class:`pyam.IamDataFrame` with one column per investment year
@@ -798,8 +836,13 @@ class Network_Processor:
             investment_year = n.meta["wildcards"]["planning_horizons"]
             network_config = self._get_network_config(investment_year)
 
+            variables = (
+                self.dsd.variable.to_pandas()["variable"]
+                if self.use_definitions
+                else list(self.functions_dict.keys())
+            )
             results = []
-            for variable in self.dsd.variable.to_pandas()["variable"]:
+            for variable in variables:
                 result = self._execute_function_for_variable(
                     variable, n, config=network_config
                 )

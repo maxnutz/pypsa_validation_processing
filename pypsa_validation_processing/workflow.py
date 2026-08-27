@@ -71,7 +71,8 @@ def main() -> None:
     config_path = resolve_config_path(args.config)
 
     processor = Network_Processor(config_path=config_path)
-    processor.read_definitions()
+    if processor.use_definitions:
+        processor.read_definitions()
     processor.calculate_variables_values()
     processor.write_output_to_xlsx()
 
