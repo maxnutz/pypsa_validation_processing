@@ -96,6 +96,44 @@ class TestCommonDefinitionsConfiguration:
         assert processor.dsd is definitions_dsd
         assert mock_dsd.call_count == 2
 
+    def test_convert_units_false_leaves_common_dsd_none(self, tmp_path: Path):
+        """convert_units: false with a real definitions_path skips common_dsd init."""
+        config_path = _make_config(tmp_path, extra="convert_units: false\n")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_path)
+        assert processor.common_dsd is None
+
+    def test_definitions_disabled_overrides_convert_units_true(self, tmp_path: Path):
+        """definitions_path: False leaves common_dsd None even if convert_units is true."""
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True)
+        (nw_path / "dummy.nc").touch()
+        config_content = f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: False
+convert_units: true
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'output'}
+"""
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(config_content)
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            with patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ):
+                processor = Network_Processor(config_path=config_path)
+        assert processor.use_definitions is False
+        assert processor.common_dsd is None
+
 
 class TestGetUnitFromCommonDefinitions:
     """Tests for _get_unit_from_common_definitions()."""

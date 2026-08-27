@@ -149,8 +149,72 @@ network_results_path: {mock_network_results_path}
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        with pytest.raises(ValueError, match="definition_path"):
+        with pytest.raises(ValueError, match="definitions_path"):
             Network_Processor(config_path=config_file)
+
+    def test_init_empty_definitions_path_raises_value_error(
+        self, tmp_path: Path, mock_network_results_path: Path
+    ):
+        """Test that an empty-string definitions_path raises ValueError mentioning both options."""
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: ""
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(ValueError, match="definitions_path") as exc_info:
+            Network_Processor(config_path=config_file)
+        assert "False" in str(exc_info.value)
+
+    def test_init_definitions_path_false_bool_disables_definitions(
+        self, tmp_path: Path, mock_network_results_path: Path
+    ):
+        """Test that definitions_path: False (YAML bool) disables definitions."""
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: False
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            processor = Network_Processor(config_path=config_file)
+            assert processor.use_definitions is False
+            assert processor.dsd is None
+            assert processor.common_dsd is None
+            assert processor.definitions_path is None
+
+    def test_init_definitions_path_false_string_disables_definitions(
+        self, tmp_path: Path, mock_network_results_path: Path
+    ):
+        """Test that definitions_path: "False" (quoted string) disables definitions."""
+        config_content = f"""
+country: AT
+model_name: AT_KN2040
+scenario_name: test_scenario
+definitions_path: "False"
+network_results_path: {mock_network_results_path}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            processor = Network_Processor(config_path=config_file)
+            assert processor.use_definitions is False
+            assert processor.dsd is None
+            assert processor.common_dsd is None
+            assert processor.definitions_path is None
 
     def test_init_nonexistent_definitions_path_raises(
         self, tmp_path: Path, mock_network_results_path: Path
@@ -1734,3 +1798,38 @@ output_path: {tmp_path / 'output.xlsx'}
         assert "2020" in result.columns
         assert "2030" in result.columns
         assert len(result) == 1
+
+    def test_iterates_mapping_variables_when_definitions_disabled(self, tmp_path: Path):
+        """With use_definitions=False, iterate over functions_dict keys, not self.dsd."""
+        processor = self._setup_processor(tmp_path)
+        processor.aggregate_per_year = True
+        processor.aggregation_level = "region"
+        processor.use_definitions = False
+        processor.dsd = None
+        processor.functions_dict = {
+            "Variable One": "calc_one",
+            "Variable Two": "calc_two",
+        }
+
+        network = MockPyPSANetwork()
+        processor.network_collection = MockNetworkCollection([network])
+
+        def fake_execute(variable, n, config=None):
+            return pd.Series(
+                [1.0],
+                index=pd.MultiIndex.from_tuples(
+                    [("AT1", "MWh_el")], names=["location", "unit"]
+                ),
+            )
+
+        with patch.object(
+            processor, "_execute_function_for_variable", side_effect=fake_execute
+        ) as mock_execute:
+            with patch.object(
+                processor, "structure_pyam_from_pandas", side_effect=lambda df: df
+            ):
+                processor.calculate_variables_values()
+
+        assert mock_execute.call_count == 2
+        called_variables = {call.args[0] for call in mock_execute.call_args_list}
+        assert called_variables == {"Variable One", "Variable Two"}
