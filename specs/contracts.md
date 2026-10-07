@@ -1,0 +1,265 @@
+# Contracts
+
+Status: draft
+
+Contracts between the components of `pypsa_validation_processing`. Each contract lists the requirements, the sources it is based on, and acceptance criteria (AC) that can become unit tests in `tests/`. Spec-vs-code differences are referenced as `SC-n`, open questions as `OQ-n`, assumptions as `A-n` (all in [open_questions.md](open_questions.md)).
+
+General rule for all contracts: [constitution/principles.md](constitution/principles.md) P5 "Fail early and loud".
+
+---
+
+## C1 Config → `Network_Processor`
+
+**Requirements**
+1. `Network_Processor(config_path)` MUST read the package config with `yaml.safe_load`. The keys, types, defaults and allowed values are specified in [configuration.md](configuration.md); that table is part of this contract.
+2. Required keys: `network_results_path`, `definitions_path`, `country`, `model_name`, `scenario_name`. A missing, `null` or empty required key MUST raise `ValueError` naming the key and the config path. (SC-4)
+3. A present optional key with a value outside its allowed values or of the wrong type MUST raise `ValueError` naming the key and the value. (SC-5)
+4. A configured path that does not exist MUST raise `FileNotFoundError` naming the path: `network_results_path`, `definitions_path` (unless `false`), `mapping_path`.
+5. `country` MUST accept every ISO 3166-1 alpha-2 code (including non-EU codes such as `CH`, `NO`, `GB`) and the value `all`; anything else MUST raise `ValueError`. (SC-3, OQ-4)
+6. All config validation MUST be completed before any network file is read (P5 "early"). (SC-18)
+7. Relative paths are resolved against the current working directory (A-1).
+
+**Sources:** `class_definitions.py::Network_Processor.__init__` (l.165-279), `_is_valid_country_identifier`, `_is_definitions_disabled`; `configs/config.default.yaml`; `README.md` "Set the config parameters"; owner decisions in the kick-off.
+
+**Acceptance criteria**
+- C1-AC1: For each required key, a config without it raises `ValueError` whose message contains the key name.
+- C1-AC2: `country: CH`, `country: NO`, `country: GB`, `country: AT`, `country: all` are accepted; `country: XX`, `country: Austria`, `country: at1` raise `ValueError`.
+- C1-AC3: `aggregation_level: nation`, `aggregate_per_year: "yes"`, `map_country_codes_to_names: "yes"`, `convert_units: "yes"` each raise `ValueError`.
+- C1-AC4: A non-existing `network_results_path`, `definitions_path` or `mapping_path` raises `FileNotFoundError`.
+- C1-AC5: With an invalid `aggregation_level`, `pypsa.NetworkCollection` is not constructed (mock asserts not called).
+- C1-AC6: Without the optional keys, the defaults of [configuration.md](configuration.md) apply (`aggregation_level == "country"`, `aggregate_per_year is True`, `map_country_codes_to_names is False`, `convert_units` true, default mapping and output path).
+
+---
+
+## C2 Network results folder
+
+Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/energy_totals.csv`, among others).
+
+**Requirements**
+1. **Networks.** All files `<network_results_path>/networks/*.nc` MUST be read together as one `pypsa.NetworkCollection`. Each file holds one solved network for one investment year. A missing `networks/` folder or a folder without `.nc` files MUST raise `FileNotFoundError` during initialisation. (SC-11)
+2. **Investment year.** The investment year of a network MUST be taken from `n.meta["wildcards"]["planning_horizons"]`, never from the file name. A network without this entry MUST raise `ValueError` naming the file. Two networks with the same investment year MUST raise `ValueError` (A-2). (SC-11)
+3. **Network config.** For each investment year, the file matching `<network_results_path>/configs/config*<year>.yaml` (e.g. `config.base_s_adm__none_2030.yaml`) MUST be loaded with `yaml.safe_load` and passed as `config` (C5).
+   - No matching file → log `WARNING` naming year and pattern; `config=None`.
+   - Several matching files → use the first one in lexicographic order and log `WARNING` listing all matches. (SC-17)
+   - File cannot be read or parsed → log `WARNING` naming the file and error; `config=None`.
+   - What a function declaring `config` does with `config=None` is open (OQ-6).
+4. **Energy totals.** The path `<network_results_path>/resources/energy_totals.csv` MUST be passed as `energy_totals` (C5) to functions declaring that parameter.
+   - Its existence MUST be checked during initialisation.
+   - Missing file → log one `WARNING` naming the path. Every variable whose function declares `energy_totals` MUST then be skipped, each with a `WARNING` naming variable and function. All other variables MUST be evaluated normally. (Owner decision, kick-off review; A-3; SC-7)
+
+**Sources:** `Network_Processor._read_pypsa_network_collection`, `_get_network_config`, `_execute_function_for_variable`, `calculate_variables_values`; `resources/AT_KN2040/` (folder listing); `README.md` "Function Signature".
+
+**Acceptance criteria**
+- C2-AC1: A results folder without `networks/`, or with an empty `networks/`, raises `FileNotFoundError` at initialisation.
+- C2-AC2: A network whose file name says `2030` but whose `meta["wildcards"]["planning_horizons"]` is `2040` produces output for 2040.
+- C2-AC3: A network without `meta["wildcards"]["planning_horizons"]` raises `ValueError`; two networks with the same planning horizon raise `ValueError`.
+- C2-AC4: With `configs/config.a_2030.yaml` and `configs/config.b_2030.yaml`, `config.a_2030.yaml` is loaded and a `WARNING` is logged (`caplog`).
+- C2-AC5: Without a matching network config, a `WARNING` is logged and a function declaring `config` receives `None`.
+- C2-AC6: Without `resources/energy_totals.csv`, a function declaring `energy_totals` is not called, a `WARNING` naming its variable is logged, and a function not declaring it is still called and its variable appears in the output.
+
+---
+
+## C3 Variable selection
+
+**Requirements**
+1. `definitions_path: <folder>` → the evaluated variables are the variables of `nomenclature.DataStructureDefinition(<folder>)` that have an entry in the mapping file, in the order of the definitions.
+   - Definition variables without a mapping entry are skipped without warning: the definitions intentionally cover more variables than are implemented.
+   - Mapping entries whose variable is not in the definitions are not evaluated; this SHOULD be logged once as `WARNING` at initialisation listing those variables (OQ-7).
+   - Units are converted to the definition units if `convert_units: true` (C9).
+2. `definitions_path: false` (YAML bool `false` or string `"false"`, case-insensitive) → every variable in the mapping file is evaluated, in file order. No unit conversion takes place, independent of `convert_units`.
+3. Each selected variable is evaluated once per investment year.
+
+**Sources:** `Network_Processor.calculate_variables_values` (l.839-843), `_is_definitions_disabled`, class docstring; `README.md` "Mapping File"; `CLAUDE.md` "Key Implementation Notes".
+
+**Acceptance criteria**
+- C3-AC1: With definitions `{A, B, C}` and mapping `{A, B}`, exactly `A` and `B` are evaluated.
+- C3-AC2: With `definitions_path: false` and mapping `{A, D}`, exactly `A` and `D` are evaluated and units are not converted (output unit equals the `UNITS_MAPPING`-normalised PyPSA unit).
+- C3-AC3: `definitions_path: "False"` behaves like `definitions_path: false`.
+- C3-AC4: With definitions `{A}` and mapping `{A, D}`, `D` is not evaluated and a `WARNING` naming `D` is logged.
+
+---
+
+## C4 Mapping file
+
+**Requirements**
+1. The mapping file is a YAML mapping `<IAMC variable>: <function name>` (both strings). Default: `pypsa_validation_processing/configs/mapping.default.yaml`; override via `mapping_path`.
+2. A missing mapping file MUST raise `FileNotFoundError`. A file that is empty or not a string-to-string mapping MUST raise `ValueError`. (SC-6)
+3. Every function name SHOULD follow the naming convention of `README.md` ("Naming Convention"): `|` → `__`, space → `_`, other special characters removed.
+4. Every function name MUST exist in `pypsa_validation_processing/statistics_functions.py`.
+   - The check MUST happen during initialisation (P5 "early").
+   - A missing function → one `WARNING` naming variable and function; the variable is skipped for all investment years; all other variables are evaluated. (Owner decision, kick-off review; SC-6)
+
+**Sources:** `configs/mapping.default.yaml`, `configs/mapping.prices_ie.yaml`; `Network_Processor._read_mappings`, `_execute_function_for_variable` (l.368-382); `README.md` "Mapping File", "Naming Convention".
+
+**Acceptance criteria**
+- C4-AC1: A non-existing `mapping_path` raises `FileNotFoundError`; an empty mapping file raises `ValueError`.
+- C4-AC2: A mapping entry `X: does_not_exist` logs exactly one `WARNING` containing `X` and `does_not_exist` during initialisation (before `calculate_variables_values`), `X` is absent from the output, and the other mapped variables are present.
+- C4-AC3: Every entry of `mapping.default.yaml` names an existing function in `statistics_functions.py`.
+
+---
+
+## C5 Statistics function interface
+
+**Requirements**
+1. A statistics function is a module-level function in `statistics_functions.py` with signature
+   ```python
+   def <function_name>(
+       n: pypsa.Network,
+       aggregate_per_year: bool = True,
+       config: dict | None = None,        # optional, only if needed
+       energy_totals: Path | None = None, # optional, only if needed
+   ) -> pd.Series | pd.DataFrame: ...
+   ```
+2. The first parameter `n` is required and receives one `pypsa.Network` (one investment year), not the collection.
+3. Every statistics function MUST declare `aggregate_per_year`.
+4. `config` and `energy_totals` are optional. `Network_Processor` MUST pass `aggregate_per_year`, `config` and `energy_totals` as keyword arguments only if the function's signature declares them (`inspect.signature`).
+5. Further parameters MUST have defaults; `Network_Processor` never passes them.
+6. Type hints in the signature and a NumPy-style docstring are required (`CLAUDE.md` "Code Style").
+
+**Sources:** `Network_Processor._execute_function_for_variable` (l.384-398); `README.md` "Function Signature (fixed)"; `statistics_functions.py` module docstring.
+
+**Acceptance criteria**
+- C5-AC1: A function `f(n)` is called without keyword arguments; `f(n, aggregate_per_year=True)` receives the configured value; `f(n, config=None)` receives the network config of its year; `f(n, energy_totals=None)` receives `<network_results_path>/resources/energy_totals.csv`.
+- C5-AC2: For every function in `statistics_functions.py` (public, defined in that module), the first parameter is named `n`, `aggregate_per_year` is a parameter, and all parameters except `n` have defaults.
+
+---
+
+## C6 Statistics function output
+
+**Requirements**
+1. `aggregate_per_year=True` → MUST return a `pd.Series` with a `pd.MultiIndex` containing at least the levels `location` and `unit`. Values are the totals over all snapshots of the network.
+2. `aggregate_per_year=False` → MUST return a `pd.DataFrame` (not a `pd.Series`) whose columns are snapshot timestamps of `n` and whose index is a `pd.MultiIndex` containing at least `location` and `unit`.
+3. Additional index levels MAY be present; they are summed in post-processing (C8).
+4. Values MUST be numeric. `unit` values are PyPSA units (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`) that MUST be keys of `utils.UNITS_MAPPING` (C9).
+5. `location` values MUST be the network's locations (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
+6. An empty result, or a result whose values are all NaN, is invalid.
+7. `Network_Processor` MUST validate every result against items 1, 2, 4 and 6. An invalid result MUST raise an exception whose message names the variable and the violation (P5; OQ-3). (SC-8)
+
+**Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
+
+**Acceptance criteria**
+- C6-AC1 (per statistics function, in `tests/test_statistics_functions.py`): with `aggregate_per_year=True` the result is a `pd.Series`, `{"location", "unit"} ⊆ set(result.index.names)`, not empty, not all NaN.
+- C6-AC2 (per statistics function): with `aggregate_per_year=False` the result is a `pd.DataFrame` (not a `pd.Series`), columns are a subset of `n.snapshots`, `{"location", "unit"} ⊆ set(result.index.names)`, not empty, not all NaN.
+- C6-AC3: For one function and the same network, the sum over the columns of the `False` result equals the `True` result (weighted by snapshot weightings where the function uses them).
+- C6-AC4: `Network_Processor` raises an exception naming the variable when a function returns an empty Series, an all-NaN Series, a Series without `location` level, or a Series for `aggregate_per_year=False`.
+
+> **Open question:** C6-AC3 assumes that the yearly value is the snapshot-weighted sum of the time series. Whether this holds for all variables (e.g. prices) is open (OQ-8).
+
+---
+
+## C7 Function independence
+
+**Requirements**
+1. A statistics function MUST NOT call or import another statistics function.
+2. Shared logic MUST live in `utils.py`. Helpers in `utils.py` MAY call other `utils.py` helpers.
+3. `utils.py` MUST NOT import from `statistics_functions.py`.
+
+**Sources:** `CLAUDE.md` "Function Architecture (Critical)"; `docs/contributing.md` "Function Architecture".
+
+**Acceptance criteria**
+- C7-AC1: Parsing `statistics_functions.py` with `ast`, no function body references the name of another function defined in that module.
+- C7-AC2: `utils.py` contains no import of `statistics_functions`.
+
+---
+
+## C8 Aggregation (in `Network_Processor`)
+
+The country of a location is its first two characters (`AT1` → `AT`).
+
+| `aggregation_level` | `country: <code>` (e.g. `AT`) | `country: all` |
+|---|---|---|
+| `country` | keep locations starting with `<code>`, sum them into one row per `(variable, unit)`; region label = `<code>` | sum per country prefix (`AT1 → AT`, `DE2 → DE`); one row per `(variable, country, unit)`; region label = country code |
+| `region` | keep only locations starting with `<code>`; one row per `(variable, location, unit)`; region label = location | keep all locations; one row per `(variable, location, unit)` |
+
+**Requirements**
+1. Aggregation MUST follow the table. It happens after the function returns and before unit conversion.
+2. Index levels other than `location` and `unit` MUST be summed.
+3. Units MUST first be normalised via `UNITS_MAPPING` (C9); values with the same normalised unit are summed.
+4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
+5. A configured country without matching locations: behaviour open (OQ-9).
+
+**Sources:** `Network_Processor._aggregate_to_country`, `_filter_to_regions`, `_select_aggregation_result`, `_postprocess_statistics_result`, `structure_pyam_from_pandas`; `CLAUDE.md` "Aggregation behavior".
+
+**Acceptance criteria**
+- C8-AC1: Input `{(AT1, MWh): 1, (AT2, MWh): 2, (DE1, MWh): 4}`:
+  - `country`/`AT` → one row `AT, MWh = 3`;
+  - `country`/`all` → `AT = 3`, `DE = 4`;
+  - `region`/`AT` → `AT1 = 1`, `AT2 = 2`;
+  - `region`/`all` → `AT1 = 1`, `AT2 = 2`, `DE1 = 4`.
+- C8-AC2: Input with an extra level `carrier` is summed over `carrier`.
+- C8-AC3: `{(AT1, MWh_el): 1, (AT1, MWh_th): 2}` with `country`/`AT` → `AT, MWh = 3`.
+- C8-AC4: With `map_country_codes_to_names: true`, region `AT` becomes `Austria`; an unmapped label is unchanged.
+- C8-AC5: The same input in time series form gives the same results per column.
+
+---
+
+## C9 Unit conversion
+
+**Requirements**
+1. **Normalisation.** Every PyPSA unit MUST first be normalised via `utils.UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` → `MWh`; `t_co2` → `t`). A unit that is not a key of `UNITS_MAPPING` MUST raise `ValueError` naming variable and unit; it MUST NOT become NaN. (SC-9)
+2. **Conversion.** If `convert_units: true` and definitions are used (C3), each variable MUST be converted with `pyam.IamDataFrame.convert_unit(current, to)` from the normalised unit to the unit in the definitions (pint with the `iam-units` registry). If both are equal, no conversion takes place.
+3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10)
+4. If a variable has several definition entries, the first one is used and a `WARNING` is logged.
+5. Errors (each MUST raise an exception naming the variable):
+   - variable without unit → `ValueError`;
+   - several units for one variable after normalisation → `ValueError`;
+   - variable missing in the definitions → exception;
+   - definition without unit → exception;
+   - unit not convertible → `ValueError`.
+6. If `convert_units: false` or `definitions_path: false`, output units are the normalised PyPSA units.
+
+**Sources:** `Network_Processor._map_unit_level`, `_convert_units_to_common_definitions`, `_get_unit_from_common_definitions`; `utils.UNITS_MAPPING`; `definitions/variable/*.yaml`; https://pyam-iamc.readthedocs.io/en/stable/ (`convert_unit`).
+
+**Acceptance criteria**
+- C9-AC1: A result with unit `MWh_el` for a variable defined in `TJ` is output as `TJ` with value × 0.0036 (1 MWh = 3.6 GJ).
+- C9-AC2: A result with unit `foo` (not in `UNITS_MAPPING`) raises `ValueError` containing `foo`.
+- C9-AC3: For a definition `unit: [ TJ, TWh ]`, the output unit is `TJ`.
+- C9-AC4: A variable with rows in `MWh` and `t` raises `ValueError`.
+- C9-AC5: A unit pair without conversion (e.g. `t` → `TJ`) raises `ValueError`.
+- C9-AC6: With `convert_units: false`, a `MWh_el` result is output as `MWh`.
+
+---
+
+## C10 Output
+
+**Requirements**
+1. **Data structure.** The result MUST be a `pyam.IamDataFrame` with IAMC index `model, scenario, region, variable, unit`; `model` = `model_name`, `scenario` = `scenario_name`, `region` = country or region label (C8).
+2. **Output directory.** `output_path` is always a directory (default: repository-root `resources/`, see [configuration.md](configuration.md)). It MUST be created if it does not exist. (SC-1)
+3. **Path tokens.** In file and folder names, whitespace runs in `model_name`, `scenario_name` and `country` are replaced by `_`; leading/trailing whitespace is removed. `_<country>` is omitted for `country: all`.
+4. **Yearly output** (`aggregate_per_year: true`): one file `<output_path>/PYPSA_<model>_<scenario>[_<country>].xlsx`; year columns are integers (investment years).
+5. **Time series output** (`aggregate_per_year: false`): folder `<output_path>/PYPSA_timeseries_<model>_<scenario>[_<country>]/` with one file per investment year `PYPSA_<model>_<scenario>[_<country>]_<year>.xlsx`.
+   - Columns are timezone-aware timestamps in UTC (`+00:00`).
+   - The year of every snapshot timestamp is replaced by the investment year (e.g. `2019-01-01 00:00` → `2050-01-01 00:00`). Leap-day handling is open (OQ-5).
+6. **Excel layout.** Files are written with `pyam.IamDataFrame.to_excel` defaults (pyam 3.2): sheet `data` with all IAMC dimensions and sheet `meta`.
+7. Existing files with the same name are overwritten.
+
+**Sources:** `Network_Processor.structure_pyam_from_pandas`, `write_output_to_xlsx`, `_sanitize_path_token`, `calculate_variables_values` (l.869-875); `format_timestamps`; `README.md` "Output behavior"; owner decisions in the kick-off.
+
+**Acceptance criteria**
+- C10-AC1: Without `output_path`, the yearly file is written to `<cwd>/resources/PYPSA_<model>_<scenario>_<country>.xlsx`.
+- C10-AC2: With `output_path: out` (not existing), `out/` is created and contains the file.
+- C10-AC3: `model_name: "Pypsa-AT v1.0"`, `scenario_name: "KN 2040"`, `country: AT` → file name `PYPSA_Pypsa-AT_v1.0_KN_2040_AT.xlsx`; with `country: all` → `PYPSA_Pypsa-AT_v1.0_KN_2040.xlsx`.
+- C10-AC4: Time series for investment years 2030 and 2040 → folder `PYPSA_timeseries_<model>_<scenario>_<country>/` with files `…_2030.xlsx` and `…_2040.xlsx`.
+- C10-AC5: Reading a yearly file with `pyam.IamDataFrame(path)` gives integer years and the configured model and scenario.
+- C10-AC6: A time series column for snapshot `2019-03-01 12:00` in investment year 2050 is `2050-03-01 12:00+00:00`.
+- C10-AC7: The written workbook contains the sheets `data` and `meta`.
+
+---
+
+## C11 External dependencies
+
+The package relies on the following behaviour. A dependency update that changes it is a breaking change and MUST be checked against this list. Versions: [constitution/tech-stack.md](constitution/tech-stack.md).
+
+| Dependency | Relied-on behaviour | Used in |
+|---|---|---|
+| `pypsa` | `pypsa.NetworkCollection(list_of_paths)` reads `.nc` files; indexing yields `pypsa.Network`; `len()` gives the number of networks. | `_read_pypsa_network_collection`, `calculate_variables_values` |
+| `pypsa` | `n.meta["wildcards"]["planning_horizons"]` holds the investment year (written by the PyPSA-AT / pypsa-de workflow). | `calculate_variables_values` |
+| `pypsa` | `n.statistics.<metric>(…, groupby=[…, "location", "unit"], nice_names=False, groupby_time=…)` returns a Series (time-aggregated) or DataFrame (snapshots as columns) with the requested index levels; filters `components`, `carrier`, `bus_carrier`, `direction`, `at_port`; metrics used: `energy_balance`, `supply`, `withdrawal`, `transmission`. | statistics functions; `utils.statistics_kwargs*`; https://docs.pypsa.org/latest/api/networks/statistics/ |
+| `pandas` | MultiIndex `Series`/`DataFrame`, `groupby(...).sum()` over index levels. | everywhere |
+| `nomenclature-iamc` | `DataStructureDefinition(path)` reads `variable/` and `region/`; `.variable.to_pandas()` returns columns `variable` and `unit`; tag expansion such as `{Final Energy Carrier}`. | `read_definitions`, `_get_unit_from_common_definitions`, `calculate_variables_values` |
+| `pyam-iamc` | `IamDataFrame(data, model=, scenario=, region=, variable=, unit=)` from a wide DataFrame; `filter`, `concat`, `convert_unit(current, to)` with `iam-units`; `to_excel` writes sheets `data` and `meta`. | `structure_pyam_from_pandas`, `_convert_units_to_common_definitions`, `write_output_to_xlsx` |
+| `pyyaml` | `yaml.safe_load` for package config, mapping, network configs. | `_read_config`, `_read_mappings`, `_get_network_config` |
+| `openpyxl` | Excel engine used by `to_excel`. | `write_output_to_xlsx` |
+
+**Acceptance criteria**
+- C11-AC1: The integration run `pixi run workflow_test` succeeds with the locked versions.
