@@ -12,7 +12,8 @@ Specs and code MUST NOT invent datasets, files, APIs, carriers, config keys or I
 
 ## P3 Roles
 - Only the `spec-writer` changes `specs/`; the `developer` never does (`CLAUDE.md`, "Roles").
-- Definitions in `sister_packages/energy-scenarios-at-workflow/definitions/` and files in `pypsa_validation_processing/configs/` are changed only on explicit request (`CLAUDE.md`, "Forbidden Actions").
+- Definitions in `sister_packages/energy-scenarios-at-workflow/definitions/` are out of scope and MUST NEVER be changed (owner decision, kick-off review).
+- Files in `pypsa_validation_processing/configs/` MUST be changed only on explicit request, or temporarily for testing purposes; temporary test changes MUST NOT be committed (owner decision, kick-off review; `CLAUDE.md`, "Forbidden Actions").
 
 ## P4 Function independence
 Statistics functions MUST NOT call or import each other. Shared logic MUST live in `pypsa_validation_processing/utils.py`; `utils.py` MUST NOT call statistics functions. Statistics functions MUST NOT aggregate to country level. Details: contracts C5–C7. Source: `CLAUDE.md`, "Function Architecture (Critical)".
@@ -23,10 +24,8 @@ Decision of the owner (kick-off review, 2026-10-07).
 - **Loud:** Every detected problem MUST either raise an exception or be logged at level `WARNING` or higher, naming the affected variable, function or file. Silent fallbacks (e.g. replacing an unknown unit by NaN or a default unit) are not allowed.
 - **Abort vs. skip:**
   - A problem that makes the whole run invalid (invalid or missing required config, missing results or definitions folder) MUST raise an exception.
-  - A problem that affects only individual variables (mapped function missing, optional input file such as `energy_totals.csv` missing) MUST log a `WARNING` and skip the affected variables; all other variables MUST still be evaluated.
-  - A variable that is evaluated but produces an invalid result (contract C6) MUST raise an exception, because the result would otherwise be silently wrong.
-
-> **Open question:** Whether an invalid result of a single variable (C6) should abort the run or be warned and skipped like a missing function. Current wording: abort. See OQ-3.
+  - A variable that **cannot be run** (its mapped function is missing, or special input data it needs, such as `energy_totals.csv`, is not available) MUST log a `WARNING` and be skipped; all other variables MUST still be evaluated. This is the only case in which a variable is skipped.
+  - A variable that is run but produces an **invalid result** (contract C6) MUST abort the run with an exception naming the variable, because the result would otherwise be silently wrong.
 
 ## P6 Implementation source rule
 For every statistics function the implementation source is chosen in this order:
