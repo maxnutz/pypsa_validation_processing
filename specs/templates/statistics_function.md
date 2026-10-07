@@ -96,14 +96,14 @@ Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_c
 ## 10. Edge cases
 | Case | Expected behaviour |
 |---|---|
-| <carrier absent in network> | <e.g. contributes 0; result still not empty> |
+| <carrier absent in network> | <e.g. contributes 0; result still has one row per location> |
 | <network without any matching component> | <e.g. raise ValueError naming the variable> |
 | <time series and yearly results disagree> | <must not happen; C6-AC3> |
 
 ## 11. Acceptance criteria
 Concrete enough to become tests in `tests/test_statistics_functions.py`.
-- AC1: With `aggregate_per_year=True`, the result is a `pd.Series` with `{"location", "unit"} ⊆ index.names`, not empty, not all NaN (C6-AC1).
-- AC2: With `aggregate_per_year=False`, the result is a `pd.DataFrame` (not `pd.Series`) with snapshots as columns and `{"location", "unit"} ⊆ index.names`, not empty, not all NaN (C6-AC2).
+- AC1: With `aggregate_per_year=True`, the result fulfils all checks of C6-AC1 (Series, MultiIndex with `location` and `unit`, ≥ 1 row, numeric dtype, valid units, locations in `n.buses.location`). All-zero or all-NaN values are valid.
+- AC2: With `aggregate_per_year=False`, the result fulfils all checks of C6-AC2 (DataFrame, not Series; snapshots of `n` as columns; otherwise as AC1).
 - AC3: <numeric check on a mock network: input values → expected output per location and unit>
 - AC4: <sign convention check>
 - AC5: <special case check>

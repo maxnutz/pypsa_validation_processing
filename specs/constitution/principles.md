@@ -23,9 +23,9 @@ Decision of the owner (kick-off review, 2026-10-07).
 - **Early:** Problems MUST be detected at the earliest possible stage. Everything that can be checked from config, mapping file, definitions and the results folder MUST be checked during initialisation of `Network_Processor`, before any network is evaluated.
 - **Loud:** Every detected problem MUST either raise an exception or be logged at level `WARNING` or higher, naming the affected variable, function or file. Silent fallbacks (e.g. replacing an unknown unit by NaN or a default unit) are not allowed.
 - **Abort vs. skip:**
-  - A problem that makes the whole run invalid (invalid or missing required config, missing results or definitions folder) MUST raise an exception.
-  - A variable that **cannot be run** (its mapped function is missing, or special input data it needs, such as `energy_totals.csv`, is not available) MUST log a `WARNING` and be skipped; all other variables MUST still be evaluated. This is the only case in which a variable is skipped.
-  - A variable that is run but produces an **invalid result** (contract C6) MUST abort the run with an exception naming the variable, because the result would otherwise be silently wrong.
+  - A **configuration error** MUST raise an exception during initialisation: invalid or missing required config, missing results, definitions or mapping file, a mapped function that does not exist or has a non-conforming signature (C4, C5).
+  - A variable that **cannot be run because special input data is not available** (e.g. `energy_totals.csv`) MUST log a `WARNING` and be skipped; all other variables MUST still be evaluated. This is the only case in which a variable is skipped.
+  - A variable that is run but produces a **structurally invalid result** (contract C6) MUST abort the run with an exception naming the variable. Values that are all zero or all NaN are not a structural error.
 
 ## P6 Implementation source rule
 For every statistics function the implementation source is chosen in this order:

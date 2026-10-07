@@ -95,15 +95,15 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 1. The mapping file is a YAML mapping `<IAMC variable>: <function name>` (both strings). Default: `pypsa_validation_processing/configs/mapping.default.yaml`; override via `mapping_path`.
 2. A missing mapping file MUST raise `FileNotFoundError`. A file that is empty or not a string-to-string mapping MUST raise `ValueError`. (SC-6)
 3. Every function name SHOULD follow the naming convention of `README.md` ("Naming Convention"): `|` → `__`, space → `_`, other special characters removed.
-4. Every function name MUST exist in `pypsa_validation_processing/statistics_functions.py`.
-   - The check MUST happen during initialisation (P5 "early").
-   - A missing function → one `WARNING` naming variable and function; the variable is skipped for all investment years; all other variables are evaluated. (Owner decision, kick-off review; SC-6)
+4. Every function name of a variable selected for evaluation (C3) MUST exist in `pypsa_validation_processing/statistics_functions.py`.
+   - The check MUST happen during initialisation, before any network is read (P5 "early").
+   - A missing function is a configuration error: `Network_Processor` MUST raise `ValueError` naming the variable and the function. (Owner decision, second review round; replaces the earlier "warn and skip"; SC-6)
 
 **Sources:** `configs/mapping.default.yaml`, `configs/mapping.prices_ie.yaml`; `Network_Processor._read_mappings`, `_execute_function_for_variable` (l.368-382); `README.md` "Mapping File", "Naming Convention".
 
 **Acceptance criteria**
 - C4-AC1: A non-existing `mapping_path` raises `FileNotFoundError`; an empty mapping file raises `ValueError`.
-- C4-AC2: A mapping entry `X: does_not_exist` logs exactly one `WARNING` containing `X` and `does_not_exist` during initialisation (before `calculate_variables_values`), `X` is absent from the output, and the other mapped variables are present.
+- C4-AC2: With `definitions_path: false` and a mapping entry `X: does_not_exist`, constructing `Network_Processor` raises `ValueError` whose message contains `X` and `does_not_exist`, and `pypsa.NetworkCollection` is not constructed (mock asserts not called).
 - C4-AC3: Every entry of `mapping.default.yaml` names an existing function in `statistics_functions.py`.
 
 ---
@@ -120,17 +120,19 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
        energy_totals: Path | None = None, # optional, only if needed
    ) -> pd.Series | pd.DataFrame: ...
    ```
-2. The first parameter `n` is required and receives one `pypsa.Network` (one investment year), not the collection.
-3. Every statistics function MUST declare `aggregate_per_year`.
-4. `config` and `energy_totals` are optional. `Network_Processor` MUST pass `aggregate_per_year`, `config` and `energy_totals` as keyword arguments only if the function's signature declares them (`inspect.signature`).
-5. Further parameters MUST have defaults; `Network_Processor` never passes them.
-6. Type hints in the signature and a NumPy-style docstring are required (`CLAUDE.md` "Code Style").
+2. Every statistics function MUST declare `n` and `aggregate_per_year` as its first two parameters (owner decision, second review round). `n` receives one `pypsa.Network` (one investment year), not the collection.
+3. `Network_Processor` MUST always call a statistics function with `n` and `aggregate_per_year` (the configured value).
+4. `config` and `energy_totals` are optional parameters. `Network_Processor` MUST pass them as keyword arguments only if the function's signature declares them (`inspect.signature`).
+5. Further parameters MAY be added; they MUST have defaults, and `Network_Processor` never passes them.
+6. The signature of every function selected for evaluation MUST be checked during initialisation. A function that does not declare `n` and `aggregate_per_year` as its first two parameters, or has a parameter other than `n` without default, is a configuration error: `ValueError` naming the variable and the function (P5).
+7. Type hints in the signature and a NumPy-style docstring are required (`CLAUDE.md` "Code Style").
 
 **Sources:** `Network_Processor._execute_function_for_variable` (l.384-398); `README.md` "Function Signature (fixed)"; `statistics_functions.py` module docstring.
 
 **Acceptance criteria**
-- C5-AC1: A function `f(n)` is called without keyword arguments; `f(n, aggregate_per_year=True)` receives the configured value; `f(n, config=None)` receives the network config of its year; `f(n, energy_totals=None)` receives `<network_results_path>/resources/energy_totals.csv`.
-- C5-AC2: For every function in `statistics_functions.py` (public, defined in that module), the first parameter is named `n`, `aggregate_per_year` is a parameter, and all parameters except `n` have defaults.
+- C5-AC1: `f(n, aggregate_per_year=True)` receives the configured `aggregate_per_year` (test with `true` and `false`) and no other keyword arguments; `f(n, aggregate_per_year=True, config=None)` additionally receives the network config of its year; `f(n, aggregate_per_year=True, energy_totals=None)` additionally receives `<network_results_path>/resources/energy_totals.csv`.
+- C5-AC2: Mapping a variable to `f(n)` (no `aggregate_per_year`), or to `f(n, aggregate_per_year=True, x)` (`x` without default), raises `ValueError` at initialisation naming the variable and `f`.
+- C5-AC3: For every public function defined in `statistics_functions.py`, the first two parameters are `n` and `aggregate_per_year`, and all parameters except `n` have defaults.
 
 ---
 
@@ -140,18 +142,40 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 1. `aggregate_per_year=True` → MUST return a `pd.Series` with a `pd.MultiIndex` containing at least the levels `location` and `unit`. Values are the totals over all snapshots of the network.
 2. `aggregate_per_year=False` → MUST return a `pd.DataFrame` (not a `pd.Series`) whose columns are snapshot timestamps of `n` and whose index is a `pd.MultiIndex` containing at least `location` and `unit`.
 3. Additional index levels MAY be present; they are summed in post-processing (C8).
-4. Values MUST be numeric. `unit` values are PyPSA units (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`) that MUST be keys of `utils.UNITS_MAPPING` (C9).
-5. `location` values MUST be the network's locations (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
-6. An empty result, or a result whose values are all NaN, is invalid.
-7. `Network_Processor` MUST validate every result against items 1, 2, 4 and 6. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
+4. Values MUST be of a numeric dtype. NaN and zero are valid values; a result whose values are all zero or all NaN is valid (owner decision, second review round).
+5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`.
+6. `location` values MUST be non-empty values of `n.buses.location` of the evaluated network (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
+7. The result MUST contain at least one row (A-4).
+8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2 and 4–7. Values themselves (zero, NaN, sign, magnitude) are not checked here.
+9. `Network_Processor` MUST validate every result against item 8. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
 
 **Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
 
 **Acceptance criteria**
-- C6-AC1 (per statistics function, in `tests/test_statistics_functions.py`): with `aggregate_per_year=True` the result is a `pd.Series`, `{"location", "unit"} ⊆ set(result.index.names)`, not empty, not all NaN.
-- C6-AC2 (per statistics function): with `aggregate_per_year=False` the result is a `pd.DataFrame` (not a `pd.Series`), columns are a subset of `n.snapshots`, `{"location", "unit"} ⊆ set(result.index.names)`, not empty, not all NaN.
+- C6-AC1 (per statistics function, in `tests/test_statistics_functions.py`): with `aggregate_per_year=True` the result
+  - is a `pd.Series` with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
+  - has at least one row and a numeric dtype (`pd.api.types.is_numeric_dtype`);
+  - has only `unit` values that are non-empty keys of `UNITS_MAPPING` and not carrier labels (C9.1);
+  - has only `location` values contained in `n.buses.location` of the mock network and none empty.
+- C6-AC2 (per statistics function): with `aggregate_per_year=False` the result
+  - is a `pd.DataFrame` (not a `pd.Series`) with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
+  - has columns that are a subset of `n.snapshots`, at least one row, and only numeric column dtypes;
+  - fulfils the `unit` and `location` checks of C6-AC1.
 - C6-AC3: For one function and the same network, the sum over the columns of the `False` result equals the `True` result (weighted by snapshot weightings where the function uses them).
-- C6-AC4: `Network_Processor` raises an exception naming the variable when a function returns an empty Series, an all-NaN Series, a Series without `location` level, or a Series for `aggregate_per_year=False`.
+- C6-AC4: `Network_Processor` raises an exception naming the variable and the violation when a function returns, for `aggregate_per_year=True`:
+  - a Series with zero rows;
+  - a Series without `location` level, or without `unit` level, or with a flat index;
+  - a Series of dtype `object` with string values;
+  - a Series with unit `""`, `"land transport"` or `"foo"`;
+  - a Series with location `""` or `"XX9"` (not in `n.buses.location`);
+  - a `pd.DataFrame`;
+
+  and, for `aggregate_per_year=False`:
+  - a `pd.Series`;
+  - a DataFrame without `location` level;
+  - a DataFrame with columns that are not snapshots of `n`;
+  - a DataFrame with a non-numeric column.
+- C6-AC5: `Network_Processor` does **not** raise for a structurally valid Series whose values are all `0.0`, nor for one whose values are all NaN; the variable appears in the output (all-NaN rows MAY be dropped by pyam, see OQ-12).
 
 > **Open question:** C6-AC3 assumes that the yearly value is the snapshot-weighted sum of the time series. Whether this holds for all variables (e.g. prices) is open (OQ-8).
 
@@ -206,7 +230,11 @@ The country of a location is its first two characters (`AT1` → `AT`).
 ## C9 Unit conversion
 
 **Requirements**
-1. **Normalisation.** Every PyPSA unit MUST first be normalised via `utils.UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` → `MWh`; `t_co2` → `t`). A unit that is not a key of `UNITS_MAPPING` MUST raise `ValueError` naming variable and unit; it MUST NOT become NaN. (SC-9)
+1. **Unit validation and normalisation.**
+   - Before normalisation, every `unit` value MUST be checked. An empty (or whitespace-only) string and a carrier label MUST be rejected with `ValueError` naming variable and value, **even if the value is a key of `UNITS_MAPPING`**. Example: `land transport` is a carrier label, not a unit.
+   - `utils.UNITS_MAPPING` MUST contain only physical units as keys and values; the current keys `""` and `"land transport"` are not allowed. (SC-9)
+   - Every valid PyPSA unit is then normalised via `UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` → `MWh`; `t_co2` → `t`).
+   - A unit that is not a key of `UNITS_MAPPING` MUST raise `ValueError` naming variable and unit; it MUST NOT become NaN. (SC-9)
 2. **Conversion.** If `convert_units: true` and definitions are used (C3), each variable MUST be converted with `pyam.IamDataFrame.convert_unit(current, to)` from the normalised unit to the unit in the definitions (pint with the `iam-units` registry). If both are equal, no conversion takes place.
 3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10)
 4. If a variable has several definition entries, the first one is used and a `WARNING` is logged.
@@ -223,6 +251,8 @@ The country of a location is its first two characters (`AT1` → `AT`).
 **Acceptance criteria**
 - C9-AC1: A result with unit `MWh_el` for a variable defined in `TJ` is output as `TJ` with value × 0.0036 (1 MWh = 3.6 GJ).
 - C9-AC2: A result with unit `foo` (not in `UNITS_MAPPING`) raises `ValueError` containing `foo`.
+- C9-AC2b: A result with unit `""` or `"land transport"` raises `ValueError` naming the variable, and no row with unit `MWh` is produced from it.
+- C9-AC2c: `UNITS_MAPPING` contains neither the key `""` nor the key `"land transport"`.
 - C9-AC3: For a definition `unit: [ TJ, TWh ]`, the output unit is `TJ`.
 - C9-AC4: A variable with rows in `MWh` and `t` raises `ValueError`.
 - C9-AC5: A unit pair without conversion (e.g. `t` → `TJ`) raises `ValueError`.
