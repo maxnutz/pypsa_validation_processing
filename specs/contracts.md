@@ -300,24 +300,25 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 **Requirements**
 1. **Data structure.** The result MUST be a `pyam.IamDataFrame` with IAMC index `model, scenario, region, variable, unit`; `model` = `model_name`, `scenario` = `scenario_name`, `region` = country or region label (C8).
 2. **Output directory.** `output_path` is always a directory (default: repository-root `resources/`, see [configuration.md](configuration.md)). It MUST be created if it does not exist. (SC-1)
-3. **Path tokens.** In file and folder names, whitespace runs in `model_name`, `scenario_name` and `country` are replaced by `_`; leading/trailing whitespace is removed. `_<country>` is omitted for `country: all`.
-4. **Yearly output** (`aggregate_per_year: true`): one file `<output_path>/PYPSA_<model>_<scenario>[_<country>].xlsx`; year columns are integers (investment years).
-5. **Time series output** (`aggregate_per_year: false`): folder `<output_path>/PYPSA_timeseries_<model>_<scenario>[_<country>]/` with one file per investment year `PYPSA_<model>_<scenario>[_<country>]_<year>.xlsx`.
+3. **Path tokens.** In file and folder names, whitespace runs in `model_name`, `scenario_name` and `country` are replaced by `_`; leading/trailing whitespace is removed. `_<country>` is omitted for `country: all`. `<level>` is the value of `aggregation_level` (`country` or `region`) and is always part of the name, so that runs that differ only in `aggregation_level` do not overwrite each other (owner decision, review; SC-22).
+4. **Yearly output** (`aggregate_per_year: true`): one file `<output_path>/PYPSA_<model>_<scenario>_<level>[_<country>].xlsx`; year columns are integers (investment years).
+5. **Time series output** (`aggregate_per_year: false`): folder `<output_path>/PYPSA_timeseries_<model>_<scenario>_<level>[_<country>]/` with one file per investment year `PYPSA_<model>_<scenario>_<level>[_<country>]_<year>.xlsx`.
    - Columns are timezone-aware timestamps in UTC (`+00:00`).
    - The year of every snapshot timestamp is replaced by the investment year (e.g. `2019-01-01 00:00` → `2050-01-01 00:00`). Leap-day handling is open (OQ-5).
 6. **Excel layout.** Files are written with `pyam.IamDataFrame.to_excel` defaults (pyam 3.2): sheet `data` with all IAMC dimensions and sheet `meta`.
-7. Existing files with the same name are overwritten.
+7. Existing files with the same name are overwritten. With the naming of items 3–5, this happens only for runs with identical `output_path`, `model_name`, `scenario_name`, `aggregation_level`, `country` and `aggregate_per_year`.
 
 **Sources:** `Network_Processor.structure_pyam_from_pandas`, `write_output_to_xlsx`, `_sanitize_path_token`, `calculate_variables_values` (l.869-875); `format_timestamps`; `README.md` "Output behavior"; owner decisions in the kick-off.
 
 **Acceptance criteria**
-- C10-AC1: Without `output_path`, the yearly file is written to `<cwd>/resources/PYPSA_<model>_<scenario>_<country>.xlsx`.
+- C10-AC1: Without `output_path` and without `aggregation_level`, the yearly file is written to `<cwd>/resources/PYPSA_<model>_<scenario>_country_<country>.xlsx`.
 - C10-AC2: With `output_path: out` (not existing), `out/` is created and contains the file.
-- C10-AC3: `model_name: "Pypsa-AT v1.0"`, `scenario_name: "KN 2040"`, `country: AT` → file name `PYPSA_Pypsa-AT_v1.0_KN_2040_AT.xlsx`; with `country: all` → `PYPSA_Pypsa-AT_v1.0_KN_2040.xlsx`.
-- C10-AC4: Time series for investment years 2030 and 2040 → folder `PYPSA_timeseries_<model>_<scenario>_<country>/` with files `…_2030.xlsx` and `…_2040.xlsx`.
+- C10-AC3: `model_name: "Pypsa-AT v1.0"`, `scenario_name: "KN 2040"`, `aggregation_level: country`, `country: AT` → file name `PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx`; with `country: all` → `PYPSA_Pypsa-AT_v1.0_KN_2040_country.xlsx`; with `aggregation_level: region`, `country: AT` → `PYPSA_Pypsa-AT_v1.0_KN_2040_region_AT.xlsx`.
+- C10-AC4: Time series for investment years 2030 and 2040 → folder `PYPSA_timeseries_<model>_<scenario>_<level>_<country>/` with files `PYPSA_<model>_<scenario>_<level>_<country>_2030.xlsx` and `…_2040.xlsx`.
 - C10-AC5: Reading a yearly file with `pyam.IamDataFrame(path)` gives integer years and the configured model and scenario.
 - C10-AC6: A time series column for snapshot `2019-03-01 12:00` in investment year 2050 is `2050-03-01 12:00+00:00`.
 - C10-AC7: The written workbook contains the sheets `data` and `meta`.
+- C10-AC8: Two runs into the same `output_path` with identical config except `aggregation_level` (`country`, then `region`) leave two yearly files (resp. two time series folders), and the first file is unchanged after the second run.
 
 ---
 
