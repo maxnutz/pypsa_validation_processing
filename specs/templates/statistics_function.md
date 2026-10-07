@@ -21,19 +21,29 @@ Implementing PR: <link, once implemented>
 Function name derived per `README.md` "Naming Convention": `|` → `__`, space → `_`, other special characters removed.
 
 ## 2. Definition source
-- File: `sister_packages/energy-scenarios-at-workflow/definitions/variable/<file>.yaml`
-- Entry (verbatim, incl. tag such as `{Final Energy Carrier}` and its expansion in `tag_*.yaml`):
-  ```yaml
-  <copied definition entry>
-  ```
-- Description: <from definition>
+The name and definition of the variable to implement are given by its GitHub issue. The variable MAY additionally be contained in a definitions folder in IAMC-valid format (readable by `nomenclature.DataStructureDefinition`, as used with pyam), e.g. the default `sister_packages/energy-scenarios-at-workflow/definitions/`.
+
+| Item | Value |
+|---|---|
+| GitHub issue | `<#nnn, link>` (required) |
+| Variable name | `<as given in the issue>` |
+| Description | `<as given in the issue>` |
+| Unit | `<as given in the issue>` |
+| Contained in a definitions folder? | `<no>` or `<path to folder + file, e.g. sister_packages/energy-scenarios-at-workflow/definitions/variable/energy-consumption.yaml>` |
+
+If the variable is contained in a definitions folder, copy the entry verbatim (incl. tags such as `{Final Energy Carrier}` and their expansion):
+```yaml
+<copied definition entry, or "n/a">
+```
+
+> If issue and definitions differ (name, description or unit), record it under "Open questions"; do not resolve it silently.
 
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
 | PyPSA unit(s) returned by the function | `<MWh_el, MWh_LHV, …>` | <statistics call / pypsa-de line> |
 | Normalised unit (`utils.UNITS_MAPPING`) | `<MWh>` | `utils.py::UNITS_MAPPING` |
-| Definition unit (first if several) | `<TJ>` | <definition file> |
+| Target unit (first if several) | `<TJ>` | <issue; definitions file if contained> |
 | Conversion | `<MWh → TJ, factor 0.0036>` | C9 |
 
 All returned units MUST normalise to one single unit (C9).
@@ -102,7 +112,8 @@ Concrete enough to become tests in `tests/test_statistics_functions.py`.
 > **Open question:** <…>
 
 ## 13. Sources
-- <definition file>
+- <GitHub issue>
+- <definitions file, if contained>
 - <pypsa-de file + lines + commit>
 - <PyPSA docs URL>
 - <resources/carriers_bus_carriers_components.csv>
