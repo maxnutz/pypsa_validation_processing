@@ -1,0 +1,100 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.24.0",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "61a0be0533f039dbee9d7601507fbb35",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "pOHn",
+      "code_hash": "ed60bc6f6f9265f87fd16be1d44cb227",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"function-for-prices\">Function for Prices</h1></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Ssxb",
+      "code_hash": "4d1ce59fc25160dce6a28c3e7da1446a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "WARNING:pypsa.network.io:Importing network from PyPSA version v1.0.2 while current version is v1.1.2. Read the release notes at `https://go.pypsa.org/release-notes` to prepare your network for import.\nINFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.1.2)\nINFO:pypsa.network.io:Imported network 'PyPSA-AT Network 2020' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "KCwg",
+      "code_hash": "6024de3206fed0d035165a8c18a5d476",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='KCwg-0' random-id='896d9928-20e5-f2c5-883e-281259db85e4'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;name&#92;&quot;:&#92;&quot;AL&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.65327},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT11&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.42284},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT12&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.38808},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT13&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.39612},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT21&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.44453},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT22&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.55984},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT31&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.42936},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT32&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.43975},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT33&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.26271},{&#92;&quot;name&#92;&quot;:&#92;&quot;AT333&#92;&quot;,&#92;&quot;objective&#92;&quot;:29.54455}]&quot;' data-total-rows='106' data-total-columns='1' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;objective&quot;,[&quot;number&quot;,&quot;float64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[[&quot;name&quot;,[&quot;string&quot;,&quot;object&quot;]]]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "VUlX",
+      "code_hash": "936fd40c8cc25f9266a538f94e0b2929",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='VUlX-0' random-id='58a8df32-7171-4daa-6279-093cb19d0b6a'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;name&#92;&quot;:&#92;&quot;agriculture electricity&#92;&quot;,&#92;&quot;co2_emissions&#92;&quot;:0.0,&#92;&quot;color&#92;&quot;:&#92;&quot;#494778&#92;&quot;,&#92;&quot;nice_name&#92;&quot;:&#92;&quot;agriculture electricity&#92;&quot;,&#92;&quot;max_growth&#92;&quot;:&#92;&quot;inf&#92;&quot;,&#92;&quot;max_relative_growth&#92;&quot;:0.0},{&#92;&quot;name&#92;&quot;:&#92;&quot;industry electricity&#92;&quot;,&#92;&quot;co2_emissions&#92;&quot;:0.0,&#92;&quot;color&#92;&quot;:&#92;&quot;#2d2a66&#92;&quot;,&#92;&quot;nice_name&#92;&quot;:&#92;&quot;industry electricity&#92;&quot;,&#92;&quot;max_growth&#92;&quot;:&#92;&quot;inf&#92;&quot;,&#92;&quot;max_relative_growth&#92;&quot;:0.0},{&#92;&quot;name&#92;&quot;:&#92;&quot;electricity&#92;&quot;,&#92;&quot;co2_emissions&#92;&quot;:0.0,&#92;&quot;color&#92;&quot;:&#92;&quot;#110d63&#92;&quot;,&#92;&quot;nice_name&#92;&quot;:&#92;&quot;electricity&#92;&quot;,&#92;&quot;max_growth&#92;&quot;:&#92;&quot;inf&#92;&quot;,&#92;&quot;max_relative_growth&#92;&quot;:0.0},{&#92;&quot;name&#92;&quot;:&#92;&quot;electricity distribution grid&#92;&quot;,&#92;&quot;co2_emissions&#92;&quot;:0.0,&#92;&quot;color&#92;&quot;:&#92;&quot;#97ad8c&#92;&quot;,&#92;&quot;nice_name&#92;&quot;:&#92;&quot;electricity distribution grid&#92;&quot;,&#92;&quot;max_growth&#92;&quot;:&#92;&quot;inf&#92;&quot;,&#92;&quot;max_relative_growth&#92;&quot;:0.0}]&quot;' data-total-rows='4' data-total-columns='5' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='false' data-page-size='10' data-field-types='[[&quot;co2_emissions&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;color&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;nice_name&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;max_growth&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;max_relative_growth&quot;,[&quot;number&quot;,&quot;float64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='false' data-show-data-types='true' data-show-page-size-selector='false' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[[&quot;name&quot;,[&quot;string&quot;,&quot;object&quot;]]]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "WpvS",
+      "code_hash": "dbf33a28ad11af85b024b951af92f8b9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='WpvS-0' random-id='08c8e33e-1b56-a1b9-7117-d747c5566c7d'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[]&quot;' data-total-rows='0' data-total-columns='58' data-max-columns='50' data-banner-text='&quot;Only showing 50 of 58 columns.&quot;' data-pagination='false' data-page-size='10' data-field-types='[[&quot;bus0&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;bus1&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;type&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;carrier&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;efficiency&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;active&quot;,[&quot;boolean&quot;,&quot;bool&quot;]],[&quot;build_year&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;lifetime&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom_mod&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom_extendable&quot;,[&quot;boolean&quot;,&quot;bool&quot;]],[&quot;p_nom_min&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom_max&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom_set&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_set&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_init&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_min_pu&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_max_pu&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;capital_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;overnight_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;discount_rate&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;fom_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;marginal_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;marginal_cost_quadratic&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;stand_by_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;length&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;terrain_factor&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;committable&quot;,[&quot;boolean&quot;,&quot;bool&quot;]],[&quot;start_up_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;shut_down_cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;min_up_time&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;min_down_time&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;up_time_before&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;down_time_before&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;ramp_limit_up&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;ramp_limit_down&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;ramp_limit_start_up&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;ramp_limit_shut_down&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;p_nom_opt&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;bus4&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;efficiency4&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;bus3&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;efficiency3&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;bus2&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;efficiency2&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;voltage&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;underground&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;under_construction&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;tags&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;geometry&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;dc&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;underwater_fraction&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;project_status&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;location&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;energy to power ratio&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;reversed&quot;,[&quot;boolean&quot;,&quot;bool&quot;]],[&quot;length_original&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;fixed_profile_scaling_opt&quot;,[&quot;number&quot;,&quot;float64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='false' data-show-data-types='true' data-show-page-size-selector='false' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[[&quot;name&quot;,[&quot;string&quot;,&quot;object&quot;]]]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iQtu",
+      "code_hash": null,
+      "outputs": [],
+      "console": []
+    }
+  ]
+}
