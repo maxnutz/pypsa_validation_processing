@@ -82,7 +82,10 @@ Before writing any code:
 ## Testing Rules
 - Add or update tests only when behavior changes.
 - Tests belong only in `/tests`.
-- all testing routines `test_statistics_functions.py` for functions in `statistics_functions.py` must test the output-format. The outputformat MUST be a pandas.Series with Multiindex of ``location`` and ``unit``. It CAN include more levels in the Multiindex.
+- all testing routines `test_statistics_functions.py` for functions in `statistics_functions.py` must test the output-format. The output format depends on `aggregate_per_year`:
+  - `aggregate_per_year=True`: MUST be a `pd.Series` with MultiIndex of ``location`` and ``unit``.
+  - `aggregate_per_year=False`: MUST be a `pd.DataFrame` with snapshots as columns and MultiIndex of ``location`` and ``unit``, NOT a `pd.Series`.
+  - In both cases the MultiIndex CAN include more levels.
 
 ### Writing Tests
 Tests live in `tests/`. Write **Unit tests** — test small isolated logic.
