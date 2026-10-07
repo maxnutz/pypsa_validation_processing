@@ -13,21 +13,25 @@ General rule for all contracts: [constitution/principles.md](constitution/princi
 **Requirements**
 1. `Network_Processor(config_path)` MUST read the package config with `yaml.safe_load`. The keys, types, defaults and allowed values are specified in [configuration.md](configuration.md); that table is part of this contract.
 2. Required keys: `network_results_path`, `definitions_path`, `country`, `model_name`, `scenario_name`. A missing, `null` or empty required key MUST raise `ValueError` naming the key and the config path. (SC-4)
-3. A present optional key with a value outside its allowed values or of the wrong type MUST raise `ValueError` naming the key and the value. (SC-5)
-4. A configured path that does not exist MUST raise `FileNotFoundError` naming the path: `network_results_path`, `definitions_path` (unless `false`), `mapping_path`.
-5. `country` MUST accept every ISO 3166-1 alpha-2 code (including non-EU codes such as `CH`, `NO`, `GB`) and the value `all`; anything else MUST raise `ValueError`. (SC-3, OQ-4)
-6. All config validation MUST be completed before any network file is read (P5 "early"). (SC-18)
-7. Relative paths are resolved against the current working directory (A-1).
+3. All other keys (`convert_units`, `mapping_path`, `output_path`, `aggregation_level`, `aggregate_per_year`, `map_country_codes_to_names`) are optional: a config containing only the five required keys MUST initialise without error, and the defaults of [configuration.md](configuration.md) apply.
+   > Checked against the code on 2026-10-07: `Network_Processor` initialises with only the five required keys, both with `definitions_path: false` and with a definitions folder. Two of the applied defaults differ from the spec (`map_country_codes_to_names`, `output_path`; SC-1, SC-2).
+4. Every key, required or optional, whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` naming the key, the expected type and the given value. The same applies to values outside the allowed values. Expected types: [configuration.md](configuration.md). (SC-5, SC-19)
+   - YAML 1.1 parses some unquoted values as non-strings, e.g. `country: NO` (Norway) as boolean `false`. Such a value MUST be rejected as a wrong type, and the message SHOULD advise quoting (`country: "NO"`).
+5. A configured path that does not exist MUST raise `FileNotFoundError` naming the path: `network_results_path`, `definitions_path` (unless `false`), `mapping_path`.
+6. `country` MUST accept every ISO 3166-1 alpha-2 code and the value `all`; anything else MUST raise `ValueError`. This explicitly includes the codes of all 27 EU member states: `AT`, `BE`, `BG`, `CY`, `CZ`, `DE`, `DK`, `EE`, `ES`, `FI`, `FR`, `GR`, `HR`, `HU`, `IE`, `IT`, `LT`, `LU`, `LV`, `MT`, `NL`, `PL`, `PT`, `RO`, `SE`, `SI`, `SK`, and non-EU codes such as `CH`, `NO`, `GB`. (SC-3, OQ-4, OQ-11)
+7. All config validation MUST be completed before any network file is read (P5 "early"). (SC-18)
+8. Relative paths are resolved against the current working directory (A-1).
 
 **Sources:** `class_definitions.py::Network_Processor.__init__` (l.165-279), `_is_valid_country_identifier`, `_is_definitions_disabled`; `configs/config.default.yaml`; `README.md` "Set the config parameters"; owner decisions in the kick-off.
 
 **Acceptance criteria**
 - C1-AC1: For each required key, a config without it raises `ValueError` whose message contains the key name.
-- C1-AC2: `country: CH`, `country: NO`, `country: GB`, `country: AT`, `country: all` are accepted; `country: XX`, `country: Austria`, `country: at1` raise `ValueError`.
-- C1-AC3: `aggregation_level: nation`, `aggregate_per_year: "yes"`, `map_country_codes_to_names: "yes"`, `convert_units: "yes"` each raise `ValueError`.
+- C1-AC2: Each of the 27 EU member-state codes listed in requirement 6 is accepted (parametrised test), as are `CH`, `"NO"` (quoted), `GB` and `all`; `XX`, `Austria`, `at1` raise `ValueError`.
+- C1-AC3: Each of the following raises `ValueError` naming the key: `aggregation_level: nation`, `aggregation_level: 1`, `aggregate_per_year: "yes"`, `map_country_codes_to_names: "yes"`, `convert_units: "yes"`, `country: 1`, `model_name: 1.0`, `scenario_name: [a, b]`, `network_results_path: 5`, `mapping_path: true`, `output_path: 5`.
+- C1-AC3b: Unquoted `country: NO` raises `ValueError` whose message mentions quoting.
 - C1-AC4: A non-existing `network_results_path`, `definitions_path` or `mapping_path` raises `FileNotFoundError`.
 - C1-AC5: With an invalid `aggregation_level`, `pypsa.NetworkCollection` is not constructed (mock asserts not called).
-- C1-AC6: Without the optional keys, the defaults of [configuration.md](configuration.md) apply (`aggregation_level == "country"`, `aggregate_per_year is True`, `map_country_codes_to_names is False`, `convert_units` true, default mapping and output path).
+- C1-AC6: A config with only the five required keys initialises without error, and the defaults of [configuration.md](configuration.md) apply (`aggregation_level == "country"`, `aggregate_per_year is True`, `map_country_codes_to_names is False`, `convert_units` true, default mapping file, output directory `<cwd>/resources`).
 
 ---
 
@@ -37,7 +41,12 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 
 **Requirements**
 1. **Networks.** All files `<network_results_path>/networks/*.nc` MUST be read together as one `pypsa.NetworkCollection`. Each file holds one solved network for one investment year. A missing `networks/` folder or a folder without `.nc` files MUST raise `FileNotFoundError` during initialisation. (SC-11)
-2. **Investment year.** The investment year of a network MUST be taken from `n.meta["wildcards"]["planning_horizons"]`, never from the file name. A network without this entry MUST raise `ValueError` naming the file. Two networks with the same investment year MUST raise `ValueError` (A-2). (SC-11)
+2. **Investment year.** (Owner decision, kick-off review.)
+   - If `n.meta["wildcards"]["planning_horizons"]` is present, it MUST be used as the investment year. `n.meta` is present in PyPSA-AT networks.
+   - If it is not present (e.g. pypsa-eur networks, which carry no `n.meta`), the investment year MUST be taken from the network's file name, and a `WARNING` naming the file and the derived year MUST be logged. The year is the last group of exactly four digits that is not adjacent to other digits, e.g. `base_s_adm__none_2030.nc` → 2030, `base_s_adm__none_2040_1H.nc` → 2040 (file names from `resources/AT_KN2040/networks/`, `resources/AT_KN2040_1H/networks/`).
+   - No `planning_horizons` entry and no four-digit group in the file name → `ValueError` naming the file.
+   - Two networks with the same investment year MUST raise `ValueError` (A-2). (SC-11)
+   - The investment year MUST be determined during initialisation (P5 "early").
 3. **Network config.** For each investment year, the file matching `<network_results_path>/configs/config*<year>.yaml` (e.g. `config.base_s_adm__none_2030.yaml`) MUST be loaded with `yaml.safe_load` and passed as `config` (C5).
    - No matching file → log `WARNING` naming year and pattern; `config=None`.
    - Several matching files → use the first one in lexicographic order and log `WARNING` listing all matches. (SC-17)
@@ -51,8 +60,9 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 
 **Acceptance criteria**
 - C2-AC1: A results folder without `networks/`, or with an empty `networks/`, raises `FileNotFoundError` at initialisation.
-- C2-AC2: A network whose file name says `2030` but whose `meta["wildcards"]["planning_horizons"]` is `2040` produces output for 2040.
-- C2-AC3: A network without `meta["wildcards"]["planning_horizons"]` raises `ValueError`; two networks with the same planning horizon raise `ValueError`.
+- C2-AC2: A network with file name `base_s_adm__none_2030.nc` and `meta["wildcards"]["planning_horizons"] = 2040` produces output for 2040, and no file-name `WARNING` is logged.
+- C2-AC3: A network without `n.meta` and file name `base_s_adm__none_2040_1H.nc` produces output for 2040, and a `WARNING` naming the file is logged (`caplog`).
+- C2-AC3b: A network without `n.meta` and file name `network.nc` raises `ValueError` naming the file. Two networks with the same investment year (from meta or file name) raise `ValueError`.
 - C2-AC4: With `configs/config.a_2030.yaml` and `configs/config.b_2030.yaml`, `config.a_2030.yaml` is loaded and a `WARNING` is logged (`caplog`).
 - C2-AC5: Without a matching network config, a `WARNING` is logged and a function declaring `config` receives `None`.
 - C2-AC6: Without `resources/energy_totals.csv`, a function declaring `energy_totals` is not called, a `WARNING` naming its variable is logged, and a function not declaring it is still called and its variable appears in the output.
@@ -133,7 +143,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 4. Values MUST be numeric. `unit` values are PyPSA units (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`) that MUST be keys of `utils.UNITS_MAPPING` (C9).
 5. `location` values MUST be the network's locations (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
 6. An empty result, or a result whose values are all NaN, is invalid.
-7. `Network_Processor` MUST validate every result against items 1, 2, 4 and 6. An invalid result MUST raise an exception whose message names the variable and the violation (P5; OQ-3). (SC-8)
+7. `Network_Processor` MUST validate every result against items 1, 2, 4 and 6. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
 
 **Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
 
@@ -253,7 +263,7 @@ The package relies on the following behaviour. A dependency update that changes 
 | Dependency | Relied-on behaviour | Used in |
 |---|---|---|
 | `pypsa` | `pypsa.NetworkCollection(list_of_paths)` reads `.nc` files; indexing yields `pypsa.Network`; `len()` gives the number of networks. | `_read_pypsa_network_collection`, `calculate_variables_values` |
-| `pypsa` | `n.meta["wildcards"]["planning_horizons"]` holds the investment year (written by the PyPSA-AT / pypsa-de workflow). | `calculate_variables_values` |
+| `pypsa` | In PyPSA-AT networks, `n.meta["wildcards"]["planning_horizons"]` holds the investment year; networks without `n.meta` (e.g. pypsa-eur) fall back to the file name (C2.2). | `calculate_variables_values` |
 | `pypsa` | `n.statistics.<metric>(…, groupby=[…, "location", "unit"], nice_names=False, groupby_time=…)` returns a Series (time-aggregated) or DataFrame (snapshots as columns) with the requested index levels; filters `components`, `carrier`, `bus_carrier`, `direction`, `at_port`; metrics used: `energy_balance`, `supply`, `withdrawal`, `transmission`. | statistics functions; `utils.statistics_kwargs*`; https://docs.pypsa.org/latest/api/networks/statistics/ |
 | `pandas` | MultiIndex `Series`/`DataFrame`, `groupby(...).sum()` over index levels. | everywhere |
 | `nomenclature-iamc` | `DataStructureDefinition(path)` reads `variable/` and `region/`; `.variable.to_pandas()` returns columns `variable` and `unit`; tag expansion such as `{Final Energy Carrier}`. | `read_definitions`, `_get_unit_from_common_definitions`, `calculate_variables_values` |
