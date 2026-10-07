@@ -6,11 +6,13 @@ individual IAMC variables yet. Every later spec is written into the scaffold cre
 
 ## Goals
 1. Create a spec scaffold in `specs/` that describes the package as it is *intended* to behave:
-   PyPSA network results in -> IAMC variables (via `pypsa.statistics`) -> IAMC-formatted Excel out.
+   PyPSA network results in -> IAMC variables -> IAMC-formatted Excel out.
 2. Provide one reusable template for "statistics function" specs (one IAMC variable = one spec).
 3. Write down the contracts between the components (see "Dependencies / contracts"), so code
    and tests can be checked against them.
-4. Collect open questions and known spec-vs-code differences as a list (candidates for GitHub issues),
+4. Write a project constitution in `specs/constitution/` (mission, tech stack, roadmap, and
+   further documents if needed) that all later specs and code changes follow.
+5. Collect open questions and known spec-vs-code differences as a list (candidates for GitHub issues),
    do not resolve them silently.
 
 ## Inputs (read-only)
@@ -19,12 +21,29 @@ individual IAMC variables yet. Every later spec is written into the scaffold cre
 - `pypsa_validation_processing/configs/config.*.yaml`, `mapping.default.yaml`, `mapping.prices_ie.yaml`
 - `tests/` (as evidence of current behaviour, not as requirements)
 - `sister_packages/energy-scenarios-at-workflow/definitions/{variable,region}` (IAMC variable names, units)
-- `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` (accounting blueprint)
+- `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` (primary implementation
+  source for statistics functions, see "Implementation source rule")
 - `resources/carriers*.csv`, `resources/carriers_bus_carriers_components.csv` (carriers, bus carriers, components)
 - PyPSA statistics docs: https://docs.pypsa.org/latest/api/networks/statistics/
 - IAMC conventions: https://docs.ece.iiasa.ac.at/standards/variables.html, pyam and nomenclature docs
 
 ## Scope (deliverables of this kick-off)
+Constitution (`specs/constitution/`):
+- `mission.md`: purpose of the package, users, problem it solves (validation of PyPSA-AT results
+  against IAMC-formatted reference data), guiding principles, non-goals.
+- `tech-stack.md`: language and version, environment (Pixi), libraries and the role of each
+  (`pypsa` incl. `statistics` accessor, `pandas`, `pyam-iamc`, `nomenclature-iamc`, `pyyaml`, `openpyxl`),
+  sister packages, testing (pytest, coverage >= 90 %), formatting (Black), docs (mkdocs).
+  Take versions from `pixi.toml` / `pixi.lock`; do not invent any.
+- `roadmap.md`: high-level implementation order in very small phases of work. It MUST be based on
+  `specs/constitution/TODO.md`. That TODO.md is created in a separate next step from existing
+  GitHub issues; it is NOT part of this kick-off. In this kick-off, write only the structure of
+  `roadmap.md` (phase format: goal, included items, done criteria, dependencies) and a reference
+  to the future `TODO.md`. Do not fill in phases yourself.
+- Further constitution files only if needed (e.g. `principles.md` for the hard rules and the
+  implementation source rule); justify each one in `specs/README.md`.
+
+Spec scaffold (`specs/`):
 - `specs/README.md`: purpose of `specs/`, spec-vs-code rule (spec wins -> GitHub issue),
   file layout, naming of spec files, status values (draft / reviewed / implemented), how to add a spec.
 - `specs/overview.md`: system context, data flow, components, glossary
@@ -33,7 +52,8 @@ individual IAMC variables yet. Every later spec is written into the scaffold cre
 - `specs/configuration.md`: every config key, type, default, allowed values, effect.
 - `specs/templates/statistics_function.md`: template for one IAMC variable with the sections:
   variable name + function name (README naming convention), definition source, unit (PyPSA vs. definition),
-  components / carriers / bus carriers, accounting rule and sign convention, optional kwargs used
+  implementation source (pypsa-de function + line range, or `pypsa.statistics`), match type
+  (exact / semantic, with reasoning), components / carriers / bus carriers, accounting rule and sign convention, optional kwargs used
   (`config`, `energy_totals`), return format for both `aggregate_per_year` values,
   edge cases, acceptance criteria (testable), open questions, sources.
 - `specs/variables/` (empty, with a short index file): later home of one spec per IAMC variable.
@@ -54,6 +74,19 @@ individual IAMC variables yet. Every later spec is written into the scaffold cre
   Every factual claim cites its source (file path + symbol/line, definition file, or doc URL).
 - Describe intended behaviour. Do not weaken a statement to match current code; record the
   difference in `open_questions.md` instead.
+- Implementation source rule (state it in the constitution and in the template):
+  - If `export_ariadne_variables.py` evaluates the same IAMC variable, the statistics function MUST
+    port that pypsa-de logic as-is: same components, carriers, bus carriers, sign conventions and
+    special cases. It is changed only as far as needed to fit the function contract (stand-alone
+    function, shared helpers only in `utils.py`, return format of contract 6, no country
+    aggregation inside the function).
+  - A semantic match is allowed: the pypsa-de variable name may differ (e.g. different naming or
+    hierarchy) as long as the meaning is the same. The spec MUST name the pypsa-de variable and
+    function and justify why they match.
+  - Only if no matching variable exists in `export_ariadne_variables.py` is the function built
+    with `pypsa.statistics`.
+  - This takes precedence over the general hint in `CLAUDE.md` to "use `pypsa.statistics` more
+    extensively"; record this in `open_questions.md` so `CLAUDE.md` can be aligned later.
 - Mark assumptions and open questions explicitly (e.g. `> **Open question:** ...`), never guess silently.
 - English, Markdown, concise. Use MUST / SHOULD / MAY for requirements.
 - Acceptance criteria must be concrete enough to become unit tests in `tests/`.
@@ -124,5 +157,6 @@ These were decided with the owner. Where the code differs, record the difference
 ## Way of working
 1. Read the inputs; list what you found per contract before writing.
 2. Propose the file layout and section headings; wait for feedback.
-3. Write the scaffold in small commits (README -> overview -> contracts -> configuration -> template -> open questions).
+3. Write in small commits (constitution: mission -> tech-stack -> roadmap structure;
+   then README -> overview -> contracts -> configuration -> template -> open questions).
 4. Self-check against the spec PR checklist before opening the PR.
