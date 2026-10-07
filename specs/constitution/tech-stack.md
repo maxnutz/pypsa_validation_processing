@@ -4,12 +4,14 @@ Status: draft
 
 Version constraints are taken from `pixi.toml` and `pyproject.toml`; locked versions from the committed `pixi.lock` (linux-64 / noarch / pure-Python wheels). Nothing here is a new requirement unless written with MUST/SHOULD.
 
+`pixi.toml` is the authoritative source for versions. Where `CLAUDE.md` or other documentation states a different version, `pixi.toml` wins (owner decision, kick-off review).
+
 ## Language
 | Item | Constraint | Locked | Source |
 |---|---|---|---|
 | Python | `>=3.11` | 3.14.3 | `pixi.toml` `[dependencies]`, `pyproject.toml` `requires-python`, `pixi.lock` |
 
-> **Open question:** `CLAUDE.md` and `docs/contributing.md` require Python ≥ 3.12; `pixi.toml`, `pyproject.toml` and the `README.md` badge say 3.11. See [open_questions.md](../open_questions.md) SC-12.
+The package MUST support Python `>=3.11` (`pixi.toml`). `CLAUDE.md` and `docs/contributing.md` state ≥ 3.12; they are to be aligned (SC-12 in [open_questions.md](../open_questions.md)).
 
 ## Environment
 - Pixi workspace `pypsa-validation-processing`, channel `conda-forge`, platforms `linux-64`, `osx-arm64`, `osx-64`, `win-64` (`pixi.toml` `[workspace]`).
