@@ -160,7 +160,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 4. Values MUST be of a numeric dtype. NaN and zero are valid values; a result whose values are all zero or all NaN is valid (owner decision, second review round).
 5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`. A statistics function MAY normalise units itself via `UNITS_MAPPING` (e.g. to combine series of different carriers); normalised units such as `MWh` are keys of `UNITS_MAPPING` and therefore valid (owner decision, 2026-10-07; resolves OQ-15).
 6. `location` values MUST be non-empty values of `n.buses.location` of the evaluated network (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
-7. The result MUST contain at least one row (A-4).
+7. The result MUST contain at least one row (A-4). Item 13 states how a function meets this when none of its carriers is present.
 8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2, 4–7 and the structural parts of items 10–12 (presence and values of the `quantity` level). Values themselves (zero, NaN, sign, magnitude) are not checked here, with the exception of negative weights (item 12).
 9. `Network_Processor` MUST validate every result against item 8. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
 10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings (`n.snapshot_weightings.objective`, as applied by `n.statistics` with `groupby_time=True`). With `aggregate_per_year=False`, each snapshot column MUST hold the values as returned by `n.statistics(…, groupby_time=False)`, i.e. **not** multiplied by the snapshot weighting, and the `unit` labels MUST be kept as pypsa returns them (e.g. `MWh_el`) (owner decision, 2026-10-07; resolves OQ-13). Reason: the output units must match the units of the common definitions (`sister_packages/energy-scenarios-at-workflow/definitions/`, out of scope, P3).
@@ -173,6 +173,13 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
     - With `aggregate_per_year=True`, the `weight` row is Σₜ wₜ·gₜ, i.e. the yearly value as returned by `n.statistics(…, groupby_time=True)` (e.g. `MWh`), and the `value` row is the weighted mean Σₜ vₜ·wₜ·gₜ / Σₜ wₜ·gₜ.
     - In PyPSA-AT networks, gₜ is constant over time (owner statement, 2026-10-07). The value row then equals Σₜ vₜ·wₜ / Σₜ wₜ, which is the weighted-price formula of pypsa-de (`export_ariadne_variables.py::get_prices`, e.g. l.3626-3634, and `price_load`, l.3378-3402), so that logic can be ported as-is (P6). Cost-based prices that divide annual costs by weighted energy (`costs_gen_generators`, `costs_gen_links`, l.3405-3500) fit the yearly `weight` row in `MWh` directly.
     - The function computes both; `Network_Processor` never aggregates over time.
+13. **Every location present**: the result MUST contain every location of the network, i.e. every non-empty unique value of `n.buses.location` (owner decision, 2026-10-07; see OQ-17 for pseudo-locations such as `EU`). A location in which none of the carriers (or components) that the function evaluates is present MUST get the value `0.0` and, with `aggregate_per_year=False`, `0.0` for every snapshot; it MUST NOT be missing from the result:
+    - such a location gets one row with index levels `location` and `unit` only (plus `quantity` for `intensive`); the `unit` is the normalised unit of the variable spec (template section 3), a key of `UNITS_MAPPING` (item 5);
+    - `aggregate_per_year=False`: the columns are all snapshots of `n`, as for every other row (item 2);
+    - `intensive`: both the `value` row and the `weight` row are `0.0`; after region aggregation such a group is NaN (C8.2, A-5);
+    - a location whose carriers are present but whose yearly value is `0.0` MUST NOT be dropped either (e.g. by `n.statistics(…, groupby_time=True)`, which drops all-zero rows); the set of locations MUST be the same for both values of `aggregate_per_year` (C6-AC3);
+    - the case "none of the carriers is present in `n` at all" is the special case in which every location gets `0.0`; it therefore never yields an empty result (item 7);
+    - example: in `base_s_adm__none_2040.nc`, the coal withdrawal of `AT13` is `0.0` over the year; the result for `Final Energy [by Carrier]|Coal` still has an `AT13` row with `0.0` for both values of `aggregate_per_year`; a 2020 network without any `H2` carrier gives, for a `flow` variable on hydrogen, `(AT1, MWh): 0.0`, `(AT2, MWh): 0.0`, … for every location.
 
 **Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
 
@@ -205,6 +212,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - a DataFrame without `location` level;
   - a DataFrame with columns that are not snapshots of `n`;
   - a DataFrame with a non-numeric column.
+- C6-AC6 (per statistics function, in `tests/test_statistics_functions.py`): on a mock network with two locations, where only the first holds the function's carriers, the result for both values of `aggregate_per_year` fulfils C6-AC1 / C6-AC2, contains both locations, and the second location has the value `0.0` (for `False`: in every snapshot column). On a mock network that contains none of the function's carriers, every location of `n.buses.location` is present with `0.0` (C6.13).
 - C6-AC5: `Network_Processor` does **not** raise for a structurally valid Series whose values are all `0.0`, nor for one whose values are all NaN; the variable appears in the output (all-NaN rows MAY be dropped by pyam, see OQ-12).
 
 ---

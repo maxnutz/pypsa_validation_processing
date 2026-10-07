@@ -97,8 +97,9 @@ Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_c
 ## 10. Edge cases
 | Case | Expected behaviour |
 |---|---|
-| <carrier absent in network> | <e.g. contributes 0; result still has one row per location> |
-| <network without any matching component> | <e.g. raise ValueError naming the variable> |
+| none of the carriers present in a location | `0.0` for this location (every snapshot with `aggregate_per_year=False`), unit as in section 3; the location is not dropped (C6.13) |
+| none of the carriers present in the network | `0.0` for every location of `n.buses.location` (C6.13) |
+| <only some carriers present in a location> | <e.g. absent carriers contribute 0> |
 | <time series and yearly results disagree> | <must not happen; C6-AC3> |
 
 ## 11. Acceptance criteria
@@ -108,7 +109,8 @@ Concrete enough to become tests in `tests/test_statistics_functions.py`.
 - AC3: <numeric check on a mock network: input values → expected output per location and unit>
 - AC4: The `True` and `False` results are consistent per the aggregation class (C6-AC3).
 - AC4: <sign convention check>
-- AC5: <special case check>
+- AC5: On a mock network with a location without any of the carriers, that location is present with `0.0`; on a mock network without any of the carriers, every location is present with `0.0` (C6-AC6).
+- AC6: <special case check>
 
 ## 12. Open questions
 > **Open question:** <…>
