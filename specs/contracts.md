@@ -176,7 +176,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 13. **Every location present**: the result MUST contain every location of the network, i.e. every non-empty unique value of `n.buses.location` (owner decision, 2026-10-07; see OQ-17 for pseudo-locations such as `EU`). A location in which none of the carriers (or components) that the function evaluates is present MUST get the value `0.0` and, with `aggregate_per_year=False`, `0.0` for every snapshot; it MUST NOT be missing from the result:
     - such a location gets one row with index levels `location` and `unit` only (plus `quantity` for `intensive`); the `unit` is the normalised unit of the variable spec (template section 3), a key of `UNITS_MAPPING` (item 5);
     - `aggregate_per_year=False`: the columns are all snapshots of `n`, as for every other row (item 2);
-    - `intensive`: both the `value` row and the `weight` row are `0.0`; after region aggregation such a group is NaN (C8.2, A-5);
+    - `intensive`: both the `value` row and the `weight` row are `0.0`; after region aggregation such a group is `0.0`, not NaN, as for `flow` and `stock` variables (C8.2, A-5);
     - a location whose carriers are present but whose yearly value is `0.0` MUST NOT be dropped either (e.g. by `n.statistics(…, groupby_time=True)`, which drops all-zero rows); the set of locations MUST be the same for both values of `aggregate_per_year` (C6-AC3);
     - the case "none of the carriers is present in `n` at all" is the special case in which every location gets `0.0`; it therefore never yields an empty result (item 7);
     - example: in `base_s_adm__none_2040.nc`, the coal withdrawal of `AT13` is `0.0` over the year; the result for `Final Energy [by Carrier]|Coal` still has an `AT13` row with `0.0` for both values of `aggregate_per_year`; a 2020 network without any `H2` carrier gives, for a `flow` variable on hydrogen, `(AT1, MWh): 0.0`, `(AT2, MWh): 0.0`, … for every location.
@@ -252,7 +252,7 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 1. Aggregation MUST follow the table and the post-processing order above.
 2. Index levels other than `location`, `unit` and `quantity` MUST be aggregated according to the aggregation class (C4.5), in the same step as locations:
    - `flow`, `stock`: sum.
-   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0, the value is NaN (A-5).
+   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0 (e.g. a region without any of the carriers, C6.13), the value is `0.0`, not NaN, and the weight is `0.0` (A-5).
 3. In `Network_Processor`, normalisation (step 2) MUST NOT happen before aggregation (step 1); units already normalised by the statistics function (C6.5) pass step 2 unchanged. Rows that share region label and normalised unit after step 2 MUST be combined in step 3 with the operation of item 2.
 4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
 5. A configured country without matching locations: behaviour open (OQ-9).
@@ -276,7 +276,7 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
   - `country`/`all` → `AT = 30`, `DE = 5`;
   - `region`/`AT` → `AT1 = 10`, `AT2 = 40`;
   - in every case the output contains no `weight` rows and no `quantity` level.
-- C8-AC7 (`intensive`): an extra level `carrier` with `(AT1, gas): value 20, weight 1` and `(AT1, oil): value 50, weight 0` gives `AT1 = 20` with `region`/`AT`; a group whose weights are all 0 gives NaN.
+- C8-AC7 (`intensive`): an extra level `carrier` with `(AT1, gas): value 20, weight 1` and `(AT1, oil): value 50, weight 0` gives `AT1 = 20` with `region`/`AT`; a group whose weights are all 0 gives `0.0` (value and weight), not NaN.
 - C8-AC8 (`stock`): `{(AT1, MW): 100, (AT2, MW): 50}` with `country`/`AT` → `AT, MW = 150`, identical to `flow`.
 
 ---
