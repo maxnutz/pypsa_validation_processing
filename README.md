@@ -59,14 +59,20 @@ This statement runs `"python workflow.py"` and uses the packaged default config 
 
 You can also run:
 ```bash
-pixi run python workflow.py --config /absolute/path/to/config.yaml
+pixi run python workflow.py --config /absolute/path/to/config.yaml --log-level INFO
 ```
+- `--config`: path to a config file (defaults to the packaged `configs/config.default.yaml`)
+- `--log-level`: one of `DEBUG`, `INFO`, `WARNING` (default), `ERROR`, `CRITICAL`
+
+After `pip install .`, the same CLI is available as `pypsa-validation-processing`.
+
+`pixi run workflow_test` runs the workflow for all four example setups in `configs/` (`country`/`region` × `year`/`timeseries`) and then the test suite. Use it for local end-to-end checks.
 ### Run tests
 Run tests with
 ```bash
 pixi run test
 ```
-This statement runs `"pytest tests/ -v"` 
+This statement runs `pytest tests/ -v` with coverage reporting and fails if coverage of `pypsa_validation_processing` drops below 90 %. See [tests/README.md](tests/README.md) for test conventions.
 
 ### Output behavior
 
@@ -79,7 +85,7 @@ This statement runs `"pytest tests/ -v"`
 
 ```text
 pypsa_validation_processing/
-|-- workflow.py                         # CLI/entry script
+|-- workflow.py                         # CLI/entry script (compatibility wrapper)
 |-- pypsa_validation_processing/
 |   |-- __init__.py
 |   |-- workflow.py                     # package-level workflow orchestration
@@ -87,9 +93,13 @@ pypsa_validation_processing/
 |   |-- statistics_functions.py         # pypsa statistics functions
 |   |-- utils.py                        # static information and general utility functions
 |   `-- configs/                        # package configuration files
-        `-- config.default.yaml         # default configuration file
-        `-- mapping.default.yaml        # mapping IAMC-variable - statistics-function 
+|       |-- config.default.yaml         # default configuration file
+|       |-- config.{country,region}-{year,timeseries}.yaml  # example setups used by `workflow_test`
+|       `-- mapping.default.yaml        # mapping IAMC-variable - statistics-function
+|-- docs/                               # mkdocs documentation sources
+|-- notebooks/                          # marimo notebooks for background info on functions
 |-- resources/                          # non-versioned resources
+|-- sister_packages/                    # related repositories (e.g. IAMC definitions)
 `-- tests/                              # test suite
 ```
 
@@ -138,6 +148,7 @@ Return format rules:
 - `aggregate_per_year=True`: return a `pandas.Series`
 - `aggregate_per_year=False`: return a `pandas.DataFrame` with snapshots as columns
 - In both cases, index levels must include at least `location` and `unit`
+- Do not aggregate to country level inside the function; this is done in post-processing.
 
 Post-processing behavior:
 
@@ -180,7 +191,9 @@ Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
 Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 ```
 
-At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. 
+At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped; mapped functions that do not exist in `statistics_functions.py` are skipped with a warning. With `definitions_path: false`, every variable in the mapping file is evaluated.
+
+The optional parameters `aggregate_per_year`, `config` and `energy_totals` are only passed to a function if they appear in its signature.
 
 ### Register statistics for a new variable
 To register a new variable, please first open a new Issue and select Issue Template "New Variable Statistics". In this issue, the following steps are prepared: 
