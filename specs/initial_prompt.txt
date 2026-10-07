@@ -1,0 +1,128 @@
+# PyPSA-validation-processing - kick-off (scaffolding only, no requirements yet)
+
+Role: You are the `spec-writer` (`.claude/agents/spec-writer.md`). Follow the root `CLAUDE.md`.
+This kick-off sets up the structure of `specs/`. It does NOT write requirements for
+individual IAMC variables yet. Every later spec is written into the scaffold created here.
+
+## Goals
+1. Create a spec scaffold in `specs/` that describes the package as it is *intended* to behave:
+   PyPSA network results in -> IAMC variables (via `pypsa.statistics`) -> IAMC-formatted Excel out.
+2. Provide one reusable template for "statistics function" specs (one IAMC variable = one spec).
+3. Write down the contracts between the components (see "Dependencies / contracts"), so code
+   and tests can be checked against them.
+4. Collect open questions and known spec-vs-code differences as a list (candidates for GitHub issues),
+   do not resolve them silently.
+
+## Inputs (read-only)
+- `README.md`, `tests/README.md`, `resources/README.md`, `docs/`
+- `pypsa_validation_processing/{workflow.py,class_definitions.py,statistics_functions.py,utils.py}`
+- `pypsa_validation_processing/configs/config.*.yaml`, `mapping.default.yaml`, `mapping.prices_ie.yaml`
+- `tests/` (as evidence of current behaviour, not as requirements)
+- `sister_packages/energy-scenarios-at-workflow/definitions/{variable,region}` (IAMC variable names, units)
+- `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` (accounting blueprint)
+- `resources/carriers*.csv`, `resources/carriers_bus_carriers_components.csv` (carriers, bus carriers, components)
+- PyPSA statistics docs: https://docs.pypsa.org/latest/api/networks/statistics/
+- IAMC conventions: https://docs.ece.iiasa.ac.at/standards/variables.html, pyam and nomenclature docs
+
+## Scope (deliverables of this kick-off)
+- `specs/README.md`: purpose of `specs/`, spec-vs-code rule (spec wins -> GitHub issue),
+  file layout, naming of spec files, status values (draft / reviewed / implemented), how to add a spec.
+- `specs/overview.md`: system context, data flow, components, glossary
+  (network, investment year, snapshot, carrier, bus carrier, location, region, country, IAMC variable).
+- `specs/contracts.md`: the contracts listed below, each with source references.
+- `specs/configuration.md`: every config key, type, default, allowed values, effect.
+- `specs/templates/statistics_function.md`: template for one IAMC variable with the sections:
+  variable name + function name (README naming convention), definition source, unit (PyPSA vs. definition),
+  components / carriers / bus carriers, accounting rule and sign convention, optional kwargs used
+  (`config`, `energy_totals`), return format for both `aggregate_per_year` values,
+  edge cases, acceptance criteria (testable), open questions, sources.
+- `specs/variables/` (empty, with a short index file): later home of one spec per IAMC variable.
+- `specs/open_questions.md`: open questions, assumptions, observed spec-vs-code differences.
+
+## Out of scope
+- Requirements or accounting rules for individual IAMC variables (follow-up specs).
+- Any change outside `specs/`: code, tests, configs, docs, `README.md`, `CLAUDE.md`, `pixi.toml`, `sister_packages/`.
+- Running the workflow, formatters or anything that writes files outside `specs/`.
+- Changing IAMC variable definitions or mapping entries.
+- Upstream model logic (PyPSA-AT / pypsa-de network building), and validation/plotting of the Excel output.
+- Performance requirements, unless already documented.
+
+## Hard rules
+- Write only under `specs/`; work on a branch `spec/kickoff-scaffold` created from up-to-date `main`.
+- Commits contain only `specs/` files. PR title starts with `spec:`; use `.github/PULL_REQUEST_TEMPLATE/spec.md`.
+- Do not invent datasets, files, APIs, carriers, config keys or IAMC variables.
+  Every factual claim cites its source (file path + symbol/line, definition file, or doc URL).
+- Describe intended behaviour. Do not weaken a statement to match current code; record the
+  difference in `open_questions.md` instead.
+- Mark assumptions and open questions explicitly (e.g. `> **Open question:** ...`), never guess silently.
+- English, Markdown, concise. Use MUST / SHOULD / MAY for requirements.
+- Acceptance criteria must be concrete enough to become unit tests in `tests/`.
+
+## Dependencies / contracts (to be written down in `specs/contracts.md`)
+1. Config -> `Network_Processor`: config keys and their semantics (`country`, `definitions_path`,
+   `convert_units`, `mapping_path`, `output_path`, `aggregation_level`, `aggregate_per_year`,
+   `map_country_codes_to_names`, `network_results_path`, `model_name`, `scenario_name`).
+   Required vs. optional, default, allowed values, and error raised on invalid input
+   (see `Network_Processor.__init__`).
+2. Network results folder `<network_results_path>` (see `_read_pypsa_network_collection`,
+   `_get_network_config`, `_execute_function_for_variable`; example: `resources/AT_KN2040/`):
+   - `networks/*.nc`: one solved network per investment year, read as `pypsa.NetworkCollection`.
+   - Investment year is taken from `n.meta["wildcards"]["planning_horizons"]`, not from the file name.
+   - `configs/config*<year>.yaml` (e.g. `config.base_s_adm__none_2030.yaml`): network config per year;
+     missing file -> warning, `config=None`; several matches -> first one is used.
+   - `resources/energy_totals.csv`: passed as a path to functions declaring `energy_totals`.
+3. Variable selection: `definitions_path: <folder>` -> mapped variables from the definitions
+   (unmapped skipped, unit conversion if `convert_units: true`); `definitions_path: false` -> all
+   variables in the mapping file, no unit conversion.
+4. Mapping file: `<IAMC variable>: <function name>`; function must exist in `statistics_functions.py`.
+5. Statistics function interface: signature, required `network` argument, optional kwargs
+   (`aggregate_per_year`, `config`, `energy_totals`) passed only if declared.
+6. Statistics function output:
+   - `aggregate_per_year=True` -> `pd.Series` with MultiIndex containing at least `location`, `unit`.
+   - `aggregate_per_year=False` -> `pd.DataFrame`, snapshots as columns, MultiIndex containing at least `location`, `unit`.
+   - Empty or all-NaN results are invalid; no country aggregation inside the function.
+7. Function independence: statistics functions never call each other; shared logic only via `utils.py`;
+   `utils.py` never calls statistics functions.
+8. Aggregation (in `Network_Processor`): `country` / `region` x `AT` / `all` behaviour as in `CLAUDE.md`.
+9. Unit conversion (`_map_unit_level`, `_convert_units_to_common_definitions`):
+   - PyPSA units are first normalised via `utils.UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` -> `MWh`, `t_co2` -> `t`).
+   - Then, if `convert_units: true` and definitions are used, `pyam.IamDataFrame.convert_unit(current, to)`
+     converts to the definition unit (pint + `iam-units` registry).
+   - Errors: variable without unit, several units per variable, variable missing in definitions,
+     or non-convertible unit -> exception. If a definition lists several units, the first one is used.
+10. Output (`structure_pyam_from_pandas`, `write_output_to_xlsx`, pyam 3.2 `IamDataFrame.to_excel`):
+    - Data is a `pyam.IamDataFrame` with IAMC index `model, scenario, region, variable, unit`;
+      `region` is the country or region code (or name, see `map_country_codes_to_names`).
+    - `aggregate_per_year: true` -> one file `<output_path>/PYPSA_<model>_<scenario>[_<country>].xlsx`,
+      year columns as integers.
+    - `aggregate_per_year: false` -> folder `<output_path>/PYPSA_timeseries_<model>_<scenario>[_<country>]/`
+      with one file per investment year `PYPSA_<model>_<scenario>[_<country>]_<year>.xlsx`.
+      Columns are UTC timestamps; the snapshot year is replaced by the investment year.
+    - `_<country>` is omitted for `country: all`. Whitespace in model, scenario and country is replaced by `_`.
+    - `to_excel` defaults: sheet `data` (all dimensions) plus sheet `meta`.
+11. External dependencies: `pypsa` (statistics accessor), `pyam-iamc`, `nomenclature-iamc`, `pandas`;
+    state which behaviour of each the package relies on.
+
+## Decisions already taken (state as intended behaviour)
+These were decided with the owner. Where the code differs, record the difference in
+`open_questions.md` as a GitHub issue candidate. Do not change the spec to match the code.
+- `output_path` is always a directory. Default: the package `resources/` folder.
+  (Code: the default is built as a file path `.../PYPSA_<model>_<scenario>[_<country>].xlsx`,
+  but `write_output_to_xlsx` appends the file name to it -> mismatch.)
+- `map_country_codes_to_names` defaults to `false`.
+  (Code: `__init__` defaults to `True`; `config.default.yaml` and `README.md` say `false`.)
+- `country` accepts any ISO 3166-1 alpha-2 code (including non-EU, e.g. `CH`, `NO`, `GB`) or `all`.
+  (Code: `_is_valid_country_identifier` accepts only keys of `utils.EU27_COUNTRY_CODES`.)
+
+## Other observations to check and record
+- `aggregation_level` defaults to `country` in code; `config.default.yaml` sets `region`.
+  This is not a conflict, but state the default explicitly.
+- The sample results folder `resources/AT_KN2040/` contains `configs/`, `networks/` and
+  `resources/energy_totals.csv`. The code passes the path without checking it exists; specify
+  the intended behaviour when the file is missing.
+
+## Way of working
+1. Read the inputs; list what you found per contract before writing.
+2. Propose the file layout and section headings; wait for feedback.
+3. Write the scaffold in small commits (README -> overview -> contracts -> configuration -> template -> open questions).
+4. Self-check against the spec PR checklist before opening the PR.
