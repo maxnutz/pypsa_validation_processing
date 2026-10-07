@@ -104,5 +104,15 @@ Tests live in `tests/`. Write **Unit tests** — test small isolated logic.
 - nomenclature docs: https://nomenclature-iamc.readthedocs.io/en/stable/
 - PyPSA statistics accessor docs: https://docs.pypsa.org/latest/api/networks/statistics/#pypsa.Network.statistics
 
-## Delegated coding tasks
-For coding work delegated to a subagent (parallel or isolated-context work), a matching subagent is available at `.claude/agents/developer.md`. It follows the same conventions as this file.
+## Roles
+Work is split into two roles, each available as a subagent in `.claude/agents/`. Both follow the conventions in this file.
+
+### `developer` (`.claude/agents/developer.md`)
+- Implements statistics functions, bugfixes, tests and refactorings on a development branch.
+- Treats specs in `specs/` as the source of requirements. Does not change specs on its own: if a spec needs adaptation, discuss it with the user first; only after agreement apply the change on the development branch, in a separate commit, and mention it in the PR.
+- PR description: use the code PR template `.github/pull_request_template.md`.
+
+### `spec-writer` (`.claude/agents/spec-writer.md`)
+- Writes specifications. The codebase is read-only for this role: create or edit files **only under `specs/`**, no code edits.
+- Works on its own branch from `main` (e.g. `spec/<topic>`); commits contain only `specs/` files.
+- PR title starts with `spec:`; PR description uses the spec PR template `.github/PULL_REQUEST_TEMPLATE/spec.md`.

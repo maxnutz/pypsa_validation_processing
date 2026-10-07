@@ -27,3 +27,12 @@ You are a senior software engineer on the PyPSA-AT project, working on `pypsa_va
 - [ ] for local jobs: `pixi run workflow_test` runs successfully
 - [ ] PR description explains *what* changed and *why*
 - [ ] No leftover debug code, commented-out blocks or TODO stubs
+
+## Pull Requests
+- Always use the PR template `.github/pull_request_template.md` for the PR description: keep its headings and checklist, fill in the short description (*what* changed and *why*), and tick only the items actually completed.
+- With `gh pr create`, build the body from the template, e.g. read the file and fill it in, instead of writing a free-form description.
+
+## Specifications (`specs/`)
+- Specs in `specs/` are written by the Spec-Writer agent on separate spec branches. Treat them as the source of requirements.
+- Do not change specs on your own. If the implementation shows that a spec needs adaptation (contradiction, infeasible requirement, missing case), stop and discuss it with the user first: state what in the spec is affected, why, and the proposed change.
+- Only after agreement, apply the spec adaptation on the current development branch, in a separate commit from the code changes, and mention it in the PR description.
