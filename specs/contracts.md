@@ -158,17 +158,20 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 2. `aggregate_per_year=False` → MUST return a `pd.DataFrame` (not a `pd.Series`) whose columns are snapshot timestamps of `n` and whose index is a `pd.MultiIndex` containing at least `location` and `unit`.
 3. Additional index levels MAY be present; they are aggregated in post-processing according to the aggregation class (C8). The level name `quantity` is reserved for `intensive` variables (item 12).
 4. Values MUST be of a numeric dtype. NaN and zero are valid values; a result whose values are all zero or all NaN is valid (owner decision, second review round).
-5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`.
+5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`. A statistics function MAY normalise units itself via `UNITS_MAPPING` (e.g. to combine series of different carriers); normalised units such as `MWh` are keys of `UNITS_MAPPING` and therefore valid (owner decision, 2026-10-07; resolves OQ-15).
 6. `location` values MUST be non-empty values of `n.buses.location` of the evaluated network (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
 7. The result MUST contain at least one row (A-4).
 8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2, 4–7 and the structural parts of items 10–12 (presence and values of the `quantity` level). Values themselves (zero, NaN, sign, magnitude) are not checked here, with the exception of negative weights (item 12).
 9. `Network_Processor` MUST validate every result against item 8. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
-10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings the function uses (e.g. `n.snapshot_weightings.objective` via `n.statistics`). The result MUST NOT have a `quantity` level.
+10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings (`n.snapshot_weightings.objective`, as applied by `n.statistics` with `groupby_time=True`). With `aggregate_per_year=False`, each snapshot column MUST hold the values as returned by `n.statistics(…, groupby_time=False)`, i.e. **not** multiplied by the snapshot weighting, and the `unit` labels MUST be kept as pypsa returns them (e.g. `MWh_el`) (owner decision, 2026-10-07; resolves OQ-13). Reason: the output units must match the units of the common definitions (`sister_packages/energy-scenarios-at-workflow/definitions/`, out of scope, P3).
+    - Note: for snapshot weightings ≠ 1 these values are power per snapshot (`MW`) although labelled `MWh_*` (pypsa docs for `groupby_time`: "With False the time series is given in MW"; checked 2026-10-07 with pypsa 1.1.2 on a 6-hourly network). This is intended and MUST NOT be corrected by the function or by `Network_Processor`.
+    - The result MUST NOT have a `quantity` level.
 11. **`stock`**: the yearly value is the end-of-year value of the investment year, typically read from static component data (e.g. `p_nom_opt`) and not summed over snapshots. With `aggregate_per_year=False`, each snapshot column holds the value at that snapshot if time-variant data is available; otherwise every column holds the yearly value. The result MUST NOT have a `quantity` level.
 12. **`intensive`**: the result MUST have an index level `quantity` with exactly the values `value` and `weight`; every row with `quantity = value` MUST have a row with `quantity = weight` and identical other index labels, and vice versa (the weight row carries the same `unit` label as its value row).
     - `value` rows hold the intensive quantity (e.g. `EUR/MWh`). `weight` rows hold the non-negative weight for aggregation, e.g. the energy volume the price applies to; a negative weight is a structural error. Which weight is used is part of the variable spec.
-    - With `aggregate_per_year=False`, weights are given per snapshot and already include the snapshot weighting (e.g. energy per snapshot in `MWh`, not power).
-    - With `aggregate_per_year=True`, the `value` row is the weighted mean over snapshots, Σₜ vₜ·wₜ / Σₜ wₜ, and the `weight` row is Σₜ wₜ.
+    - `weight` rows follow the same convention as `flow` values (C6.10): with `aggregate_per_year=False`, wₜ is the value per snapshot as returned by `n.statistics(…, groupby_time=False)` (e.g. withdrawal in `MW`), **not** multiplied by the snapshot weighting gₜ (`n.snapshot_weightings.objective`).
+    - With `aggregate_per_year=True`, the `weight` row is Σₜ wₜ·gₜ, i.e. the yearly value as returned by `n.statistics(…, groupby_time=True)` (e.g. `MWh`), and the `value` row is the weighted mean Σₜ vₜ·wₜ·gₜ / Σₜ wₜ·gₜ.
+    - In PyPSA-AT networks, gₜ is constant over time (owner statement, 2026-10-07). The value row then equals Σₜ vₜ·wₜ / Σₜ wₜ, which is the weighted-price formula of pypsa-de (`export_ariadne_variables.py::get_prices`, e.g. l.3626-3634, and `price_load`, l.3378-3402), so that logic can be ported as-is (P6). Cost-based prices that divide annual costs by weighted energy (`costs_gen_generators`, `costs_gen_links`, l.3405-3500) fit the yearly `weight` row in `MWh` directly.
     - The function computes both; `Network_Processor` never aggregates over time.
 
 **Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
@@ -184,9 +187,9 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - has columns that are a subset of `n.snapshots`, at least one row, and only numeric column dtypes;
   - fulfils the `unit` and `location` checks of C6-AC1.
 - C6-AC3: For one function and the same network, the `True` result follows from the `False` result according to the class (per statistics function, in `tests/test_statistics_functions.py`):
-  - `flow`: the sum over the columns of the `False` result equals the `True` result (weighted by snapshot weightings where the function uses them);
+  - `flow`: the sum over the columns of the `False` result, each column multiplied by its snapshot weighting (`n.snapshot_weightings.objective`), equals the `True` result (C6.10), tested on a network with snapshot weighting ≠ 1;
   - `stock`: the last column of the `False` result equals the `True` result;
-  - `intensive`: for each row, the `True` `weight` equals the sum over the columns of the `False` `weight` row, and the `True` `value` equals Σₜ vₜ·wₜ / Σₜ wₜ computed from the `False` `value` and `weight` rows.
+  - `intensive`: for each row, the `True` `weight` equals the sum over the columns of the `False` `weight` row, each column multiplied by gₜ (as for `flow`), and the `True` `value` equals Σₜ vₜ·wₜ·gₜ / Σₜ wₜ·gₜ computed from the `False` `value` and `weight` rows.
 - C6-AC4: `Network_Processor` raises an exception naming the variable and the violation when a function returns, for `aggregate_per_year=True`:
   - a Series with zero rows;
   - a Series without `location` level, or without `unit` level, or with a flat index;
@@ -242,7 +245,7 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 2. Index levels other than `location`, `unit` and `quantity` MUST be aggregated according to the aggregation class (C4.5), in the same step as locations:
    - `flow`, `stock`: sum.
    - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0, the value is NaN (A-5).
-3. Normalisation (step 2) MUST NOT happen before aggregation (step 1). Rows that share region label and normalised unit after step 2 MUST be combined in step 3 with the operation of item 2.
+3. In `Network_Processor`, normalisation (step 2) MUST NOT happen before aggregation (step 1); units already normalised by the statistics function (C6.5) pass step 2 unchanged. Rows that share region label and normalised unit after step 2 MUST be combined in step 3 with the operation of item 2.
 4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
 5. A configured country without matching locations: behaviour open (OQ-9).
 6. For `intensive` variables, `weight` rows MUST be dropped after step 3 (re-groupby); only `value` rows reach unit conversion and output. With `aggregation_level: region`, no aggregation over locations takes place, but extra index levels are still aggregated as in item 2.

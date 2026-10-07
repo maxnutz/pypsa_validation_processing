@@ -91,7 +91,7 @@ Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_c
 
 ## 9. Return format
 - `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit<, quantity><, …>]`, values = <`flow`: total over snapshots, weighted \| `stock`: end-of-year value \| `intensive`: weighted mean over snapshots, plus `weight` rows> (C6.10–12).
-- `aggregate_per_year=False`: `pd.DataFrame`, MultiIndex `[location, unit<, …>]`, columns = snapshots of `n`.
+- `aggregate_per_year=False`: `pd.DataFrame`, MultiIndex `[location, unit<, …>]`, columns = snapshots of `n`; for `flow`: values and units as returned by `n.statistics(…, groupby_time=False)`, not multiplied by the snapshot weighting (C6.10).
 - No country aggregation inside the function (C6, C8).
 
 ## 10. Edge cases
