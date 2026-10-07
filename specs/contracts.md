@@ -92,12 +92,25 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 ## C4 Mapping file
 
 **Requirements**
-1. The mapping file is a YAML mapping `<IAMC variable>: <function name>` (both strings). Default: `pypsa_validation_processing/configs/mapping.default.yaml`; override via `mapping_path`.
-2. A missing mapping file MUST raise `FileNotFoundError`. A file that is empty or not a string-to-string mapping MUST raise `ValueError`. (SC-6)
+1. The mapping file is a YAML mapping from `<IAMC variable>` (string) to an entry in one of two forms (owner decision, aggregation classes):
+   - short form `<IAMC variable>: <function name>` (string), equivalent to `{function: <function name>, aggregation: flow}`;
+   - long form `<IAMC variable>: {function: <function name>, aggregation: <class>}` with `<class>` ∈ {`flow`, `stock`, `intensive`} (item 5). The key `aggregation` MAY be omitted (default `flow`); `function` is required.
+
+   Default: `pypsa_validation_processing/configs/mapping.default.yaml`; override via `mapping_path`.
+2. A missing mapping file MUST raise `FileNotFoundError`. A file that is empty, not a mapping, or has an entry that is neither of the forms in item 1 (missing `function`, unknown key, `aggregation` not one of the three classes) MUST raise `ValueError` naming the variable. (SC-6, SC-21)
 3. Every function name SHOULD follow the naming convention of `README.md` ("Naming Convention"): `|` → `__`, space → `_`, other special characters removed.
 4. Every function name of a variable selected for evaluation (C3) MUST exist in `pypsa_validation_processing/statistics_functions.py`.
    - The check MUST happen during initialisation, before any network is read (P5 "early").
    - A missing function is a configuration error: `Network_Processor` MUST raise `ValueError` naming the variable and the function. (Owner decision, second review round; replaces the earlier "warn and skip"; SC-6)
+5. **Aggregation classes.** The aggregation class of a variable determines how values are aggregated over time (inside the statistics function, C6) and over regions and extra index levels (in `Network_Processor`, C8):
+
+   | Class | Typical quantities (examples) | Over time (`aggregate_per_year=True`, C6) | Over regions and extra index levels (C8) |
+   |---|---|---|---|
+   | `flow` | energy (`MWh`), emissions (`t`), total costs (`EUR`) | sum over snapshots, weighted by snapshot weightings | sum |
+   | `stock` | capacity (`MW`), storage volume (`MWh`) | end-of-year value; no sum over snapshots | sum |
+   | `intensive` | prices (`EUR/MWh`), specific investment costs (`EUR/kW`) | weighted mean over snapshots, computed by the function | weighted mean with the weights returned by the function |
+
+   The class is a property of the variable, not of the function: the same function MAY in principle serve variables of different classes, but the declared class MUST match what the function returns (C6.10–C6.12).
 
 **Sources:** `configs/mapping.default.yaml`, `configs/mapping.prices_ie.yaml`; `Network_Processor._read_mappings`, `_execute_function_for_variable` (l.368-382); `README.md` "Mapping File", "Naming Convention".
 
@@ -105,6 +118,8 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 - C4-AC1: A non-existing `mapping_path` raises `FileNotFoundError`; an empty mapping file raises `ValueError`.
 - C4-AC2: With `definitions_path: false` and a mapping entry `X: does_not_exist`, constructing `Network_Processor` raises `ValueError` whose message contains `X` and `does_not_exist`, and `pypsa.NetworkCollection` is not constructed (mock asserts not called).
 - C4-AC3: Every entry of `mapping.default.yaml` names an existing function in `statistics_functions.py`.
+- C4-AC4: `X: f` and `X: {function: f}` both give class `flow` for `X`; `X: {function: f, aggregation: intensive}` gives class `intensive`.
+- C4-AC5: Each of `X: {aggregation: flow}`, `X: {function: f, aggregation: mean}`, `X: {function: f, weight: g}` and `X: [f]` raises `ValueError` at initialisation naming `X`, and `pypsa.NetworkCollection` is not constructed.
 
 ---
 
@@ -139,15 +154,22 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 ## C6 Statistics function output
 
 **Requirements**
-1. `aggregate_per_year=True` → MUST return a `pd.Series` with a `pd.MultiIndex` containing at least the levels `location` and `unit`. Values are the totals over all snapshots of the network.
+1. `aggregate_per_year=True` → MUST return a `pd.Series` with a `pd.MultiIndex` containing at least the levels `location` and `unit`. Values are the yearly values according to the variable's aggregation class (C4.5, items 10–12).
 2. `aggregate_per_year=False` → MUST return a `pd.DataFrame` (not a `pd.Series`) whose columns are snapshot timestamps of `n` and whose index is a `pd.MultiIndex` containing at least `location` and `unit`.
-3. Additional index levels MAY be present; they are summed in post-processing (C8).
+3. Additional index levels MAY be present; they are aggregated in post-processing according to the aggregation class (C8). The level name `quantity` is reserved for `intensive` variables (item 12).
 4. Values MUST be of a numeric dtype. NaN and zero are valid values; a result whose values are all zero or all NaN is valid (owner decision, second review round).
 5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`.
 6. `location` values MUST be non-empty values of `n.buses.location` of the evaluated network (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
 7. The result MUST contain at least one row (A-4).
-8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2 and 4–7. Values themselves (zero, NaN, sign, magnitude) are not checked here.
+8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2, 4–7 and the structural parts of items 10–12 (presence and values of the `quantity` level). Values themselves (zero, NaN, sign, magnitude) are not checked here, with the exception of negative weights (item 12).
 9. `Network_Processor` MUST validate every result against item 8. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
+10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings the function uses (e.g. `n.snapshot_weightings.objective` via `n.statistics`). The result MUST NOT have a `quantity` level.
+11. **`stock`**: the yearly value is the end-of-year value of the investment year, typically read from static component data (e.g. `p_nom_opt`) and not summed over snapshots. With `aggregate_per_year=False`, each snapshot column holds the value at that snapshot if time-variant data is available; otherwise every column holds the yearly value. The result MUST NOT have a `quantity` level.
+12. **`intensive`**: the result MUST have an index level `quantity` with exactly the values `value` and `weight`; every row with `quantity = value` MUST have a row with `quantity = weight` and identical other index labels, and vice versa (the weight row carries the same `unit` label as its value row).
+    - `value` rows hold the intensive quantity (e.g. `EUR/MWh`). `weight` rows hold the non-negative weight for aggregation, e.g. the energy volume the price applies to; a negative weight is a structural error. Which weight is used is part of the variable spec.
+    - With `aggregate_per_year=False`, weights are given per snapshot and already include the snapshot weighting (e.g. energy per snapshot in `MWh`, not power).
+    - With `aggregate_per_year=True`, the `value` row is the weighted mean over snapshots, Σₜ vₜ·wₜ / Σₜ wₜ, and the `weight` row is Σₜ wₜ.
+    - The function computes both; `Network_Processor` never aggregates over time.
 
 **Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
 
@@ -161,7 +183,10 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - is a `pd.DataFrame` (not a `pd.Series`) with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
   - has columns that are a subset of `n.snapshots`, at least one row, and only numeric column dtypes;
   - fulfils the `unit` and `location` checks of C6-AC1.
-- C6-AC3: For one function and the same network, the sum over the columns of the `False` result equals the `True` result (weighted by snapshot weightings where the function uses them).
+- C6-AC3: For one function and the same network, the `True` result follows from the `False` result according to the class (per statistics function, in `tests/test_statistics_functions.py`):
+  - `flow`: the sum over the columns of the `False` result equals the `True` result (weighted by snapshot weightings where the function uses them);
+  - `stock`: the last column of the `False` result equals the `True` result;
+  - `intensive`: for each row, the `True` `weight` equals the sum over the columns of the `False` `weight` row, and the `True` `value` equals Σₜ vₜ·wₜ / Σₜ wₜ computed from the `False` `value` and `weight` rows.
 - C6-AC4: `Network_Processor` raises an exception naming the variable and the violation when a function returns, for `aggregate_per_year=True`:
   - a Series with zero rows;
   - a Series without `location` level, or without `unit` level, or with a flat index;
@@ -169,6 +194,8 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - a Series with unit `""`, `"land transport"` or `"foo"`;
   - a Series with location `""` or `"XX9"` (not in `n.buses.location`);
   - a `pd.DataFrame`;
+  - for a `flow` or `stock` variable: a Series with a `quantity` level;
+  - for an `intensive` variable: a Series without `quantity` level; with a `quantity` value other than `value`/`weight`; with a `value` row lacking its `weight` row; with a negative weight;
 
   and, for `aggregate_per_year=False`:
   - a `pd.Series`;
@@ -176,8 +203,6 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - a DataFrame with columns that are not snapshots of `n`;
   - a DataFrame with a non-numeric column.
 - C6-AC5: `Network_Processor` does **not** raise for a structurally valid Series whose values are all `0.0`, nor for one whose values are all NaN; the variable appears in the output (all-NaN rows MAY be dropped by pyam, see OQ-12).
-
-> **Open question:** C6-AC3 assumes that the yearly value is the snapshot-weighted sum of the time series. Whether this holds for all variables (e.g. prices) is open (OQ-8).
 
 ---
 
@@ -198,19 +223,22 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 
 ## C8 Aggregation (in `Network_Processor`)
 
-The country of a location is its first two characters (`AT1` → `AT`).
+The country of a location is its first two characters (`AT1` → `AT`). "Aggregate" in the table means the class-specific operation of item 2 (sum for `flow` and `stock`, weighted mean for `intensive`).
 
 | `aggregation_level` | `country: <code>` (e.g. `AT`) | `country: all` |
 |---|---|---|
-| `country` | keep locations starting with `<code>`, sum them into one row per `(variable, unit)`; region label = `<code>` | sum per country prefix (`AT1 → AT`, `DE2 → DE`); one row per `(variable, country, unit)`; region label = country code |
+| `country` | keep locations starting with `<code>`, aggregate them into one row per `(variable, unit)`; region label = `<code>` | aggregate per country prefix (`AT1 → AT`, `DE2 → DE`); one row per `(variable, country, unit)`; region label = country code |
 | `region` | keep only locations starting with `<code>`; one row per `(variable, location, unit)`; region label = location | keep all locations; one row per `(variable, location, unit)` |
 
 **Requirements**
 1. Aggregation MUST follow the table. It happens after the function returns and before unit conversion.
-2. Index levels other than `location` and `unit` MUST be summed.
-3. Units MUST first be normalised via `UNITS_MAPPING` (C9); values with the same normalised unit are summed.
+2. Index levels other than `location`, `unit` and `quantity` MUST be aggregated according to the aggregation class (C4.5), in the same step as locations:
+   - `flow`, `stock`: sum.
+   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). For time series this is done per snapshot column. If Σ wᵢ = 0, the value is NaN (A-5).
+3. Units MUST first be normalised via `UNITS_MAPPING` (C9); values with the same normalised unit are aggregated together as in item 2.
 4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
 5. A configured country without matching locations: behaviour open (OQ-9).
+6. For `intensive` variables, `weight` rows MUST be dropped after aggregation; only `value` rows reach unit conversion and output. With `aggregation_level: region`, no aggregation over locations takes place, but extra index levels are still aggregated as in item 2.
 
 **Sources:** `Network_Processor._aggregate_to_country`, `_filter_to_regions`, `_select_aggregation_result`, `_postprocess_statistics_result`, `structure_pyam_from_pandas`; `CLAUDE.md` "Aggregation behavior".
 
@@ -224,6 +252,13 @@ The country of a location is its first two characters (`AT1` → `AT`).
 - C8-AC3: `{(AT1, MWh_el): 1, (AT1, MWh_th): 2}` with `country`/`AT` → `AT, MWh = 3`.
 - C8-AC4: With `map_country_codes_to_names: true`, region `AT` becomes `Austria`; an unmapped label is unchanged.
 - C8-AC5: The same input in time series form gives the same results per column.
+- C8-AC6 (`intensive`): input `{(AT1, EUR/MWh, value): 10, (AT1, EUR/MWh, weight): 1, (AT2, EUR/MWh, value): 40, (AT2, EUR/MWh, weight): 2, (DE1, EUR/MWh, value): 5, (DE1, EUR/MWh, weight): 1}`:
+  - `country`/`AT` → one row `AT, EUR/MWh = 30` (= (10·1 + 40·2) / 3);
+  - `country`/`all` → `AT = 30`, `DE = 5`;
+  - `region`/`AT` → `AT1 = 10`, `AT2 = 40`;
+  - in every case the output contains no `weight` rows and no `quantity` level.
+- C8-AC7 (`intensive`): an extra level `carrier` with `(AT1, gas): value 20, weight 1` and `(AT1, oil): value 50, weight 0` gives `AT1 = 20` with `region`/`AT`; a group whose weights are all 0 gives NaN.
+- C8-AC8 (`stock`): `{(AT1, MW): 100, (AT2, MW): 50}` with `country`/`AT` → `AT, MW = 150`, identical to `flow`.
 
 ---
 

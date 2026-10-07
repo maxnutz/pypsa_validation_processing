@@ -17,6 +17,7 @@ Implementing PR: <link, once implemented>
 | IAMC variable | `<Final Energy [by Carrier]\|Electricity>` |
 | Function name | `<Final_Energy_by_Carrier__Electricity>` |
 | Mapping file(s) | `<pypsa_validation_processing/configs/mapping.default.yaml>` |
+| Aggregation class | `<flow \| stock \| intensive>` (C4.5); for `intensive`: weight used = `<e.g. withdrawn energy in MWh>` |
 
 Function name derived per `README.md` "Naming Convention": `|` → `__`, space → `_`, other special characters removed.
 
@@ -89,7 +90,7 @@ Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_c
 | `energy_totals` | `<yes/no>` | <columns read> | variable skipped with `WARNING` (C2.4) |
 
 ## 9. Return format
-- `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit<, …>]`, values = <total over snapshots, weighted>.
+- `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit<, quantity><, …>]`, values = <`flow`: total over snapshots, weighted \| `stock`: end-of-year value \| `intensive`: weighted mean over snapshots, plus `weight` rows> (C6.10–12).
 - `aggregate_per_year=False`: `pd.DataFrame`, MultiIndex `[location, unit<, …>]`, columns = snapshots of `n`.
 - No country aggregation inside the function (C6, C8).
 
@@ -105,6 +106,7 @@ Concrete enough to become tests in `tests/test_statistics_functions.py`.
 - AC1: With `aggregate_per_year=True`, the result fulfils all checks of C6-AC1 (Series, MultiIndex with `location` and `unit`, ≥ 1 row, numeric dtype, valid units, locations in `n.buses.location`). All-zero or all-NaN values are valid.
 - AC2: With `aggregate_per_year=False`, the result fulfils all checks of C6-AC2 (DataFrame, not Series; snapshots of `n` as columns; otherwise as AC1).
 - AC3: <numeric check on a mock network: input values → expected output per location and unit>
+- AC4: The `True` and `False` results are consistent per the aggregation class (C6-AC3).
 - AC4: <sign convention check>
 - AC5: <special case check>
 

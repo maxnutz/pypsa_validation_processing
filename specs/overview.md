@@ -38,7 +38,7 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
    1. Determine the investment year from `n.meta["wildcards"]["planning_horizons"]` (PyPSA-AT networks) or, if absent, from the file name with a `WARNING` (e.g. pypsa-eur networks); load the network config of that year (C2).
    2. Select the variables to evaluate (C3).
    3. For each variable, call its statistics function with `n` and the optional kwargs it declares (C5). Result: `pd.Series` or `pd.DataFrame` per C6.
-   4. Post-process the result: aggregate or filter by `aggregation_level` and `country` (C8), normalise units via `UNITS_MAPPING` (C9), add the `variable` level.
+   4. Post-process the result: aggregate (by aggregation class) or filter by `aggregation_level` and `country` (C8), normalise units via `UNITS_MAPPING` (C9), add the `variable` level.
 4. **Assembly.**
    - `aggregate_per_year: true`: merge all years into one table with one column per investment year.
    - `aggregate_per_year: false`: keep one table per investment year; replace the snapshot year by the investment year (C10).
@@ -70,7 +70,8 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
 | **Country** | ISO 3166-1 alpha-2 code (e.g. `AT`). The country of a location is its first two characters. Output granularity for `aggregation_level: country`. | `Network_Processor._aggregate_to_country`; [contracts.md](contracts.md) C1, C8 |
 | **IAMC variable** | Hierarchical variable name with `|` separators, e.g. `Final Energy [by Carrier]|Electricity`, defined with a unit in the definitions. | `sister_packages/energy-scenarios-at-workflow/definitions/variable/*.yaml`; https://docs.ece.iiasa.ac.at/standards/variables.html |
 | **Statistics function** | Function in `statistics_functions.py` that computes one IAMC variable from one network. | `README.md` "Variable's Statistics - Functions" |
-| **Mapping file** | YAML file `<IAMC variable>: <function name>`. | `configs/mapping.default.yaml` |
+| **Mapping file** | YAML file `<IAMC variable>: <function name>` or `<IAMC variable>: {function: <function name>, aggregation: <class>}`. | `configs/mapping.default.yaml`; [contracts.md](contracts.md) C4 |
+| **Aggregation class** | How a variable is aggregated over time and regions: `flow` (summed over time and regions, e.g. energy), `stock` (end-of-year value, summed over regions, e.g. capacity), `intensive` (weighted mean over time and regions, e.g. prices, specific costs). Declared per variable in the mapping file; default `flow`. | [contracts.md](contracts.md) C4.5, C6, C8 |
 | **Definitions** | Folder in IAMC-valid format read by `nomenclature.DataStructureDefinition`, with `variable/` and `region/` sub-folders. Default: `sister_packages/energy-scenarios-at-workflow/definitions/`; any other valid folder MAY be set via `definitions_path`. | `Network_Processor.read_definitions`; https://nomenclature-iamc.readthedocs.io/en/stable/ |
 | **Network config** | The model config of one investment year, `<network_results_path>/configs/config*<year>.yaml`. Not the package config. | `Network_Processor._get_network_config` |
 | **Package config** | The YAML file passed via `--config`; keys in [configuration.md](configuration.md). | `workflow.resolve_config_path` |
