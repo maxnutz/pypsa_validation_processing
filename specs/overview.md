@@ -33,16 +33,20 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
 
 ## Data flow
 1. **Start.** `workflow.main` parses `--config` and `--log-level`, then creates `Network_Processor(config_path)` (`pypsa_validation_processing/workflow.py::main`). Without `--config`, the packaged `configs/config.default.yaml` is used (`get_default_config_path`).
-2. **Initialisation.** `Network_Processor.__init__` reads and validates the config (C1, [configuration.md](configuration.md)), the mapping file (C4), the definitions (C3) and the network results folder (C2). All checks of [principles.md](constitution/principles.md) P5 happen here.
+2. **Initialisation.** `Network_Processor.__init__` reads and validates the config (C1, [configuration.md](configuration.md)), the mapping file (C4), the definitions (C3) and the network results folder (C2). All checks of [principles.md](constitution/principles.md) P5 that need only config, mapping file, definitions and the results folder happen here (e.g. function existence and signature, C4, C5). Checks that need the result of a statistics function (result structure C6.9, unit labels C9.1, unit errors C9.5) do **not** happen here; they happen in step 3.4 and step 5.
 3. **Per investment year** (`calculate_variables_values`): for each network in the `pypsa.NetworkCollection`:
    1. Determine the investment year from `n.meta["wildcards"]["planning_horizons"]` (PyPSA-AT networks) or, if absent, from the file name with a `WARNING` (e.g. pypsa-eur networks); load the network config of that year (C2).
    2. Select the variables to evaluate (C3).
    3. For each variable, call its statistics function with `n` and the optional kwargs it declares (C5). Result: `pd.Series` or `pd.DataFrame` per C6.
-   4. Post-process the result: aggregate (by aggregation class) or filter by `aggregation_level` and `country` (C8), normalise units via `UNITS_MAPPING` (C9), add the `variable` level.
+   4. Post-process the result, in this order (C8 "Post-processing order"):
+      1. Validate the result structure (C6.9) and the raw unit labels (C9.1).
+      2. **Aggregation:** aggregate or filter by `aggregation_level` and `country` and over extra index levels, grouped by the raw PyPSA unit labels (e.g. `MWh_el` and `MWh_th` stay separate), with the class-specific operation (C8).
+      3. **Unit label normalisation** via `UNITS_MAPPING` (C9.1), e.g. `MWh_el`, `MWh_th` → `MWh`.
+      4. **Re-groupby** by region and normalised unit with the class-specific operation (sum for `flow` and `stock`, weighted mean for `intensive`; C8); then drop `weight` rows and add the `variable` level.
 4. **Assembly.**
    - `aggregate_per_year: true`: merge all years into one table with one column per investment year.
    - `aggregate_per_year: false`: keep one table per investment year; replace the snapshot year by the investment year (C10).
-5. **Structuring** (`structure_pyam_from_pandas`): normalise timestamps, map region codes to names if configured, build a `pyam.IamDataFrame`, convert units to the definition units if configured (C9).
+5. **Structuring** (`structure_pyam_from_pandas`): normalise timestamps, map region codes to names if configured, build a `pyam.IamDataFrame`, convert units to the definition units if configured (C9.2). Unit conversion is always the last transformation of values.
 6. **Export** (`write_output_to_xlsx`): write `.xlsx` file(s) into `output_path` (C10).
 
 ## Components

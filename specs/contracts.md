@@ -230,15 +230,22 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 | `country` | keep locations starting with `<code>`, aggregate them into one row per `(variable, unit)`; region label = `<code>` | aggregate per country prefix (`AT1 → AT`, `DE2 → DE`); one row per `(variable, country, unit)`; region label = country code |
 | `region` | keep only locations starting with `<code>`; one row per `(variable, location, unit)`; region label = location | keep all locations; one row per `(variable, location, unit)` |
 
+**Post-processing order.** After a statistics function has returned a valid result (C6.9), `Network_Processor` MUST apply these steps in this order:
+
+1. **Aggregation** by the table below and over extra index levels (item 2), grouped by the **raw PyPSA unit labels** (`MWh_el` and `MWh_th` stay separate rows).
+2. **Unit label normalisation** via `UNITS_MAPPING` (C9.1).
+3. **Re-groupby** by region label (and `quantity` for `intensive`) and normalised unit, with the same class-specific operation as in step 1 (item 2).
+4. **Unit conversion** (C9.2), if configured. It is always the last transformation of values.
+
 **Requirements**
-1. Aggregation MUST follow the table. It happens after the function returns and before unit conversion.
+1. Aggregation MUST follow the table and the post-processing order above.
 2. Index levels other than `location`, `unit` and `quantity` MUST be aggregated according to the aggregation class (C4.5), in the same step as locations:
    - `flow`, `stock`: sum.
-   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). For time series this is done per snapshot column. If Σ wᵢ = 0, the value is NaN (A-5).
-3. Units MUST first be normalised via `UNITS_MAPPING` (C9); values with the same normalised unit are aggregated together as in item 2.
+   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0, the value is NaN (A-5).
+3. Normalisation (step 2) MUST NOT happen before aggregation (step 1). Rows that share region label and normalised unit after step 2 MUST be combined in step 3 with the operation of item 2.
 4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
 5. A configured country without matching locations: behaviour open (OQ-9).
-6. For `intensive` variables, `weight` rows MUST be dropped after aggregation; only `value` rows reach unit conversion and output. With `aggregation_level: region`, no aggregation over locations takes place, but extra index levels are still aggregated as in item 2.
+6. For `intensive` variables, `weight` rows MUST be dropped after step 3 (re-groupby); only `value` rows reach unit conversion and output. With `aggregation_level: region`, no aggregation over locations takes place, but extra index levels are still aggregated as in item 2.
 
 **Sources:** `Network_Processor._aggregate_to_country`, `_filter_to_regions`, `_select_aggregation_result`, `_postprocess_statistics_result`, `structure_pyam_from_pandas`; `CLAUDE.md` "Aggregation behavior".
 
@@ -249,7 +256,8 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
   - `region`/`AT` → `AT1 = 1`, `AT2 = 2`;
   - `region`/`all` → `AT1 = 1`, `AT2 = 2`, `DE1 = 4`.
 - C8-AC2: Input with an extra level `carrier` is summed over `carrier`.
-- C8-AC3: `{(AT1, MWh_el): 1, (AT1, MWh_th): 2}` with `country`/`AT` → `AT, MWh = 3`.
+- C8-AC3: `{(AT1, MWh_el): 1, (AT2, MWh_el): 4, (AT1, MWh_th): 2}` with `country`/`AT`: after step 1 `{(AT, MWh_el): 5, (AT, MWh_th): 2}`; after steps 2–3 one row `AT, MWh = 7`.
+- C8-AC3b (`intensive`): `{(AT1, EUR/MWh_el): value 10, weight 1; (AT1, EUR/MWh_th): value 40, weight 2}` with `region`/`AT` → after step 1 two value rows (10 and 40); after steps 2–3 one row `AT1, EUR/MWh = 30` (= (10·1 + 40·2) / 3).
 - C8-AC4: With `map_country_codes_to_names: true`, region `AT` becomes `Austria`; an unmapped label is unchanged.
 - C8-AC5: The same input in time series form gives the same results per column.
 - C8-AC6 (`intensive`): input `{(AT1, EUR/MWh, value): 10, (AT1, EUR/MWh, weight): 1, (AT2, EUR/MWh, value): 40, (AT2, EUR/MWh, weight): 2, (DE1, EUR/MWh, value): 5, (DE1, EUR/MWh, weight): 1}`:
@@ -265,12 +273,12 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 ## C9 Unit conversion
 
 **Requirements**
-1. **Unit validation and normalisation.**
-   - Before normalisation, every `unit` value MUST be checked. An empty (or whitespace-only) string and a carrier label MUST be rejected with `ValueError` naming variable and value, **even if the value is a key of `UNITS_MAPPING`**. Example: `land transport` is a carrier label, not a unit.
+1. **Unit validation and normalisation.** Normalisation is step 2 of the post-processing order (C8): after aggregation, before re-groupby and conversion.
+   - Before aggregation (as part of result validation, C6.5), every raw `unit` value MUST be checked. An empty (or whitespace-only) string and a carrier label MUST be rejected with `ValueError` naming variable and value, **even if the value is a key of `UNITS_MAPPING`**. Example: `land transport` is a carrier label, not a unit.
    - `utils.UNITS_MAPPING` MUST contain only physical units as keys and values; the current keys `""` and `"land transport"` are not allowed. (SC-9)
    - Every valid PyPSA unit is then normalised via `UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` → `MWh`; `t_co2` → `t`).
    - A unit that is not a key of `UNITS_MAPPING` MUST raise `ValueError` naming variable and unit; it MUST NOT become NaN. (SC-9)
-2. **Conversion.** If `convert_units: true` and definitions are used (C3), each variable MUST be converted with `pyam.IamDataFrame.convert_unit(current, to)` from the normalised unit to the unit in the definitions (pint with the `iam-units` registry). If both are equal, no conversion takes place.
+2. **Conversion.** Conversion is step 4 of the post-processing order (C8), the last transformation of values. If `convert_units: true` and definitions are used (C3), each variable MUST be converted with `pyam.IamDataFrame.convert_unit(current, to)` from the normalised unit to the unit in the definitions (pint with the `iam-units` registry). If both are equal, no conversion takes place.
 3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10)
 4. If a variable has several definition entries, the first one is used and a `WARNING` is logged.
 5. Errors (each MUST raise an exception naming the variable):
