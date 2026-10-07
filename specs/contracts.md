@@ -274,11 +274,10 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10)
 4. If a variable has several definition entries, the first one is used and a `WARNING` is logged.
 5. Errors (each MUST raise an exception naming the variable):
-   - variable without unit → `ValueError`;
-   - several units for one variable after normalisation → `ValueError`;
-   - variable missing in the definitions → exception;
-   - definition without unit → exception;
-   - unit not convertible → `ValueError`.
+   - always: variable without unit → `ValueError`; several units for one variable after normalisation → `ValueError`;
+   - only when conversion applies (C9.2: `convert_units: true` and definitions used): definition without unit → exception; unit not convertible → `ValueError`.
+
+   A variable missing from the definitions never reaches this step (C3.1); with `definitions_path: false`, no definition-related check takes place (C3.2, C9.6).
 6. If `convert_units: false` or `definitions_path: false`, output units are the normalised PyPSA units.
 
 **Sources:** `Network_Processor._map_unit_level`, `_convert_units_to_common_definitions`, `_get_unit_from_common_definitions`; `utils.UNITS_MAPPING`; `definitions/variable/*.yaml`; https://pyam-iamc.readthedocs.io/en/stable/ (`convert_unit`).
