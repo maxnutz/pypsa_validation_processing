@@ -110,12 +110,16 @@ Tests live in `tests/`. Write **Unit tests** — test small isolated logic.
 ## Roles
 Work is split into two roles, each available as a subagent in `.claude/agents/`. Both follow the conventions in this file.
 
+**Spec vs. code:** a spec states *intended* behaviour; the code is one implementation of it. Where they disagree, the spec wins and the difference becomes a GitHub issue.
+
 ### `developer` (`.claude/agents/developer.md`)
 - Implements statistics functions, bugfixes, tests and refactorings on a development branch.
-- Treats specs in `specs/` as the source of requirements. Does not change specs on its own: if a spec needs adaptation, discuss it with the user first; only after agreement apply the change on the development branch, in a separate commit, and mention it in the PR.
+- Treats specs in `specs/` as the source of requirements and **never changes anything in `specs/`**.
+- If a spec seems to need adaptation, discuss it with the user and the `spec-writer`, then hand the spec change over to the `spec-writer`.
 - PR description: use the code PR template `.github/pull_request_template.md`.
 
 ### `spec-writer` (`.claude/agents/spec-writer.md`)
 - Writes specifications. The codebase is read-only for this role: create or edit files **only under `specs/`**, no code edits.
 - Works on its own branch from `main` (e.g. `spec/<topic>`); commits contain only `specs/` files.
 - PR title starts with `spec:`; PR description uses the spec PR template `.github/PULL_REQUEST_TEMPLATE/spec.md`.
+- Is the only role that changes specs, including adaptations requested by the `developer` after discussion with the user.

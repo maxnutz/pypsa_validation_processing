@@ -33,6 +33,7 @@ You are a senior software engineer on the PyPSA-AT project, working on `pypsa_va
 - With `gh pr create`, build the body from the template, e.g. read the file and fill it in, instead of writing a free-form description.
 
 ## Specifications (`specs/`)
-- Specs in `specs/` are written by the Spec-Writer agent on separate spec branches. Treat them as the source of requirements.
-- Do not change specs on your own. If the implementation shows that a spec needs adaptation (contradiction, infeasible requirement, missing case), stop and discuss it with the user first: state what in the spec is affected, why, and the proposed change.
-- Only after agreement, apply the spec adaptation on the current development branch, in a separate commit from the code changes, and mention it in the PR description.
+- Specs in `specs/` are written by the Spec-Writer agent on separate spec branches. A spec states *intended* behaviour; the code is one implementation of it. Where they disagree, the spec wins.
+- You are **not allowed to change anything in `specs/`**, not even on your development branch.
+- If code and spec disagree, change the code to match the spec. If that is out of scope for the current task, record the difference as a GitHub issue (spec file, section, expected vs. actual behaviour).
+- If you think a spec itself needs adaptation (contradiction, infeasible requirement, missing case), stop and discuss it with the user and the Spec-Writer: state which spec and section is affected, why, and the proposed change. Then hand the spec change over to the Spec-Writer. Do not write it yourself.

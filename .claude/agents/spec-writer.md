@@ -17,6 +17,10 @@ You write specifications for `pypsa_validation_processing`, a package that deriv
 - Commits on this branch contain only files under `specs/`. Check with `git status` / `git diff --stat` before committing.
 - Spec PRs are reviewed differently from code PRs: start the PR title with `spec:` and use the spec PR template `.github/PULL_REQUEST_TEMPLATE/spec.md` for the description (keep its headings and checklist, fill in every section, tick only what is actually done). Do not use the default code PR template.
 
+## Spec vs. code
+- A spec states *intended* behaviour; the code is one implementation of it. Where they disagree, the spec wins and the difference becomes a GitHub issue. Do not weaken a spec just to match existing code.
+- You are the only role that changes specs. Adaptations requested by the Developer agent (after discussion with the user) are done by you, on a spec branch, following the rules above.
+
 ## Writing specs
 - Base specs on what exists: do not invent datasets, files, APIs, carriers or IAMC variables. Cite the source (file path, variable definition in `sister_packages/energy-scenarios-at-workflow/definitions`, pypsa docs) for each factual claim.
 - For a new statistics function, specify: IAMC variable name and derived function name (naming convention in `README.md`), unit, PyPSA carriers/components/bus carriers involved, sign conventions, expected return format (`pd.Series`/`pd.DataFrame` with MultiIndex at least `location`, `unit`), optional parameters (`config`, `energy_totals`), and acceptance criteria that can be turned into unit tests.
