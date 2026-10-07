@@ -45,8 +45,8 @@ Code references are to commit `1b38477` (branch base of `spec/kickoff-scaffold`)
 | SC-15 | Time series columns are UTC (`+00:00`). | Code uses UTC (`format_timestamps`, `fixed_tz` = +00:00); `README.md` "Output behavior" says fixed `+01:00`. | `class_definitions.py` l.52; `README.md` |
 | SC-16 | Statistics-function results are Series/DataFrame per C6. | `tests/README.md` describes `TestFinalEnergyByCarrierElectricity` as "Validates return type (DataFrame)" with levels "country, unit", and lists a `TestEU27CountryCodes` class that does not exist (actual: `TestRegionsCodes`). | `tests/README.md`; `tests/test_utils.py` |
 | SC-17 | Several matching network configs → first in lexicographic order, `WARNING`. | `glob.glob` order (not sorted), logged at `INFO`. | `class_definitions.py` l.777-789 |
-| SC-19 | Every key with a wrong data type → `ValueError`; unquoted `country: NO` (parsed as `false`) is rejected with a hint to quote it. | Types of `network_results_path`, `definitions_path`, `country`, `model_name`, `scenario_name`, `mapping_path`, `output_path`, `aggregation_level` are not checked; `country: NO` gives the misleading message `got: False`. | `class_definitions.py` l.165-279 |
 | SC-18 | All config validation before reading networks. | `aggregation_level`, `aggregate_per_year`, `map_country_codes_to_names` are validated after `_read_pypsa_network_collection` and `read_definitions`. | `class_definitions.py` l.234-258 |
+| SC-19 | Every key with a wrong data type → `ValueError`; unquoted `country: NO` (parsed as `false`) is rejected with a hint to quote it. | Types of `network_results_path`, `definitions_path`, `country`, `model_name`, `scenario_name`, `mapping_path`, `output_path`, `aggregation_level` are not checked; `country: NO` gives the misleading message `got: False`. | `class_definitions.py` l.165-279 |
 
 ## Assumptions
 
