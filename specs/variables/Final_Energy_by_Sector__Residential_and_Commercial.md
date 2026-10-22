@@ -46,7 +46,7 @@ Implementing PR: –
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, with reason:
-- The `urban central heat` Load is divided by `1 + λ` (distribution losses), as in `Final Energy [by Carrier]|District Heat` (OQ-21).
+- The `urban central heat` Load is divided by `1 + λ` (distribution losses), as in `Final Energy [by Carrier]|District Heat` (owner decision 2026-10-22, OQ-21 resolved).
 - Per location (D1); no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
@@ -95,7 +95,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC6: C6-AC6.
 
 ## 12. Open questions
-- OQ-21 (loss correction), OQ-22 (double counting with agriculture/industry decentral heat), OQ-6.
+- OQ-22 (double counting with agriculture/industry decentral heat), OQ-6.
 
 ## 13. Sources
 - #14, #2; definitions as in section 2

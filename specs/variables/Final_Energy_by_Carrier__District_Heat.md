@@ -49,7 +49,7 @@ Owner decision (2026-10-22): the variable measures what its definition says, **h
 
 Changes to the ported logic, with reason:
 - Only the parts delivered from `urban central heat` buses are taken (definition).
-- The `urban central heat` Load is divided by `1 + λ` to exclude distribution losses (definition). pypsa-de counts the Load including losses (OQ-21).
+- The `urban central heat` Load is divided by `1 + λ` to exclude distribution losses (definition). pypsa-de counts the Load including losses. Owner decision 2026-10-22 (OQ-21 resolved): consistency with the definition takes precedence; the correction is applied and checked against real data during implementation.
 
 ## 5. Match type
 - Match type: `semantic` (partial).
@@ -101,7 +101,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_th` (or `MWh`).
 - AC8: An unknown withdrawing carrier on `urban central heat` raises `ValueError`.
 
 ## 12. Open questions
-- OQ-21 (loss correction deviates from pypsa-de), OQ-6 (`config=None`).
+- OQ-6 (`config=None`). OQ-21 resolved.
 
 ## 13. Sources
 - #63 (incl. comment), #73; definitions as in section 2

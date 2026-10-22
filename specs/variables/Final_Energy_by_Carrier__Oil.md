@@ -48,7 +48,7 @@ Implementing PR: –
 
 Changes to the ported logic, only as needed for the function contract:
 - The fossil share `f_oil` is adapted to the single `EU oil` bus (D2). It is system-wide (owner decision 2026-10-22) and replaces the regional clipped ratio (#53).
-- `shipping methanol` is not counted (pypsa-de counts it in `Liquids` and therefore partly in `Petroleum`). Reason: methanol is not oil and is not supplied by the oil bus (OQ-20).
+- `shipping methanol` is not counted (pypsa-de counts it in `Liquids` and therefore partly in `Petroleum`). Reason: methanol is not oil and is not supplied by the oil bus. Owner decision 2026-10-22 (OQ-20 resolved): methanol belongs to `E-Fuels` or `Biofuels`, depending on its production pathway.
 - Domestic shares per country (D4) instead of one value per region.
 - Per location (D1); no `MWh2TWh`; zero-fill (C6.13).
 
@@ -65,7 +65,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `kerosene for aviation` | `kerosene for aviation` | withdrawal × `d_aviation` (D4) | yes | l.2463-2467 |
 | Load | `shipping oil` | `shipping oil` | withdrawal × `d_navigation` (D4) | yes | l.2468-2470 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` (D5) | yes | l.2192-2197 |
-| Load | `shipping methanol` | `shipping methanol` | – | **no** (OQ-20) | l.2472-2474 |
+| Load | `shipping methanol` | `shipping methanol` | – | **no** (OQ-20 resolved; counted in `E-Fuels`/`Biofuels`) | l.2472-2474 |
 | Link | `oil` (power plant), `urban central oil CHP` | `oil` | – | **no** (transformation) | l.2642-2647 |
 | Link | `agriculture machinery oil`, `land transport oil`, `kerosene for aviation`, `shipping oil`, `naphtha for industry` (oil → demand bus) | `oil` | – | **no** (delivery to the Load bus; the Load is counted) | carriers table |
 
@@ -102,7 +102,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 - AC8: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-18 (`NE_naphtha`), OQ-20 (shipping methanol), OQ-1 (year of `energy_totals`).
+- OQ-18 (`NE_naphtha`), OQ-1 (year of `energy_totals`). OQ-20 resolved.
 
 ## 13. Sources
 - #46, #53, #2; definitions as in section 2
