@@ -59,7 +59,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Component | Carrier(s) | Bus carrier | Port | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `agriculture electricity`, `agriculture machinery electric` | `low voltage` | withdrawal | yes | l.2553-2555 |
-| Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution` (e.g. Load `electricity`; Links `rural air heat pump`, `rural ground heat pump`, `rural resistive heater`, `urban decentral air heat pump`, `urban decentral resistive heater`) | `low voltage` | withdrawal (bus0) | yes (residential and commercial) | l.2278-2302 |
+| Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution` (e.g. Load `electricity`; Links `rural air heat pump`, `rural ground heat pump`, `rural resistive heater`, `urban decentral air heat pump`, `urban decentral resistive heater`) | `low voltage` | withdrawal at the `low voltage` port (for heat pumps this is `bus1`: in PyPSA-AT they have `bus0` = heat bus, `bus1` = `low voltage`, measured AT11 2025) | yes (residential and commercial) | l.2278-2302 |
 | Link | `BEV charger` | `low voltage` | withdrawal (bus0) | yes (transportation) | l.2437-2439 |
 | Load | `industry electricity` | `low voltage` | withdrawal | yes | l.2113-2119 |
 | Link | `DAC` | `AC` | withdrawal | yes | l.2591-2603 |

@@ -57,7 +57,7 @@ Changes to the ported logic, only as needed for the function contract:
 |---|---|---|---|---|---|
 | Link | `BEV charger` | `low voltage` | withdrawal (bus0) | yes, **not** divided by the charger efficiency | l.2437-2439 |
 | Load | `land transport fuel cell` | `H2` | withdrawal | yes | l.2448-2450 |
-| Load | `land transport oil` | `land transport oil` | withdrawal, unit D7 | yes, **not** divided by an engine efficiency (OQ-19) | l.2476-2477 |
+| Load | `land transport oil` | `land transport oil` | withdrawal, unit D7 | yes, **not** divided by an engine efficiency (D7, OQ-19 resolved) | l.2476-2477 |
 | Load | `kerosene for aviation` | `kerosene for aviation` | × `d_aviation` (D4) | yes | l.2463-2467 |
 | Load | `shipping oil` | `shipping oil` | × `d_navigation` (D4) | yes | l.2468-2470 |
 | Load | `shipping methanol` | `shipping methanol` | × `d_navigation` (D4) | yes | l.2472-2474 |
@@ -74,7 +74,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | no (see OQ-19) | – | – |
+| `config` | no | – | – |
 | `energy_totals` | yes | D4 | variable skipped with `WARNING` (C2.4, SC-7) |
 
 ## 9. Return format
@@ -96,7 +96,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-19 (#19 efficiency division), OQ-1 (year of `energy_totals`).
+- OQ-1 (year of `energy_totals`). OQ-19 resolved (D7).
 
 ## 13. Sources
 - #15, #19 (incl. comments), #5; definitions as in section 2
