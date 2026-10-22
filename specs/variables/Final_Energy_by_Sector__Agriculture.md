@@ -45,7 +45,9 @@ Implementing PR: –
 | pypsa-de variable name | `Final Energy\|Agriculture` |
 | pypsa-de commit | `a5baa7e9` |
 
-Changes to the ported logic, only as needed for the function contract: per location; no `MWh2TWh`; zero-fill (C6.13).
+Changes to the ported logic, with reason:
+- `agriculture heat` is not counted as heat. Instead, the agricultural share of the decentral heat input of the `rural heat` bus is counted (D8, owner decision 2026-10-22, OQ-22 resolved). Reason: the delivered heat and the fuel producing it were counted in two sectors.
+- Per location; no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
 - Match type: `exact`.
@@ -54,15 +56,16 @@ Changes to the ported logic, only as needed for the function contract: per locat
 | Component | Carrier(s) | Bus carrier | Port | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `agriculture electricity`, `agriculture machinery electric` | `low voltage` | withdrawal | yes | l.2553-2555 |
-| Load | `agriculture heat` | `rural heat` | withdrawal (heat, `MWh_th`) | yes | l.2556 |
+| Load | `agriculture heat` | `rural heat` | used only as heat demand for the share `σ_rural,agr(l)` (D8) | **no** (as heat) | l.2556 |
+| Links / Generators | decentral heat supply of `rural heat` (D8) | input carriers | input × `σ_rural,agr(l)` | yes | D8 |
 | Load | `agriculture machinery oil` | `agriculture machinery oil` | withdrawal | yes | l.2557-2559 |
 | Link | `agriculture machinery oil` (supply), `agriculture machinery oil CC` | – | – | **no** (supply-link losses are not final energy) | l.2553-2565 |
 
 ## 7. Accounting rule and sign convention
-- Formula: `FE_agr(l) = L[agriculture electricity](l) + L[agriculture machinery electric](l) + L[agriculture heat](l) + L[agriculture machinery oil](l)`
+- Formula: `FE_agr(l) = L[agriculture electricity](l) + L[agriculture machinery electric](l) + L[agriculture machinery oil](l) + D8_agr(l)`
 - Sign convention: withdrawals positive; result MUST be ≥ 0.
 - Weighting: per C6.10.
-- Note: `agriculture heat` is counted as heat, while the fuels of the decentral boilers and heat pumps that supply the `rural heat` bus are counted in `Final Energy [by Sector]|Residential and Commercial` (pypsa-de l.2352-2409). Across both sectors this can double count (OQ-22).
+- `σ_rural,agr(l)` is computed from yearly values and applied to every snapshot (D8).
 
 ## 8. Optional kwargs
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
@@ -81,13 +84,13 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock at `A`, 1 snapshot: Loads 2 + 1 + 3 + 4, plus an `agriculture machinery oil CC` link with input 5 and output 4. Result `(A, MWh): 10`.
+- AC3: Mock at `A`, 1 snapshot: Loads `agriculture electricity` 2, `agriculture machinery electric` 1, `agriculture machinery oil` 4; `agriculture heat` 3 and `rural heat` 9 on the `rural heat` bus (`σ_rural,agr = 0.25`); rural heat inputs `rural biomass boiler` 8 and `rural ground heat pump` electricity 4 (`I_rural = 12`); an `agriculture machinery oil CC` link with input 5 and output 4. Result `(A, MWh): 2 + 1 + 4 + 0.25·12 = 10`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6 (incl. a location without agriculture loads).
 
 ## 12. Open questions
-- OQ-22 (double counting of decentral heat across sectors).
+None specific. OQ-22 resolved (D8).
 
 ## 13. Sources
 - #13, #2; definitions as in section 2

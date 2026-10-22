@@ -2,7 +2,7 @@
 
 Status: draft
 
-Rules and quantities used by more than one variable spec. Variable specs reference them as D1–D7 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
+Rules and quantities used by more than one variable spec. Variable specs reference them as D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
@@ -85,3 +85,24 @@ FE_coal_industry = L[coal for industry]·(1 − κ) + L[coal for industry]·κ /
 `land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is a bus label, not a physical unit (C9.1, SC-9). The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.
 
 A statistics function MUST therefore report this flow with unit `MWh_LHV` and MUST NOT divide it by a vehicle efficiency (owner decision 2026-10-22, OQ-19 resolved: the hint in #19 applies only to networks whose Load is not yet fuel energy). Check on AT 2025 (`resources/electricity_network_0p3`): 65.10 TWh = 234.4 PJ, against 267.4 PJ `Final Energy [by Sector]|Transportation|Oil` in the Eurostat energy balance 2024.
+
+## D8 Split of decentral heat input between sectors `D8_sec(l)`
+Owner decision 2026-10-22 (OQ-22 resolved): for decentral heat, the `Final Energy [by Sector]` variables measure the **energy input** to decentral heat supply, not the delivered heat. The input is split between sectors per location, in proportion to their heat demands. District heat (`urban central heat`) is not affected; there the delivered heat is counted (`Final Energy [by Carrier]|District Heat`).
+
+For each decentral bus type `b ∈ {rural heat, urban decentral heat}` and location `l`:
+
+1. **Input `I_b(l)`**: energy entering the decentral heat supply of `b` at `l`, kept per input carrier:
+   - Links whose heat output goes to a `b` bus (`rural|urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`): withdrawal at the input port, i.e. at the bus that is not the heat bus. For heat pumps in PyPSA-AT this is `bus1` = `low voltage`, because `bus0` is the heat bus (measured AT11 2025). Location per D1 (e.g. `rural oil boiler` from `EU oil` → location of its heat bus).
+   - Generators `rural solar thermal`, `urban decentral solar thermal`: their heat supply (as pypsa-de, l.2349-2350: "for solar thermal secondary energy == Final energy").
+   - Excluded: water-tank/pit chargers and dischargers (storage), heat vents (dumped heat). Ambient heat drawn by heat pumps is not part of `I_b` (`Final Energy [by Carrier]|Ambient Heat`, #75).
+2. **Heat demands `H_b,x(l)`** (yearly, withdrawals from `b` buses at `l`):
+   - `x = rc`: Load `rural heat` (on `rural heat`), Load `urban decentral heat` (on `urban decentral heat`);
+   - `x = agr`: Load `agriculture heat` (on `rural heat`);
+   - `x = ind`: Load `low-temperature heat for industry` (on `urban decentral heat`; pypsa-eur places it there only in nodes without an `urban central heat` bus, `prepare_sector_network.py` l.5280-5294);
+   - `x = other`: any other withdrawal except storage chargers and heat vents (e.g. `DAC` on `urban decentral heat`). Its share is not assigned to any of the three sectors.
+3. **Share** `σ_b,x(l) = H_b,x(l) / Σ_x H_b,x(l)`. If the denominator is 0, then `σ_b,x(l) = 0`. Shares are computed from yearly values and applied to every snapshot, so that C6-AC3 holds.
+4. **Sector value** `D8_x(l) = Σ_b σ_b,x(l) · I_b(l)`. Values are normalised to `MWh` before summing over input carriers (C6.5).
+
+Consistency: for every `l` and `b`, `Σ_x σ_b,x(l) · I_b(l) = I_b(l)` (no energy is counted twice or lost). `Final Energy [by Carrier]|*` variables are not split by sector and keep counting the full input of their carrier (e.g. all `rural oil boiler` oil in `Final Energy [by Carrier]|Oil`).
+
+Deviation from pypsa-de: pypsa-de assigns the full decentral input to Residential and Commercial (l.2297-2409) and counts `agriculture heat` (l.2556) and decentral `low-temperature heat for industry` (l.2121-2123) as heat. This double counts; AT 2025 (`electricity_network_0p3`): `rural heat` 2.60 TWh, `urban decentral heat` 0.09 TWh, total ≈ 9.7 PJ (OQ-22). Shares vary per location (`rural heat`, agriculture share 4.9–100 %), so a per-location split is required.

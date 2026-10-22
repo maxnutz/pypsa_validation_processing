@@ -48,6 +48,7 @@ Implementing PR: –
 
 Changes to the ported logic, only as needed for the function contract:
 - `NE_x` and `κ` cannot be computed from the pypsa-de inputs (D5, D6); method open (OQ-18).
+- Decentral `low-temperature heat for industry` (on `urban decentral heat`) is not counted as heat. Instead, the industrial share of the decentral heat input is counted (D8, owner decision 2026-10-22, OQ-22 resolved). The Load on `urban central heat` stays counted as delivered heat (district heat is a final energy carrier).
 - Per location; no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
@@ -58,7 +59,9 @@ Changes to the ported logic, only as needed for the function contract:
 | Component | Carrier(s) | Bus carrier | Port | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `industry electricity` | `low voltage` | withdrawal | yes | l.2113-2119 |
-| Load | `low-temperature heat for industry` (central and decentral buses) | `urban central heat`, `urban decentral heat` | withdrawal | yes | l.2121-2127 |
+| Load | `low-temperature heat for industry` on `urban central heat` | `urban central heat` | withdrawal (heat) | yes | l.2121-2127 |
+| Load | `low-temperature heat for industry` on `urban decentral heat` | `urban decentral heat` | used only as heat demand for `σ_urban decentral,ind(l)` (D8) | **no** (as heat) | l.2121-2127 |
+| Links / Generators | decentral heat supply of `urban decentral heat` (D8) | input carriers | input × `σ_urban decentral,ind(l)` | yes | D8 |
 | Load | `gas for industry` | `gas for industry` | withdrawal − `NE_gas` | yes | l.2135-2146 |
 | Load | `H2 for industry` | `H2` | withdrawal − `NE_H2` | yes | l.2157-2162 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` | yes | l.2192-2197 |
@@ -68,7 +71,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Link | `… for industry CC`, `… for industry` (supply links) | – | – | **no** (efficiency losses of supply links are not final energy; the Load is counted) | l.2253-2262 |
 
 ## 7. Accounting rule and sign convention
-- Formula: `FE_ind(l) = L[industry electricity](l) + L[low-temperature heat for industry](l) + L[gas for industry](l) − NE_gas(l) + L[H2 for industry](l) − NE_H2(l) + L[naphtha for industry](l) − NE_naphtha(l) + L[solid biomass for industry](l) + FE_coal_industry(l)` (D5, D6)
+- Formula: `FE_ind(l) = L[industry electricity](l) + L[low-temperature heat for industry @ urban central heat](l) + D8_ind(l) + L[gas for industry](l) − NE_gas(l) + L[H2 for industry](l) − NE_H2(l) + L[naphtha for industry](l) − NE_naphtha(l) + L[solid biomass for industry](l) + FE_coal_industry(l)` (D5, D6)
 - Sign convention: withdrawals positive; result MUST be ≥ 0.
 - Weighting: per C6.10.
 
@@ -89,11 +92,12 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock at `A`, 1 snapshot, all `NE = 0`, `κ = 0`: Loads `industry electricity` 10, LT heat 5, `gas for industry` 8, `H2 for industry` 2, `naphtha for industry` 6, `solid biomass for industry` 3, `coal for industry` 4, `industry methanol` 7; `gas for industry CC` link with input 10 and output 9. Result `(A, MWh): 38`.
+- AC3: Mock at `A`, 1 snapshot, all `NE = 0`, `κ = 0`: Loads `industry electricity` 10, `low-temperature heat for industry` 5 on `urban central heat`, `gas for industry` 8, `H2 for industry` 2, `naphtha for industry` 6, `solid biomass for industry` 3, `coal for industry` 4, `industry methanol` 7; `gas for industry CC` link with input 10 and output 9. Result `(A, MWh): 38`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6.
 - AC7: With `NE_gas = 3` injected (OQ-18 method), the result decreases by exactly 3.
+- AC8: Mock at `B` without `urban central heat` bus: `low-temperature heat for industry` 1 and `urban decentral heat` Load 3 on `urban decentral heat` (`σ = 0.25`), `urban decentral gas boiler` gas input 6. The decentral heat contribution to the result is `0.25·6 = 1.5`, not 1.
 
 ## 12. Open questions
 - OQ-18.
