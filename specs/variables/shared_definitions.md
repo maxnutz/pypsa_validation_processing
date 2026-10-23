@@ -6,7 +6,7 @@ Rules and quantities used by more than one variable spec. Variable specs referen
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
-Checked on 2026-10-23 against `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc` (52 locations, 24 snapshots, weighting 365 h): D1 (single `EU oil`, `EU coal` buses; 51 regional `gas` buses), D7 (`land transport oil` bus unit `land transport`; Load absent in 2050) and the D8 port convention of heat pumps (`bus0` heat, `bus1` `low voltage`) hold. Deviations: OQ-23 (D2, D3; resolved), OQ-25 (D8), OQ-26 (D2 for kerosene).
+Checked on 2026-10-23 against `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc` (52 locations, 24 snapshots, weighting 365 h): D1 (single `EU oil`, `EU coal` buses; 51 regional `gas` buses), D7 (`land transport oil` bus unit `land transport`; Load absent in 2050) and the D8 port convention of heat pumps (`bus0` heat, `bus1` `low voltage`) hold. Deviations: OQ-23 (D2, D3; resolved), OQ-25 (D8; resolved), OQ-26 (D2 for kerosene).
 
 Notation: `L[c](l)` = withdrawal of the Loads with carrier `c` at location `l`; `W[bc, c](l)` = withdrawal of components with carrier `c` from buses with bus carrier `bc`; `S[bc, c]` = supply to buses with bus carrier `bc`. All flows are `flow` quantities in the sense of C6.10: weighted sum over snapshots for `aggregate_per_year=True`, unweighted per-snapshot values for `aggregate_per_year=False`.
 
@@ -102,7 +102,7 @@ For each decentral bus type `b ∈ {rural heat, urban decentral heat}` and locat
 1. **Input `I_b(l)`**: energy entering the decentral heat supply of `b` at `l`, kept per input carrier:
    - Links whose heat output goes to a `b` bus (`rural|urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`): withdrawal at the input port, i.e. at the bus that is not the heat bus. For heat pumps in PyPSA-AT this is `bus1` = `low voltage`, because `bus0` is the heat bus (measured AT11 2025). Location per D1 (e.g. `rural oil boiler` from `EU oil` → location of its heat bus).
    - Generators `rural solar thermal`, `urban decentral solar thermal`: their heat supply (as pypsa-de, l.2349-2350: "for solar thermal secondary energy == Final energy").
-   - CHPs that supply a decentral heat bus (e.g. `biogas CHP` → `rural heat`): open (OQ-25).
+   - CHPs, i.e. Links with a heat output to a `b` bus and a further non-heat output (e.g. `biogas CHP`: bus0 `biogas`, bus1 `AC`, bus2 `rural heat`): their **heat supply** at the `b` port, not their input. The electricity part is electricity production and not part of `I_b`. This treats CHP heat on decentral buses like CHP heat on `urban central heat` buses, where the delivered heat is counted (`Final Energy [by Carrier]|District Heat`). Owner decision 2026-10-23 (OQ-25).
    - Excluded: water-tank/pit chargers and dischargers (storage), heat vents (dumped heat). Ambient heat drawn by heat pumps is not part of `I_b` (`Final Energy [by Carrier]|Ambient Heat`, #75).
 2. **Heat demands `H_b,x(l)`** (yearly, withdrawals from `b` buses at `l`):
    - `x = rc`: Load `rural heat` (on `rural heat`), Load `urban decentral heat` (on `urban decentral heat`);

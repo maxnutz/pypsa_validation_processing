@@ -100,7 +100,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC8: Mock at `B` without `urban central heat` bus: `low-temperature heat for industry` 1 and `urban decentral heat` Load 3 on `urban decentral heat` (`σ = 0.25`), `urban decentral gas boiler` gas input 6. The decentral heat contribution to the result is `0.25·6 = 1.5`, not 1.
 
 ## 12. Open questions
-- OQ-18, OQ-25 (CHP on decentral heat bus).
+- OQ-18. OQ-25 resolved (D8).
 
 ## 13. Sources
 - #12, #74, #2; definitions as in section 2
