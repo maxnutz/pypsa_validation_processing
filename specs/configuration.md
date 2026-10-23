@@ -12,7 +12,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 |---|---|---|---|---|---|---|
 | `network_results_path` | path (string) | yes | – | existing directory | Results folder (C2). | missing or wrong type: `ValueError`; not existing: `FileNotFoundError` |
 | `definitions_path` | path (string) or `false` | yes | – | existing directory in IAMC-valid definitions format, or `false` / `"false"` (case-insensitive) | Folder → variables from definitions + unit conversion; `false` → all mapping variables, no conversion (C3). | missing/empty or wrong type: `ValueError`; not existing: `FileNotFoundError` |
-| `country` | string | yes | – | ISO 3166-1 alpha-2 code, incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
+| `country` | string | yes | – | ISO 3166-1 alpha-2 code, incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), `EU` (European Union = the 27 member states, C8.8), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
 | `model_name` | string | yes | – | non-empty string | IAMC `model`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `scenario_name` | string | yes | – | non-empty string | IAMC `scenario`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `convert_units` | bool | no | `true` | `true`, `false` | Convert to definition units (C9). Without effect if `definitions_path: false`. | `ValueError` (SC-5) |
@@ -29,13 +29,13 @@ Sources: `class_definitions.py::Network_Processor.__init__` (l.165-279); `config
 ## Notes per key
 
 ### `network_results_path`
-Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder, so `config=None` is passed for every year in that setup.
+Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. The config and the energy totals are taken from `n.meta` if the networks carry them; the files are only the fallback (C2.3, C2.4). Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder; its networks carry the config in `n.meta`.
 
 ### `definitions_path`
 Default choice and packaged config: `sister_packages/energy-scenarios-at-workflow/definitions` (the common definitions). Any other `definitions/` folder MAY be set, as long as it is a valid IAMC variable definition readable by `nomenclature.DataStructureDefinition` (owner decision, kick-off review). The key is required even when definitions are not used: then it MUST be set to `false` explicitly.
 
 ### `country`
-`all` keeps every country (or region) of the network. A specific code selects all locations whose label starts with that code (C8). Packaged config: `all`.
+`all` keeps every country (or region) of the network. A specific code selects all locations whose label starts with that code (C8). Packaged config: `all`. `EU` selects the locations of the 27 EU member states, not the copperplate pseudo-location `EU` of the networks, which is never part of the output (C8.7, C8.8).
 
 YAML 1.1 (`yaml.safe_load`) parses some unquoted codes as non-strings: `country: NO` becomes boolean `false` (checked 2026-10-07). Such codes MUST be quoted (`country: "NO"`); an unquoted one is rejected as a wrong type (C1.4).
 
