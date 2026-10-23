@@ -97,7 +97,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC8: An unknown carrier supplying a gas bus raises `ValueError` naming the carrier (D3).
 
 ## 12. Open questions
-- OQ-18 (method for `NE_gas`).
+- OQ-18 (method for `NE_gas`), OQ-23 (`import gas`).
 
 ## 13. Sources
 - #45, #61, #74, #97; definitions as in section 2

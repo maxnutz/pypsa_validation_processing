@@ -90,7 +90,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC6: C6-AC6 (incl. a location without agriculture loads).
 
 ## 12. Open questions
-None specific. OQ-22 resolved (D8).
+- OQ-25 (CHP on decentral heat bus). OQ-22 resolved (D8).
 
 ## 13. Sources
 - #13, #2; definitions as in section 2

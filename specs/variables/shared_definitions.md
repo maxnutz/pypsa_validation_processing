@@ -6,6 +6,8 @@ Rules and quantities used by more than one variable spec. Variable specs referen
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
+Checked on 2026-10-23 against `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc` (52 locations, 24 snapshots, weighting 365 h): D1 (single `EU oil`, `EU coal` buses; 51 regional `gas` buses), D7 (`land transport oil` bus unit `land transport`; Load absent in 2050) and the D8 port convention of heat pumps (`bus0` heat, `bus1` `low voltage`) hold. Deviations: OQ-23 (D2, D3), OQ-25 (D8), OQ-26 (D2 for kerosene).
+
 Notation: `L[c](l)` = withdrawal of the Loads with carrier `c` at location `l`; `W[bc, c](l)` = withdrawal of components with carrier `c` from buses with bus carrier `bc`; `S[bc, c]` = supply to buses with bus carrier `bc`. All flows are `flow` quantities in the sense of C6.10: weighted sum over snapshots for `aggregate_per_year=True`, unweighted per-snapshot values for `aggregate_per_year=False`.
 
 ## D1 Location attribution
@@ -29,6 +31,7 @@ C_oil = {"oil refining", "Fischer-Tropsch", "biomass to liquid", "biomass to liq
 - Stores (`oil` Store) are excluded: they shift energy in time and do not produce it.
 - `f_oil` is the same scalar for every location and every snapshot. With `aggregate_per_year=False` the yearly `f_oil` MUST be applied to every snapshot column, so that the `flow` consistency of C6-AC3 holds (avoids SC-23).
 - If `Σ_c S[oil, c] = 0`, then `f_oil = 0` (no oil supplied, so no fossil oil).
+- `import oil` (pypsa-eur green import option) is not yet classified (OQ-23).
 - A component other than a Store that supplies energy to an `oil` bus with a carrier outside `C_oil` MUST raise `ValueError` naming the carrier (P5; the spec does not cover such a network).
 - By construction `0 ≤ f_oil ≤ 1`. No clipping is needed, so no renewable production is "lost" (resolves the problem of #53).
 
@@ -45,6 +48,7 @@ r ∈ G_renewable = {"Sabatier", "biogas to gas", "biogas to gas CC", "BioSNG", 
 
 - Excluded: gas transport (`gas pipeline`, `gas pipeline new`, Links between gas buses) and Stores (`gas`).
 - Same rules as D2 for time series, zero denominator (`f_gas = 0`), and unknown supplying carriers (`ValueError`).
+- `import gas` (pypsa-eur green import option) is not yet classified (OQ-23).
 
 Sources: `_get_fuel_fractions` l.109-242 (`fuel_fractions["Natural Gas"]` = gas compressing share; `"Efuel"` = Sabatier; `"Biomass"` = `bio*`). Supplying carriers measured: 2020 Generators `pipeline gas` 2006.07 TWh, `production gas` 1714.52, `lng gas` 158.43; Links `biogas to gas` 196.11, `Sabatier` 19.44, `biogas to gas CC` 1.72, `BioSNG` 0.01, `BioSNG CC` 0.00; transport `gas pipeline` 1024.75, `gas pipeline new` 6390.43; Store `gas` 667.35.
 
@@ -94,6 +98,7 @@ For each decentral bus type `b ∈ {rural heat, urban decentral heat}` and locat
 1. **Input `I_b(l)`**: energy entering the decentral heat supply of `b` at `l`, kept per input carrier:
    - Links whose heat output goes to a `b` bus (`rural|urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`): withdrawal at the input port, i.e. at the bus that is not the heat bus. For heat pumps in PyPSA-AT this is `bus1` = `low voltage`, because `bus0` is the heat bus (measured AT11 2025). Location per D1 (e.g. `rural oil boiler` from `EU oil` → location of its heat bus).
    - Generators `rural solar thermal`, `urban decentral solar thermal`: their heat supply (as pypsa-de, l.2349-2350: "for solar thermal secondary energy == Final energy").
+   - CHPs that supply a decentral heat bus (e.g. `biogas CHP` → `rural heat`): open (OQ-25).
    - Excluded: water-tank/pit chargers and dischargers (storage), heat vents (dumped heat). Ambient heat drawn by heat pumps is not part of `I_b` (`Final Energy [by Carrier]|Ambient Heat`, #75).
 2. **Heat demands `H_b,x(l)`** (yearly, withdrawals from `b` buses at `l`):
    - `x = rc`: Load `rural heat` (on `rural heat`), Load `urban decentral heat` (on `urban decentral heat`);

@@ -96,7 +96,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-1 (year of `energy_totals`). OQ-19 resolved (D7).
+- OQ-1 (year of `energy_totals`), OQ-24 (`electricity for rail`, `electricity for road`). OQ-19 resolved (D7).
 
 ## 13. Sources
 - #15, #19 (incl. comments), #5; definitions as in section 2
