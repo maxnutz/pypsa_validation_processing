@@ -85,7 +85,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
 - AC3: Mock at `A`, 1 snapshot: Loads `agriculture electricity` 2, `agriculture machinery electric` 1, `agriculture machinery oil` 4; `agriculture heat` 3 and `rural heat` 9 on the `rural heat` bus (`σ_rural,agr = 0.25`); rural heat inputs `rural biomass boiler` 8 and `rural ground heat pump` electricity 4 (`I_rural = 12`); an `agriculture machinery oil CC` link with input 5 and output 4. Result `(A, MWh): 2 + 1 + 4 + 0.25·12 = 10`.
-- AC3b: As AC3, plus a `biogas CHP` with biogas input 10, electricity output 2 to `AC` and heat output 4 to `rural heat` (`rural heat` Load 13, so `σ_rural,agr = 3/16`). `I_rural = 12 + 4 = 16` (heat output, not input). Result `(A, MWh): 2 + 1 + 4 + 3/16·16 = 10`.
+- AC3b: As AC3, plus a `biogas CHP` with biogas input 10, electricity output 2 to `AC` and heat output 4 to `rural heat` (`rural heat` Load 13, so `σ_rural,agr = 3/16`). `I_rural = 12 + 4 = 16` (heat received by consumers from the CHP, G1; neither the biogas input 10 nor the electricity 2). Result `(A, MWh): 2 + 1 + 4 + 3/16·16 = 10`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6 (incl. a location without agriculture loads).

@@ -58,7 +58,7 @@ Changes to the ported logic, with reason:
 |---|---|---|---|---|---|
 | Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution`, `rail`, `road`, and that is **not** a decentral heat technology of D8 (e.g. Load `electricity`; in `20261020_carbon_accounting_run` `electricity for residential`, `electricity for services`). `electricity for rail` is counted in Transportation, `electricity for road` in no sector (OQ-24) | `low voltage` | withdrawal | yes (electricity) | l.2278-2302 |
 | Load | `urban central heat` | `urban central heat` | withdrawal ÷ (1 + λ) | yes (heat) | l.2345-2348 |
-| Links / Generators | decentral heat supply of D8: `rural`/`urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`, `solar thermal`; CHPs on decentral heat buses (e.g. `biogas CHP`) with their heat output | `gas`, `oil`, `solid biomass`, `low voltage` (input); `rural heat`, `urban decentral heat` | input × `σ_b,rc(l)` (D8) | yes | l.2297-2409; D8 |
+| Links / Generators | decentral heat supply of D8: `rural`/`urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`, `solar thermal`; CHPs on decentral heat buses (e.g. `biogas CHP`) with the heat received by consumers (G1) | `gas`, `oil`, `solid biomass`, `low voltage` (input); `rural heat`, `urban decentral heat` | input × `σ_b,rc(l)` (D8) | yes | l.2297-2409; D8 |
 | Link | `home battery charger`/`discharger`, `BEV charger`, `DAC`, water-tank/pit chargers | – | – | **no** | l.2293, 2316-2321 |
 
 `σ_b,rc(l)` = residential/commercial share of the heat demand on decentral bus type `b` at `l` (D8).

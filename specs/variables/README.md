@@ -2,7 +2,7 @@
 
 One spec per IAMC variable, written from [../templates/statistics_function.md](../templates/statistics_function.md). File name: `<function_name>.md` (see [../README.md](../README.md) "Naming of spec files").
 
-Rules and quantities used by several variables (location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input) are specified once in [shared_definitions.md](shared_definitions.md) (D1–D8).
+Rules and quantities used by several variables (final energy measured at the consumer, location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input) are specified once in [shared_definitions.md](shared_definitions.md) (G1, D1–D8).
 
 ## Index
 | IAMC variable | Spec | Match type | Status |

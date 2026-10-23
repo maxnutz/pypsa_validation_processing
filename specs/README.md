@@ -27,7 +27,7 @@ specs/
 │   └── statistics_function.md    template for one IAMC variable spec
 └── variables/
     ├── README.md                 index of variable specs
-    ├── shared_definitions.md     rules and quantities shared by several variable specs (D1–D8)
+    ├── shared_definitions.md     rules and quantities shared by several variable specs (G1, D1–D8)
     └── <function_name>.md        one spec per IAMC variable
 ```
 
