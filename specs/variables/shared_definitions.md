@@ -6,7 +6,7 @@ Rules and quantities used by more than one variable spec. Variable specs referen
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
-Checked on 2026-10-23 against `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc` (52 locations, 24 snapshots, weighting 365 h): D1 (single `EU oil`, `EU coal` buses; 51 regional `gas` buses), D7 (`land transport oil` bus unit `land transport`; Load absent in 2050) and the D8 port convention of heat pumps (`bus0` heat, `bus1` `low voltage`) hold. Deviations: OQ-23 (D2, D3), OQ-25 (D8), OQ-26 (D2 for kerosene).
+Checked on 2026-10-23 against `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc` (52 locations, 24 snapshots, weighting 365 h): D1 (single `EU oil`, `EU coal` buses; 51 regional `gas` buses), D7 (`land transport oil` bus unit `land transport`; Load absent in 2050) and the D8 port convention of heat pumps (`bus0` heat, `bus1` `low voltage`) hold. Deviations: OQ-23 (D2, D3; resolved), OQ-25 (D8), OQ-26 (D2 for kerosene).
 
 Notation: `L[c](l)` = withdrawal of the Loads with carrier `c` at location `l`; `W[bc, c](l)` = withdrawal of components with carrier `c` from buses with bus carrier `bc`; `S[bc, c]` = supply to buses with bus carrier `bc`. All flows are `flow` quantities in the sense of C6.10: weighted sum over snapshots for `aggregate_per_year=True`, unweighted per-snapshot values for `aggregate_per_year=False`.
 
@@ -24,18 +24,22 @@ One yearly value for the whole network (owner decision, 2026-10-22: system-wide,
 ```
 f_oil = S[oil, "oil refining"] / Σ_c S[oil, c]     for c ∈ C_oil
 C_oil = {"oil refining", "Fischer-Tropsch", "biomass to liquid", "biomass to liquid CC",
-         "electrobiofuels", "unsustainable bioliquids"}
+         "electrobiofuels", "unsustainable bioliquids", "import oil"}
 ```
 
 - Supply is counted at the Link port that feeds the oil bus (`bus1`), weighted over the year (`groupby_time=True`), summed over all locations.
 - Stores (`oil` Store) are excluded: they shift energy in time and do not produce it.
 - `f_oil` is the same scalar for every location and every snapshot. With `aggregate_per_year=False` the yearly `f_oil` MUST be applied to every snapshot column, so that the `flow` consistency of C6-AC3 holds (avoids SC-23).
 - If `Σ_c S[oil, c] = 0`, then `f_oil = 0` (no oil supplied, so no fossil oil).
-- `import oil` (pypsa-eur green import option) is not yet classified (OQ-23).
-- A component other than a Store that supplies energy to an `oil` bus with a carrier outside `C_oil` MUST raise `ValueError` naming the carrier (P5; the spec does not cover such a network).
+- `import oil` is non-fossil (OQ-23 resolved; see the classification below).
+- A component other than a Store whose **yearly supply** to an `oil` bus is non-zero and whose carrier is outside `C_oil` MUST raise `ValueError` naming the carrier (P5; the spec does not cover such a network). A component of such a carrier with zero yearly supply (e.g. an unused import Link) is ignored.
 - By construction `0 ≤ f_oil ≤ 1`. No clipping is needed, so no renewable production is "lost" (resolves the problem of #53).
 
 Sources: `export_ariadne_variables.py::_get_fuel_fractions` l.109-242 (pypsa-de commit `a5baa7e9`). Adaptation: pypsa-de distinguishes `DE oil`/`EU oil` and `renewable oil` buses. PyPSA-AT networks have neither `renewable oil` nor `renewable gas` buses (measured 2020 and 2040), but have a single `EU oil` bus. Supplying carriers measured: 2020 `oil refining` 5873.20 TWh, `unsustainable bioliquids` 192.16, `biomass to liquid` 15.90, `biomass to liquid CC` 0.01, `electrobiofuels` 0.01, `Fischer-Tropsch` 0.00, `oil` Store 0.04; 2040 `oil refining` 1662.45, `electrobiofuels` 599.68, `Fischer-Tropsch` 182.11. `unsustainable bioliquids` is non-fossil as in pypsa-de (`fuel_fractions["Biomass"] = renewable_fuel_balance.filter(like="bio")`, l.226).
+
+Classification of supplying carriers (owner decision 2026-10-23, OQ-23): a supplying carrier is non-fossil if it takes CO2 from `co2 atmosphere` (or from biomass, e.g. `bio*`, `unsustainable bioliquids`) in the amount that its fuel emits when burned, so that its net emissions are zero. A fossil carrier has no such offset. New carriers are added to the lists of D2/D3 by a spec change according to this criterion.
+
+Evidence for `import oil` / `import gas` (measured 2026-10-23 on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc`): both are Links `co2 atmosphere` (bus0) → `EU oil` / regional `gas` (bus1), built by pypsa-eur `add_import_options` ("Add green energy import options", `prepare_sector_network.py` l.6445-6515). They withdraw 1/`efficiency` = 0.2571 t CO2 per MWh oil and 0.198 t CO2 per MWh gas from `co2 atmosphere`, equal to `efficiency2` (emission to `co2 atmosphere`) of the oil consumers (`kerosene for aviation`, `land transport oil`, `rural oil boiler`) and gas consumers (`rural gas boiler`, `gas for industry`, `CCGT`). `p0 ≥ 0` in every snapshot (only removal). Atmosphere balance 2025/2030/2040/2050: `import oil` 0/0/−129.30/0 Mt (2040: 502.91 TWh, `f_oil` = 0.697), `import gas` −0.24/−0.28/0/0 Mt. Fossil supply (`oil primary` → `oil refining`, gas Generators) has no such offset.
 
 ## D3 Fossil share of gas `f_gas`
 One yearly value for the whole network, as D2:
@@ -43,12 +47,12 @@ One yearly value for the whole network, as D2:
 ```
 f_gas = Σ_g S[gas, g] / (Σ_g S[gas, g] + Σ_r S[gas, r])
 g ∈ G_fossil    = {"lng gas", "pipeline gas", "production gas"}   (Generators)
-r ∈ G_renewable = {"Sabatier", "biogas to gas", "biogas to gas CC", "BioSNG", "BioSNG CC"}   (Links, port bus1)
+r ∈ G_renewable = {"Sabatier", "biogas to gas", "biogas to gas CC", "BioSNG", "BioSNG CC", "import gas"}   (Links, port bus1)
 ```
 
 - Excluded: gas transport (`gas pipeline`, `gas pipeline new`, Links between gas buses) and Stores (`gas`).
-- Same rules as D2 for time series, zero denominator (`f_gas = 0`), and unknown supplying carriers (`ValueError`).
-- `import gas` (pypsa-eur green import option) is not yet classified (OQ-23).
+- Same rules as D2 for time series, zero denominator (`f_gas = 0`), unknown supplying carriers (`ValueError` only for non-zero yearly supply), and classification of supplying carriers.
+- `import gas` is non-fossil (OQ-23 resolved; evidence in D2).
 
 Sources: `_get_fuel_fractions` l.109-242 (`fuel_fractions["Natural Gas"]` = gas compressing share; `"Efuel"` = Sabatier; `"Biomass"` = `bio*`). Supplying carriers measured: 2020 Generators `pipeline gas` 2006.07 TWh, `production gas` 1714.52, `lng gas` 158.43; Links `biogas to gas` 196.11, `Sabatier` 19.44, `biogas to gas CC` 1.72, `BioSNG` 0.01, `BioSNG CC` 0.00; transport `gas pipeline` 1024.75, `gas pipeline new` 6390.43; Store `gas` 667.35.
 

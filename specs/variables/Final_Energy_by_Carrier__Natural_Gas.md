@@ -94,10 +94,10 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC5: The result is ≥ 0 for every location, also when the renewable gas supply of one location exceeds its demand (regression for #97).
 - AC6: C6-AC6.
 - AC7: `gas pipeline` flows and the `gas` Store do not change `f_gas`.
-- AC8: An unknown carrier supplying a gas bus raises `ValueError` naming the carrier (D3).
+- AC8: An unknown carrier with non-zero yearly supply to a gas bus raises `ValueError` naming the carrier (D3); an unknown carrier with zero supply is ignored. An `import gas` Link supplying 40 instead of `biogas to gas` in the mock of AC3 gives the same result (`f_gas = 0.6`).
 
 ## 12. Open questions
-- OQ-18 (method for `NE_gas`), OQ-23 (`import gas`).
+- OQ-18 (method for `NE_gas`). OQ-23 resolved (`import gas` non-fossil, D3).
 
 ## 13. Sources
 - #45, #61, #74, #97; definitions as in section 2
