@@ -31,7 +31,7 @@ As for `Final Energy [by Carrier]|Oil`, "Oil" is fossil oil. `Net Imports|Biofue
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
-| PyPSA unit(s) | `MWh_LHV` | `EU oil` bus |
+| PyPSA unit(s) | `MWh_th` | `EU oil` bus (measured in `AT_KN2040` 2040, `electricity_network_0p3` 2025 and `20261020_carbon_accounting_run` 2025–2050) |
 | Normalised unit | `MWh` | `UNITS_MAPPING` |
 | Target unit | `TJ` | definitions file |
 | Conversion | MWh → TJ, 0.0036 | C9 |

@@ -32,8 +32,8 @@ Implementing PR: –
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
-| PyPSA unit(s) | `MWh_LHV`; `land transport` relabelled to `MWh_LHV` (D7) | bus units |
-| Normalised unit | `MWh` | `UNITS_MAPPING` |
+| PyPSA unit(s) | `MWh_th` (boiler withdrawal at the `EU oil` bus), `MWh_LHV` (demand Loads); `land transport` relabelled to `MWh_LHV` (D7) | bus units (measured) |
+| Normalised unit | `MWh` (the function MUST normalise, because flows with different units are summed; C6.5) | `UNITS_MAPPING` |
 | Target unit | `TJ` | definitions file |
 | Conversion | MWh → TJ, 0.0036 | C9 |
 

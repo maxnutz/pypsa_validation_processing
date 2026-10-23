@@ -63,7 +63,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `low-temperature heat for industry` on `urban decentral heat` | `urban decentral heat` | used only as heat demand for `σ_urban decentral,ind(l)` (D8) | **no** (as heat) | l.2121-2127 |
 | Links / Generators | decentral heat supply of `urban decentral heat` (D8) | input carriers | input × `σ_urban decentral,ind(l)` | yes | D8 |
 | Load | `gas for industry` | `gas for industry` | withdrawal − `NE_gas` | yes | l.2135-2146 |
-| Load | `H2 for industry` | `H2` | withdrawal − `NE_H2` | yes | l.2157-2162 |
+| Load | `H2 for industry` | `H2` (`AT_KN2040`) or `H2 for industry` (`electricity_network_0p3`, `20261020_carbon_accounting_run`; supplied by the Links `H2 for industry` and `methane pyrolysis plasma`) | withdrawal − `NE_H2`; identified by the Load carrier, not by the bus carrier | yes | l.2157-2162 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` | yes | l.2192-2197 |
 | Load | `solid biomass for industry` | `solid biomass for industry` | withdrawal | yes | l.2201-2206 |
 | Load | `coal for industry` | `coal for industry` | withdrawal with coke correction (D6) | yes | l.2208-2228 |
