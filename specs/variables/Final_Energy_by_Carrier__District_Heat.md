@@ -78,7 +78,7 @@ Measured withdrawals from `urban central heat` in 2040 (TWh): Load `urban centra
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | yes | `config["sector"]["district_heating"]["district_heating_loss"]` | taken from `n.meta` if present (C2.3, OQ-27); `config=None` occurs only for networks without `n.meta` and config file (OQ-6). Proposal: `config=None` or missing key → variable skipped with `WARNING` (P5 "special input data") |
+| `config` | yes | `config["sector"]["district_heating"]["district_heating_loss"]` | taken from `n.meta` if present (C2.3, OQ-27); `config=None` (no `n.meta`, no config file) → variable skipped with `WARNING` (C2.3); missing key → the function raises `utils.MissingInputError`, variable skipped with `WARNING`; no default value (OQ-6) |
 | `energy_totals` | no | – | – |
 
 ## 9. Return format
@@ -101,7 +101,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_th` (or `MWh`).
 - AC8: An unknown withdrawing carrier on `urban central heat` raises `ValueError`.
 
 ## 12. Open questions
-- OQ-6 (`config=None`). OQ-21 resolved.
+- None specific. OQ-6, OQ-21 resolved.
 
 ## 13. Sources
 - #63 (incl. comment), #73; definitions as in section 2

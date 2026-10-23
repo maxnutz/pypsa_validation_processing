@@ -103,7 +103,7 @@ Per template / C6: `pd.Series` (`True`) or `pd.DataFrame` with snapshots as colu
 - AC6: C6-AC6 (zero-fill of a location without carriers, and of a network without carriers).
 
 ## 12. Open questions
-None specific. General: OQ-17 (`EU` location). OQ-24 resolved.
+None specific. OQ-17, OQ-24 resolved.
 
 ## 13. Sources
 - #43, #5, #2

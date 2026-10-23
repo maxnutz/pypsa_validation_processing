@@ -63,7 +63,7 @@ In PyPSA-AT, oil is one copperplate bus `EU oil` (measured 2020, 2040). Fossil o
 
 ## 7. Accounting rule and sign convention
 - Formula: `NI_oil(l) = f_oil · Σ_c W[oil, c](l) − S[oil, oil refining](l)` (D1, D2)
-- Sign convention: positive = net import. Values MAY be negative (e.g. the `EU` location, which holds the refining, OQ-17).
+- Sign convention: positive = net import. Values MAY be negative (e.g. the pseudo-location `EU`, which holds the refining; it is returned by the function but dropped from the output, C8.7, OQ-17).
 - Weighting: per C6.10; `f_oil` is a yearly scalar for every snapshot.
 - Model note: domestic crude production is not modelled in PyPSA-AT (`oil primary` is a single Generator). So for a regional location, net imports equal its fossil oil consumption.
 
@@ -92,7 +92,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC6: C6-AC6.
 
 ## 12. Open questions
-- OQ-17 (`EU` location). OQ-23 resolved (`import oil` non-fossil, D2).
+- None specific. OQ-17, OQ-23 (`import oil` non-fossil, D2) resolved.
 
 ## 13. Sources
 - #69, #2; definitions as in section 2

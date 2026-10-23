@@ -79,7 +79,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | open | pypsa-de reads `config["sector"]["ammonia"]` and `config_industry` for ammonia (l.2034-2058); depends on OQ-18 | per OQ-6 |
+| `config` | open | pypsa-de reads `config["sector"]["ammonia"]` and `config_industry` for ammonia (l.2034-2058); depends on OQ-18 | per C2.3 (OQ-6 resolved) |
 | `energy_totals` | no | – | – |
 
 ## 9. Return format

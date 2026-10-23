@@ -73,7 +73,7 @@ Changes to the ported logic, with reason:
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | yes | `λ` | taken from `n.meta` if present (C2.3); `config=None` per OQ-6 (proposal: skip with `WARNING`) |
+| `config` | yes | `λ` | taken from `n.meta` if present (C2.3); `config=None` → skipped with `WARNING`; missing key → `utils.MissingInputError`, skipped with `WARNING`; no default (C2.3, OQ-6) |
 | `energy_totals` | no | – | – |
 
 ## 9. Return format
@@ -94,7 +94,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC7: On the mock of AC3 the decentral parts of `Final_Energy_by_Sector__Residential_and_Commercial` and `Final_Energy_by_Sector__Agriculture` add up to `I_rural = 11` (D8 consistency).
 
 ## 12. Open questions
-- OQ-6. OQ-22 (D8), OQ-24, OQ-25 (D8) resolved.
+- None specific. OQ-6, OQ-22 (D8), OQ-24, OQ-25 (D8) resolved.
 
 ## 13. Sources
 - #14, #2; definitions as in section 2

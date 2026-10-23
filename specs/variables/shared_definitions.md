@@ -22,7 +22,7 @@ Outputs of conversion technologies (power plants, CHPs, refineries, fuel-supply 
 1. A Load flow is attributed to `n.buses.location` of the Load's bus.
 2. A Link flow is attributed to `n.buses.location` of the bus at the evaluated port.
 3. Exception for copperplate buses: if that bus is a copperplate bus (its location is `EU`), the flow MUST be attributed to `n.buses.location` of the Link's `bus1` (the bus that receives the converted energy, e.g. `AT11 rural heat` for a `rural oil boiler` fed from `EU oil`).
-4. If `bus1` is a copperplate bus as well, the flow stays at `EU` (handling of `EU` per OQ-17).
+4. If `bus1` is a copperplate bus as well, the flow stays at the pseudo-location `EU`. Statistics functions return it (C6.13); `Network_Processor` drops it from the output (C8.7, OQ-17). The pseudo-location `EU` is the copperplate, not the European Union (`country: EU`, C8.8).
 
 Reason: in PyPSA-AT, oil and coal are single copperplate buses (`EU oil`, `EU coal`; measured: 1 bus each), so withdrawals from them carry no regional information. Gas has regional buses (53 `… gas` buses), so the exception does not apply. pypsa-de achieves the same with `.filter(like=region)` on the component name (`export_ariadne_variables.py::get_final_energy`, e.g. l.2372-2381). Existing helper: `utils.create_location_index_from_copperplate`.
 
