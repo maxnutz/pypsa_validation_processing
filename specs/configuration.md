@@ -29,7 +29,7 @@ Sources: `class_definitions.py::Network_Processor.__init__` (l.165-279); `config
 ## Notes per key
 
 ### `network_results_path`
-Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder, so `config=None` is passed for every year in that setup.
+Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. The config and the energy totals are taken from `n.meta` if the networks carry them; the files are only the fallback (C2.3, C2.4). Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder; its networks carry the config in `n.meta`.
 
 ### `definitions_path`
 Default choice and packaged config: `sister_packages/energy-scenarios-at-workflow/definitions` (the common definitions). Any other `definitions/` folder MAY be set, as long as it is a valid IAMC variable definition readable by `nomenclature.DataStructureDefinition` (owner decision, kick-off review). The key is required even when definitions are not used: then it MUST be set to `false` explicitly.

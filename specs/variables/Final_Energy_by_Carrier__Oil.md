@@ -108,7 +108,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 - AC8: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-18 (`NE_naphtha`), OQ-1 (year of `energy_totals`), OQ-20, OQ-23, OQ-26 resolved.
+- OQ-18 (`NE_naphtha`). OQ-1, OQ-20, OQ-23, OQ-26, OQ-27 resolved.
 
 ## 13. Sources
 - #46, #53, #2; definitions as in section 2

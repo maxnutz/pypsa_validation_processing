@@ -78,7 +78,7 @@ Measured withdrawals from `urban central heat` in 2040 (TWh): Load `urban centra
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | yes | `config["sector"]["district_heating"]["district_heating_loss"]` | per OQ-6. Proposal: `config=None` or missing key → variable skipped with `WARNING` (P5 "special input data") |
+| `config` | yes | `config["sector"]["district_heating"]["district_heating_loss"]` | taken from `n.meta` if present (C2.3, OQ-27); `config=None` occurs only for networks without `n.meta` and config file (OQ-6). Proposal: `config=None` or missing key → variable skipped with `WARNING` (P5 "special input data") |
 | `energy_totals` | no | – | – |
 
 ## 9. Return format

@@ -37,35 +37,42 @@ General rule for all contracts: [constitution/principles.md](constitution/princi
 
 ## C2 Network results folder
 
-Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/energy_totals.csv`, among others).
+Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/energy_totals.csv`, among others). `resources/20261020_carbon_accounting_run/` contains only `networks/`; its networks carry the run config and the energy totals in `n.meta` (OQ-27).
 
 **Requirements**
 1. **Networks.** All files `<network_results_path>/networks/*.nc` MUST be read together as one `pypsa.NetworkCollection`. Each file holds one solved network for one investment year. A missing `networks/` folder or a folder without `.nc` files MUST raise `FileNotFoundError` during initialisation. (SC-11)
 2. **Investment year.** (Owner decision, kick-off review.)
    - If `n.meta["wildcards"]["planning_horizons"]` is present, it MUST be used as the investment year. `n.meta` is present in PyPSA-AT networks.
-   - If it is not present (e.g. pypsa-eur networks, which carry no `n.meta`), the investment year MUST be taken from the network's file name, and a `WARNING` naming the file and the derived year MUST be logged. The year is the last group of exactly four digits that is not adjacent to other digits, e.g. `base_s_adm__none_2030.nc` → 2030, `base_s_adm__none_2040_1H.nc` → 2040 (file names from `resources/AT_KN2040/networks/`, `resources/AT_KN2040_1H/networks/`).
-   - No `planning_horizons` entry and no four-digit group in the file name → `ValueError` naming the file.
+   - Else, if `n.meta["wildcards"]["horizon"]` is present (e.g. `20261020_carbon_accounting_run`: `{"run": "CA_base", "horizon": "2040"}`), it MUST be used (owner decision 2026-10-23, OQ-27).
+   - If neither is present (e.g. pypsa-eur networks, which carry no `n.meta`), the investment year MUST be taken from the network's file name, and a `WARNING` naming the file and the derived year MUST be logged. The year is the last group of exactly four digits that is not adjacent to other digits, e.g. `base_s_adm__none_2030.nc` → 2030, `base_s_adm__none_2040_1H.nc` → 2040 (file names from `resources/AT_KN2040/networks/`, `resources/AT_KN2040_1H/networks/`).
+   - No `planning_horizons` or `horizon` entry and no four-digit group in the file name → `ValueError` naming the file.
    - Two networks with the same investment year MUST raise `ValueError` (A-2). (SC-11)
    - The investment year MUST be determined during initialisation (P5 "early").
-3. **Network config.** For each investment year, the file matching `<network_results_path>/configs/config*<year>.yaml` (e.g. `config.base_s_adm__none_2030.yaml`) MUST be loaded with `yaml.safe_load` and passed as `config` (C5).
+3. **Network config.** (Owner decision 2026-10-23, OQ-27.) For each investment year, `config` (C5) is taken from the network itself if possible:
+   - If `n.meta` is non-empty, `config` MUST be `n.meta` without the keys `wildcards` and `resources`. Measured: `n.meta` equals the config file in `resources/AT_KN2040/` (2040: 0 differences after normalising key types) and holds the run config in `electricity_network_0p3` (whose config files cannot be parsed with `yaml.safe_load`, `python/tuple` tag), `AT_KN2040_1H` and `20261020_carbon_accounting_run` (both without `configs/`).
+   - Only if `n.meta` is empty or missing (e.g. pypsa-eur networks), the file matching `<network_results_path>/configs/config*<year>.yaml` (e.g. `config.base_s_adm__none_2030.yaml`) MUST be loaded with `yaml.safe_load` and passed as `config`, with the rules below.
+   - In both cases, all mapping keys MUST be converted to `str` before passing (`n.meta` stores year keys as strings, `"2025"`; YAML yields `int`), so that functions see one form.
    - No matching file → log `WARNING` naming year and pattern; `config=None`.
    - Several matching files → use the first one in lexicographic order and log `WARNING` listing all matches. (SC-17)
    - File cannot be read or parsed → log `WARNING` naming the file and error; `config=None`.
-   - What a function declaring `config` does with `config=None` is open (OQ-6).
-4. **Energy totals.** The path `<network_results_path>/resources/energy_totals.csv` MUST be passed as `energy_totals` (C5) to functions declaring that parameter.
-   - Its existence MUST be checked during initialisation.
-   - Missing file → log one `WARNING` naming the path. Every variable whose function declares `energy_totals` MUST then be skipped, each with a `WARNING` naming variable and function. All other variables MUST be evaluated normally. (Owner decision, kick-off review; A-3; SC-7)
+   - What a function declaring `config` does with `config=None` (only possible for networks without `n.meta` and without a readable config file) is open (OQ-6).
+4. **Energy totals.** (Owner decision 2026-10-23, OQ-27, resolves OQ-1.) For each investment year, `energy_totals` (C5) is a `pd.DataFrame` with one row per country (index `country`) and the columns of pypsa-eur's `energy_totals.csv`, for one year: the energy totals year of the model run. It MUST be passed to functions declaring that parameter.
+   - If `n.meta["resources"]["energy_totals"]` is present, it MUST be used. It is stored in pandas `split` orientation (`index`, `columns`, `data`, `index_names`) and holds the year `n.meta["energy"]["energy_totals_year"]` (measured: 34 countries × 50 columns; 2019 in `AT_KN2040`, 2023 in `electricity_network_0p3`, `AT_KN2040_1H`, `20261020_carbon_accounting_run`). These are the values the model used; they can differ slightly from the CSV row of the same year (AT 2019 `total domestic aviation`: 0.428 vs. 0.431 TWh).
+   - Otherwise, the rows of `<network_results_path>/resources/energy_totals.csv` (index `country`, `year`) with `year == config["energy"]["energy_totals_year"]` (C2.3) MUST be used.
+   - The source MUST be determined during initialisation. If neither source is available (no `n.meta` entry, and no CSV, no `energy_totals_year` in `config`, or no row of that year), log one `WARNING` naming the network and the missing input. Every variable whose function declares `energy_totals` MUST then be skipped for that network, each with a `WARNING` naming variable and function. All other variables MUST be evaluated normally. (Owner decision, kick-off review; A-3; SC-7)
 
 **Sources:** `Network_Processor._read_pypsa_network_collection`, `_get_network_config`, `_execute_function_for_variable`, `calculate_variables_values`; `resources/AT_KN2040/` (folder listing); `README.md` "Function Signature".
 
 **Acceptance criteria**
 - C2-AC1: A results folder without `networks/`, or with an empty `networks/`, raises `FileNotFoundError` at initialisation.
-- C2-AC2: A network with file name `base_s_adm__none_2030.nc` and `meta["wildcards"]["planning_horizons"] = 2040` produces output for 2040, and no file-name `WARNING` is logged.
+- C2-AC2: A network with file name `base_s_adm__none_2030.nc` and `meta["wildcards"]["planning_horizons"] = 2040` produces output for 2040, and no file-name `WARNING` is logged. The same holds for `meta["wildcards"] = {"horizon": "2040"}` and file name `solved_2030.nc`.
 - C2-AC3: A network without `n.meta` and file name `base_s_adm__none_2040_1H.nc` produces output for 2040, and a `WARNING` naming the file is logged (`caplog`).
 - C2-AC3b: A network without `n.meta` and file name `network.nc` raises `ValueError` naming the file. Two networks with the same investment year (from meta or file name) raise `ValueError`.
 - C2-AC4: With `configs/config.a_2030.yaml` and `configs/config.b_2030.yaml`, `config.a_2030.yaml` is loaded and a `WARNING` is logged (`caplog`).
-- C2-AC5: Without a matching network config, a `WARNING` is logged and a function declaring `config` receives `None`.
-- C2-AC6: Without `resources/energy_totals.csv`, a function declaring `energy_totals` is not called, a `WARNING` naming its variable is logged, and a function not declaring it is still called and its variable appears in the output.
+- C2-AC5: A network without `n.meta` and without a matching network config: a `WARNING` is logged and a function declaring `config` receives `None`.
+- C2-AC5b: A network whose `n.meta` holds `{"wildcards": …, "resources": …, "sector": {"district_heating": {"district_heating_loss": 0.15}}, "co2_budget": {"2030": 0.45}}` and a `configs/` file with different values: a function declaring `config` receives `{"sector": {…: 0.15}, "co2_budget": {"2030": 0.45}}` (from `n.meta`, without `wildcards` and `resources`). Without `n.meta`, the file is used and its `int` year keys arrive as `str`.
+- C2-AC6: A network without `n.meta` and without `resources/energy_totals.csv`: a function declaring `energy_totals` is not called, a `WARNING` naming its variable is logged, and a function not declaring it is still called and its variable appears in the output.
+- C2-AC6b: A network with `n.meta["resources"]["energy_totals"]` and no CSV: a function declaring `energy_totals` receives the table from `n.meta` (index `country`). A network without that entry, with `config["energy"]["energy_totals_year"] = 2019` and a CSV with years 2018–2020: the function receives exactly the 2019 rows, indexed by `country`.
 
 ---
 
@@ -132,7 +139,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
        n: pypsa.Network,
        aggregate_per_year: bool = True,
        config: dict | None = None,        # optional, only if needed
-       energy_totals: Path | None = None, # optional, only if needed
+       energy_totals: pd.DataFrame | None = None, # optional, only if needed (C2.4)
    ) -> pd.Series | pd.DataFrame: ...
    ```
 2. Every statistics function MUST declare `n` and `aggregate_per_year` as its first two parameters (owner decision, second review round). `n` receives one `pypsa.Network` (one investment year), not the collection.
@@ -145,7 +152,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 **Sources:** `Network_Processor._execute_function_for_variable` (l.384-398); `README.md` "Function Signature (fixed)"; `statistics_functions.py` module docstring.
 
 **Acceptance criteria**
-- C5-AC1: `f(n, aggregate_per_year=True)` receives the configured `aggregate_per_year` (test with `true` and `false`) and no other keyword arguments; `f(n, aggregate_per_year=True, config=None)` additionally receives the network config of its year; `f(n, aggregate_per_year=True, energy_totals=None)` additionally receives `<network_results_path>/resources/energy_totals.csv`.
+- C5-AC1: `f(n, aggregate_per_year=True)` receives the configured `aggregate_per_year` (test with `true` and `false`) and no other keyword arguments; `f(n, aggregate_per_year=True, config=None)` additionally receives the network config of its year (C2.3); `f(n, aggregate_per_year=True, energy_totals=None)` additionally receives the energy totals table of its year (C2.4).
 - C5-AC2: Mapping a variable to `f(n)` (no `aggregate_per_year`), or to `f(n, aggregate_per_year=True, x)` (`x` without default), raises `ValueError` at initialisation naming the variable and `f`.
 - C5-AC3: For every public function defined in `statistics_functions.py`, the first two parameters are `n` and `aggregate_per_year`, and all parameters except `n` have defaults.
 
@@ -347,7 +354,7 @@ The package relies on the following behaviour. A dependency update that changes 
 | Dependency | Relied-on behaviour | Used in |
 |---|---|---|
 | `pypsa` | `pypsa.NetworkCollection(list_of_paths)` reads `.nc` files; indexing yields `pypsa.Network`; `len()` gives the number of networks. | `_read_pypsa_network_collection`, `calculate_variables_values` |
-| `pypsa` | In PyPSA-AT networks, `n.meta["wildcards"]["planning_horizons"]` holds the investment year; networks without `n.meta` (e.g. pypsa-eur) fall back to the file name (C2.2). | `calculate_variables_values` |
+| `pypsa` | In PyPSA-AT networks, `n.meta["wildcards"]["planning_horizons"]` (or `["horizon"]`) holds the investment year, and `n.meta` holds the run config and `n.meta["resources"]["energy_totals"]`; networks without `n.meta` (e.g. pypsa-eur) fall back to the file name and the results-folder files (C2.2–C2.4). | `calculate_variables_values` |
 | `pypsa` | `n.statistics.<metric>(…, groupby=[…, "location", "unit"], nice_names=False, groupby_time=…)` returns a Series (time-aggregated) or DataFrame (snapshots as columns) with the requested index levels; filters `components`, `carrier`, `bus_carrier`, `direction`, `at_port`; metrics used: `energy_balance`, `supply`, `withdrawal`, `transmission`. | statistics functions; `utils.statistics_kwargs*`; https://docs.pypsa.org/latest/api/networks/statistics/ |
 | `pandas` | MultiIndex `Series`/`DataFrame`, `groupby(...).sum()` over index levels. | everywhere |
 | `nomenclature-iamc` | `DataStructureDefinition(path)` reads `variable/` and `region/`; `.variable.to_pandas()` returns columns `variable` and `unit`; tag expansion such as `{Final Energy Carrier}`. | `read_definitions`, `_get_unit_from_common_definitions`, `calculate_variables_values` |

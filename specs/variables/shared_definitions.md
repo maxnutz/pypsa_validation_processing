@@ -71,12 +71,12 @@ For `k ∈ {aviation, navigation}` and country `c` = the first two characters of
 d_k(c) = total domestic k / (total domestic k + total international k)
 ```
 
-- The values are read from `energy_totals.csv` (C2.4), columns `total domestic aviation`, `total international aviation`, `total domestic navigation`, `total international navigation`, row `country == c`.
+- The values are read from the `energy_totals` table (C2.4: from `n.meta`, else from `energy_totals.csv`), columns `total domestic aviation`, `total international aviation`, `total domestic navigation`, `total international navigation`, row `country == c`.
 - The share MUST be determined per country, not one value for all locations (current `utils.get_energy_totals_domestic_share` uses `AT` for all, OQ-1).
-- Which `year` row is used is open (OQ-1). The file holds the years 1990–2024 for 34 countries (measured).
+- The year is the energy totals year of the model run (`n.meta["energy"]["energy_totals_year"]` or `config["energy"]["energy_totals_year"]`, C2.4; OQ-1 resolved). The table passed holds that year only.
 - A location whose country has no row → `ValueError` naming the country.
 - A denominator of 0 → `d_k(c) = 0`.
-- `energy_totals.csv` not available → the variable is skipped per C2.4 / P5.
+- Energy totals not available → the variable is skipped per C2.4 / P5.
 
 Source: `export_ariadne_variables.py::get_final_energy` l.2453-2474 (`international_*_fraction`; `d_k = 1 − international fraction`); `resources/AT_KN2040/resources/energy_totals.csv`.
 

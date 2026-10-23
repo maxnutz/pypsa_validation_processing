@@ -73,7 +73,7 @@ Changes to the ported logic, with reason:
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | yes | `λ` | per OQ-6 (proposal: skip with `WARNING`) |
+| `config` | yes | `λ` | taken from `n.meta` if present (C2.3); `config=None` per OQ-6 (proposal: skip with `WARNING`) |
 | `energy_totals` | no | – | – |
 
 ## 9. Return format
