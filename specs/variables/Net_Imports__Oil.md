@@ -92,7 +92,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC6: C6-AC6.
 
 ## 12. Open questions
-- OQ-17 (`EU` location), OQ-26 (kerosene from methanol). OQ-23 resolved (`import oil` non-fossil, D2).
+- OQ-17 (`EU` location). OQ-23 resolved (`import oil` non-fossil, D2).
 
 ## 13. Sources
 - #69, #2; definitions as in section 2

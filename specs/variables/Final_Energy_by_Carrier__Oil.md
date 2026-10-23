@@ -62,7 +62,8 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `agriculture machinery oil` | `agriculture machinery oil` | withdrawal | yes | l.2557-2559 |
 | Link | `rural oil boiler`, `urban decentral oil boiler` | `oil` | withdrawal (bus0), location per D1 | yes | l.2372-2381 |
 | Load | `land transport oil` | `land transport oil` | withdrawal, unit D7 | yes | l.2476-2477 |
-| Load | `kerosene for aviation` | `kerosene for aviation` | withdrawal × `d_aviation` (D4) | yes | l.2463-2467 |
+| Load | `kerosene for aviation` | `kerosene for aviation` | withdrawal × `d_aviation` (D4) × `s_ker` (oil-based part, OQ-26) | yes | l.2463-2467 |
+| Link | `kerosene for aviation` (from `EU oil`), `methanol-to-kerosene` (from `EU methanol`) | `kerosene for aviation` | supply | share `s_ker` only | OQ-26 |
 | Load | `shipping oil` | `shipping oil` | withdrawal × `d_navigation` (D4) | yes | l.2468-2470 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` (D5) | yes | l.2192-2197 |
 | Load | `shipping methanol` | `shipping methanol` | – | **no** (OQ-20 resolved; counted in `E-Fuels`/`Biofuels`) | l.2472-2474 |
@@ -70,9 +71,13 @@ Changes to the ported logic, only as needed for the function contract:
 | Link | `agriculture machinery oil`, `land transport oil`, `kerosene for aviation`, `shipping oil`, `naphtha for industry` (oil → demand bus) | `oil` | – | **no** (delivery to the Load bus; the Load is counted) | carriers table |
 
 ## 7. Accounting rule and sign convention
-- Formula: `FE_oil(l) = f_oil · ( L[agriculture machinery oil](l) + W[oil, rural oil boiler](l) + W[oil, urban decentral oil boiler](l) + L[land transport oil](l) + d_aviation(c)·L[kerosene for aviation](l) + d_navigation(c)·L[shipping oil](l) + L[naphtha for industry](l) − NE_naphtha(l) )`, with `c` = country of `l`
+- Formula: `FE_oil(l) = f_oil · ( L[agriculture machinery oil](l) + W[oil, rural oil boiler](l) + W[oil, urban decentral oil boiler](l) + L[land transport oil](l) + d_aviation(c)·s_ker(l)·L[kerosene for aviation](l) + d_navigation(c)·L[shipping oil](l) + L[naphtha for industry](l) − NE_naphtha(l) )`, with `c` = country of `l`
+- `s_ker(l) = S[kerosene for aviation, "kerosene for aviation"](l) / Σ_c S[kerosene for aviation, c](l)`: yearly oil-based share of the kerosene supply at `l` (supply of the Link `kerosene for aviation` from `EU oil` over the supply of all Links feeding the `kerosene for aviation` bus, e.g. also `methanol-to-kerosene`). Measured at the consumer (G1): only the oil-based part of the Load is counted. Owner decision 2026-10-23 (OQ-26).
+  - No supply to the kerosene bus at `l` → `s_ker(l) = 0`.
+  - A carrier other than `kerosene for aviation` and `methanol-to-kerosene` with non-zero yearly supply to a `kerosene for aviation` bus → `ValueError` naming the carrier (as D2).
+  - Measured: `methanol-to-kerosene` supplies 0.00 TWh in all networks checked (`AT_KN2040` 2040, `electricity_network_0p3` 2025, `20261020_carbon_accounting_run` 2025–2050), so `s_ker = 1`.
 - Sign convention: withdrawals positive; result MUST be ≥ 0.
-- Weighting: per C6.10; `f_oil` and `d_k` are scalars applied to every snapshot.
+- Weighting: per C6.10; `f_oil`, `d_k` and `s_ker` are yearly values applied to every snapshot.
 - Special cases: domestic aviation/navigation (D4), non-energy use (D5), unit of land transport (D7).
 
 ## 8. Optional kwargs
@@ -95,6 +100,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
 - AC3: Mock: `oil refining` supplies 75, `Fischer-Tropsch` supplies 25 (`f_oil = 0.75`). At `A` (country `AA`): `land transport oil` Load 40 (bus unit `land transport`), `kerosene for aviation` Load 20, `d_aviation(AA) = 0.5`, `agriculture machinery oil` Load 4, `NE_naphtha = 0`, 1 snapshot. Result `(A, MWh_LHV or MWh): 0.75·(40 + 10 + 4) = 40.5`.
+- AC3b: As AC3, but the kerosene bus at `A` is supplied by `kerosene for aviation` 15 and `methanol-to-kerosene` 5 (`s_ker = 0.75`). Result `0.75·(40 + 0.5·0.75·20 + 4) = 38.625`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0; no unit `land transport` in the result.
 - AC6: C6-AC6.
@@ -102,7 +108,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 - AC8: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-18 (`NE_naphtha`), OQ-1 (year of `energy_totals`), OQ-26 (kerosene from methanol). OQ-20, OQ-23 resolved.
+- OQ-18 (`NE_naphtha`), OQ-1 (year of `energy_totals`), OQ-20, OQ-23, OQ-26 resolved.
 
 ## 13. Sources
 - #46, #53, #2; definitions as in section 2
