@@ -61,6 +61,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `agriculture electricity`, `agriculture machinery electric` | `low voltage` | withdrawal | yes | l.2553-2555 |
 | Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution` (e.g. Load `electricity`, or its split `electricity for residential`, `electricity for services`, `electricity for rail`, `electricity for road` in `20261020_carbon_accounting_run`; Links `rural air heat pump`, `rural ground heat pump`, `rural resistive heater`, `urban decentral air heat pump`, `urban decentral resistive heater`) | `low voltage` | withdrawal at the `low voltage` port (for heat pumps this is `bus1`: in PyPSA-AT they have `bus0` = heat bus, `bus1` = `low voltage`, measured AT11 2025) | yes (residential and commercial) | l.2278-2302 |
 | Link | `BEV charger` | `low voltage` | withdrawal (bus0) | yes (transportation) | l.2437-2439 |
+| Load | `electricity for road` (only in networks with the split base load, e.g. `20261020_carbon_accounting_run`; none in AT) | `low voltage` | withdrawal | yes: the Load is electricity demand of the network, although built from historic data (owner decision 2026-10-23, OQ-24). It is counted in no `Final Energy [by Sector]` variable, so the sector variables do not sum to this variable by this amount (37.525 TWh in total, every year) | OQ-24 |
 | Load | `industry electricity` | `low voltage` | withdrawal | yes | l.2113-2119 |
 | Link | `DAC` | `AC` | withdrawal | yes | l.2591-2603 |
 | Link | `electricity distribution grid`, `home battery charger`, `urban central air heat pump`, `urban central resistive heater` | `low voltage` | – | **no** (losses, storage, district-heat supply) | substring pattern l.2293 |
@@ -102,7 +103,7 @@ Per template / C6: `pd.Series` (`True`) or `pd.DataFrame` with snapshots as colu
 - AC6: C6-AC6 (zero-fill of a location without carriers, and of a network without carriers).
 
 ## 12. Open questions
-None specific. General: OQ-17 (`EU` location).
+None specific. General: OQ-17 (`EU` location). OQ-24 resolved.
 
 ## 13. Sources
 - #43, #5, #2
