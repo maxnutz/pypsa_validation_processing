@@ -21,7 +21,7 @@ Outputs of conversion technologies (power plants, CHPs, refineries, fuel-supply 
 ## G2 Final energy is never negative
 Owner decision 2026-10-28 (on #97: "Final Energy - variables must stay positive or equal to Zero (= must NOT become negative. Never). Ever."). Every `Final Energy` variable MUST be `≥ 0` at every location: the yearly value for `aggregate_per_year=True` and every snapshot column for `aggregate_per_year=False`. Subtracted corrections (non-energy use D5, coke D6, distribution losses) MUST NOT make a location negative. Results are not clipped; a negative value is a spec or implementation error.
 
-Exception: `Final Energy [by Sector]|Transportation` subtracts the `V2G` feed-in per snapshot. Its snapshot values MAY be negative; its yearly values MUST be `≥ 0` (owner decision 2026-10-28).
+Exception: `Final Energy [by Sector]|Transportation` and `Final Energy [by Carrier]|Electricity` subtract the `V2G` feed-in per snapshot. Their snapshot values MAY be negative; its yearly values MUST be `≥ 0` (owner decision 2026-10-28).
 
 ## D1 Location attribution
 1. A Load flow is attributed to `n.buses.location` of the Load's bus.
