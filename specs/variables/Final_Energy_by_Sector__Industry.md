@@ -47,7 +47,7 @@ Implementing PR: –
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, only as needed for the function contract:
-- `NE_x` and `κ` cannot be computed from the pypsa-de inputs (D5, D6); method open (OQ-18).
+- `NE_x` and `κ` cannot be computed from the pypsa-de inputs yet (D5, D6). OQ-18 resolved: physical method once the networks carry industry production data; until then Eurostat shares for gas and naphtha, `NE_H2 = 0` and `κ = 0`, each skipped correction with a `WARNING` (C2.5).
 - Decentral `low-temperature heat for industry` (on `urban decentral heat`) is not counted as heat. Instead, the industrial share of the decentral heat input is counted (D8, owner decision 2026-10-22, OQ-22 resolved). The Load on `urban central heat` stays counted as delivered heat (district heat is a final energy carrier).
 - Per location; no `MWh2TWh`; zero-fill (C6.13).
 
@@ -79,8 +79,9 @@ Changes to the ported logic, only as needed for the function contract:
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
 |---|---|---|---|
 | `aggregate_per_year` | always | – | – |
-| `config` | open | pypsa-de reads `config["sector"]["ammonia"]` and `config_industry` for ammonia (l.2034-2058); depends on OQ-18 | per C2.3 (OQ-6 resolved) |
+| `config` | no | not needed for the Eurostat fallback; the physical method (pypsa-de reads `config["sector"]["ammonia"]` and `config_industry`, l.2034-2058) is specified in a follow-up (C2.5) | – |
 | `energy_totals` | no | – | – |
+| `industry_non_energy_shares` | yes | `NE_gas`, `NE_naphtha` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh`.
@@ -96,11 +97,11 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6.
-- AC7: With `NE_gas = 3` injected (OQ-18 method), the result decreases by exactly 3.
+- AC7: In the mock of AC3 (country `AA`), with `S[AA, Natural Gas] = 0.25` and `S[AA, Oil] = 0.5`: `NE_gas = 2`, `NE_naphtha = 3`, `NE_H2 = 0`, `κ = 0`; the result is `38 − 5 = 33`, and `WARNING`s naming the skipped H2 and coke corrections are logged. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 - AC8: Mock at `B` without `urban central heat` bus: `low-temperature heat for industry` 1 and `urban decentral heat` Load 3 on `urban decentral heat` (`σ = 0.25`), `urban decentral gas boiler` gas input 6. The decentral heat contribution to the result is `0.25·6 = 1.5`, not 1.
 
 ## 12. Open questions
-- OQ-18. OQ-25 resolved (D8).
+- OQ-18 resolved (D5, D6, C2.5). OQ-25 resolved (D8).
 
 ## 13. Sources
 - #12, #74, #2; definitions as in section 2

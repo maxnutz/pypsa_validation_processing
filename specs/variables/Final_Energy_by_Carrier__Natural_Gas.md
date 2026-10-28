@@ -48,7 +48,7 @@ Issue #97 (owner): "Final Energy - variables must stay positive. Ever."
 
 Changes to the ported logic, only as needed for the function contract:
 - The fossil share `f_gas` is adapted to the PyPSA-AT gas topology (D3). It is system-wide, as in pypsa-de (owner decision 2026-10-22), and replaces the current regional, clipped production/usage ratio.
-- Non-energy use is subtracted per D5, method open (OQ-18). It replaces the static EU-27 Eurostat factor of the current code (#61).
+- Non-energy use is subtracted per D5 (OQ-18 resolved): country-specific Eurostat share `S[c, Natural Gas]` while the networks carry no industry production data. It replaces the static EU-27 Eurostat factor of the current code (#61).
 - Per location (D1); no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
@@ -76,6 +76,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `aggregate_per_year` | always | – | – |
 | `config` | no | – | – |
 | `energy_totals` | no | – | – |
+| `industry_non_energy_shares` | yes | `NE_gas` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
@@ -94,10 +95,11 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC5: The result is ≥ 0 for every location, also when the renewable gas supply of one location exceeds its demand (regression for #97).
 - AC6: C6-AC6.
 - AC7: `gas pipeline` flows and the `gas` Store do not change `f_gas`.
+- AC9: With `S[AA, Natural Gas] = 0.25` for location `A` (country `AA`) in the mock of AC3: `NE_gas = 5`, result `0.6·(10 + 20 − 5) = 15`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8). A country without a row gives `NE_gas = 0` and a `WARNING` naming the country.
 - AC8: An unknown carrier with non-zero yearly supply to a gas bus raises `ValueError` naming the carrier (D3); an unknown carrier with zero supply is ignored. An `import gas` Link supplying 40 instead of `biogas to gas` in the mock of AC3 gives the same result (`f_gas = 0.6`).
 
 ## 12. Open questions
-- OQ-18 (method for `NE_gas`). OQ-23 resolved (`import gas` non-fossil, D3).
+- OQ-18 resolved (D5, C2.5). OQ-23 resolved (`import gas` non-fossil, D3).
 
 ## 13. Sources
 - #45, #61, #74, #97; definitions as in section 2

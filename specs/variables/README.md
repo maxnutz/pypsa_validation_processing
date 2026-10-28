@@ -8,14 +8,14 @@ Rules and quantities used by several variables (final energy measured at the con
 | IAMC variable | Spec | Match type | Status |
 |---|---|---|---|
 | `Final Energy [by Carrier]\|Electricity` | [Final_Energy_by_Carrier__Electricity.md](Final_Energy_by_Carrier__Electricity.md) | exact | draft |
-| `Final Energy [by Carrier]\|Coal` | [Final_Energy_by_Carrier__Coal.md](Final_Energy_by_Carrier__Coal.md) | semantic | draft (blocked by OQ-18) |
-| `Final Energy [by Carrier]\|Natural Gas` | [Final_Energy_by_Carrier__Natural_Gas.md](Final_Energy_by_Carrier__Natural_Gas.md) | semantic | draft (blocked by OQ-18) |
-| `Final Energy [by Carrier]\|Oil` | [Final_Energy_by_Carrier__Oil.md](Final_Energy_by_Carrier__Oil.md) | semantic | draft (blocked by OQ-18) |
+| `Final Energy [by Carrier]\|Coal` | [Final_Energy_by_Carrier__Coal.md](Final_Energy_by_Carrier__Coal.md) | semantic | draft |
+| `Final Energy [by Carrier]\|Natural Gas` | [Final_Energy_by_Carrier__Natural_Gas.md](Final_Energy_by_Carrier__Natural_Gas.md) | semantic | draft |
+| `Final Energy [by Carrier]\|Oil` | [Final_Energy_by_Carrier__Oil.md](Final_Energy_by_Carrier__Oil.md) | semantic | draft |
 | `Final Energy [by Carrier]\|District Heat` | [Final_Energy_by_Carrier__District_Heat.md](Final_Energy_by_Carrier__District_Heat.md) | semantic (partial) | draft |
 | `Net Imports\|Electricity` | [Net_Imports__Electricity.md](Net_Imports__Electricity.md) | semantic | draft |
 | `Net Imports\|Oil` | [Net_Imports__Oil.md](Net_Imports__Oil.md) | none | draft |
 | `Final Energy [by Sector]\|Transportation` | [Final_Energy_by_Sector__Transportation.md](Final_Energy_by_Sector__Transportation.md) | exact | draft |
-| `Final Energy [by Sector]\|Industry` | [Final_Energy_by_Sector__Industry.md](Final_Energy_by_Sector__Industry.md) | semantic | draft (blocked by OQ-18) |
+| `Final Energy [by Sector]\|Industry` | [Final_Energy_by_Sector__Industry.md](Final_Energy_by_Sector__Industry.md) | semantic | draft |
 | `Final Energy [by Sector]\|Agriculture` | [Final_Energy_by_Sector__Agriculture.md](Final_Energy_by_Sector__Agriculture.md) | exact | draft |
 | `Final Energy [by Sector]\|Residential and Commercial` | [Final_Energy_by_Sector__Residential_and_Commercial.md](Final_Energy_by_Sector__Residential_and_Commercial.md) | exact | draft |
 

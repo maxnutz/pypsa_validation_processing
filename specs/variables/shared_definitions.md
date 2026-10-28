@@ -83,9 +83,22 @@ Source: `export_ariadne_variables.py::get_final_energy` l.2453-2474 (`internatio
 ## D5 Non-energy use `NE_x(l)`
 Non-energy use of carrier `x ∈ {gas, naphtha, H2}` in industry at location `l`. The sector definition excludes non-energy use: "industrial sector excluding non-energy use (e.g.feedstocks)" (`definitions/variable/tag_sector.yaml`). So final energy variables that contain industry demand of these carriers MUST subtract `NE_x(l)`.
 
-- pypsa-de derives `NE_x` from `industry_production` and `industry_sector_ratios` (and, for ammonia, `config_industry`) (`get_final_energy` l.2034-2093). These inputs are not part of the results folder (`resources/AT_KN2040/resources/` contains only `energy_totals.csv`), and they are not inputs of a statistics function (C5).
-- **The method to determine `NE_x(l)` is open (OQ-18; owner decision 2026-10-22: require exclusion, method open; related #61, #74).** Until it is resolved, a spec that uses D5 cannot reach status `implemented`.
-- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l`, so that results stay ≥ 0.
+Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the network provides the data, Eurostat shares otherwise (C2.5).
+
+- **Physical method.** pypsa-de derives `NE_x` from `industry_production` and `industry_sector_ratios` (and, for ammonia, `config_industry`) (`get_final_energy` l.2034-2093). No PyPSA-AT network stores these tables yet; the method is specified in a follow-up spec once it does (C2.5).
+- **Eurostat fallback.** With the table `S = industry_non_energy_shares` (C2.5) and `c` = the first two characters of `l`:
+  ```
+  NE_gas(l)     = S[c, Natural Gas] · L[gas for industry](l)
+  NE_naphtha(l) = S[c, Oil]         · L[naphtha for industry](l)
+  NE_H2(l)      = 0
+  ```
+  - `naphtha for industry` uses the share of all oil products (`O4000XBIO`), not of naphtha alone: pypsa-eur's `naphtha for industry` holds the whole industrial oil demand, while Eurostat books naphtha as 100 % non-energy (AT 2024: `FC_IND_E` naphtha 0 GWh).
+  - `NE_H2 = 0`: Eurostat has no hydrogen; H2 non-energy use is skipped (owner decision 2026-10-28), with one `WARNING` per call (C2.5).
+  - A country without a row for the carrier → `NE_x = 0` for its locations, with one `WARNING` per call naming country and carrier.
+  - The share is constant over snapshots; for time series output it is applied to every snapshot.
+  - Measured (eurostat-energy-balance_processing#8, 2024): AT gas 0.104, AT oil 0.807; DE gas 0.103, DE oil 0.910; EU27_2020 gas 0.138. The current code uses one EU-27 gas factor of 0.060 (#61).
+- Functions that use D5 MUST declare `industry_non_energy_shares` (C5); without the table they are skipped (C2.5).
+- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l`, so that results stay ≥ 0. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5).
 
 ## D6 Coke correction for industrial coal `κ(l)`
 pypsa-de counts the coke part of `coal for industry` as secondary energy and converts it back with `mwh_coal_per_mwh_coke = 1.366`:
@@ -95,7 +108,11 @@ FE_coal_industry = L[coal for industry]·(1 − κ) + L[coal for industry]·κ /
 κ = coke·1.366 / (coke·1.366 + coal)      from industrial_energy_demand
 ```
 
-(`get_final_energy` l.2208-2225.) The input `industrial_energy_demand` is not available (as D5). **The method to determine `κ(l)` is open (OQ-18).** Until it is resolved, a spec that uses D6 cannot reach status `implemented`.
+(`get_final_energy` l.2208-2225.) Owner decision 2026-10-28 (OQ-18 resolved, option C):
+
+- **Physical method.** `κ` from the industry production data, once the networks carry it (C2.5, follow-up spec).
+- **Eurostat fallback.** `κ(l) = 0`, with one `WARNING` per call (C2.5). Eurostat gives no usable value: it books blast-furnace coke as transformation, not as industrial final consumption, and reports no non-energy coke for AT (`FC_IND_NE` `C0311`: `: m`). `n.meta["resources"]["industrial_demand_overrides"]` splits `coal` and `coke` per region, but only for 2025 (measured in `20261020_carbon_accounting_run`), so it is not used.
+- `κ = 0` overestimates coal final energy by at most the factor `1.366` on the coke part.
 
 ## D7 Unit of `land transport oil`
 `land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is a bus label, not a physical unit (C9.1, SC-9). The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.

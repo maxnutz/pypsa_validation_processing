@@ -86,6 +86,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `aggregate_per_year` | always | – | – |
 | `config` | no | – | – |
 | `energy_totals` | yes | domestic shares (D4) | variable skipped with `WARNING` (C2.4) |
+| `industry_non_energy_shares` | yes | `NE_naphtha` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land transport` unit in the result (C9.1).
@@ -106,9 +107,10 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 - AC6: C6-AC6.
 - AC7: The domestic share is taken per country: two locations of different countries with different `energy_totals` rows get different shares.
 - AC8: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
+- AC9: As AC3 with `naphtha for industry` Load 10 at `A` and `S[AA, Oil] = 0.8`: `NE_naphtha = 8`, result `0.75·(40 + 10 + 4 + 10 − 8) = 42`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 
 ## 12. Open questions
-- OQ-18 (`NE_naphtha`). OQ-1, OQ-20, OQ-23, OQ-26, OQ-27 resolved.
+- OQ-18 resolved (D5, C2.5). OQ-1, OQ-20, OQ-23, OQ-26, OQ-27 resolved.
 
 ## 13. Sources
 - #46, #53, #2; definitions as in section 2

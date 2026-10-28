@@ -47,7 +47,7 @@ Implementing PR: –
 
 Changes to the ported logic, only as needed for the function contract:
 - Per location instead of `.filter(like=region)`; no `MWh2TWh` scaling; zero-fill (C6.13).
-- The coke fraction `κ` cannot be read from `industrial_energy_demand` (not an available input); its method is open (D6, OQ-18).
+- The coke fraction `κ` cannot be read from `industrial_energy_demand` (not an available input). Per D6 (OQ-18 resolved): physical method once the networks carry industry production data, otherwise `κ = 0` with a `WARNING` (C2.5).
 
 ## 5. Match type
 - Match type: `semantic`.
@@ -71,8 +71,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `aggregate_per_year` | always | Series / DataFrame (C6) | – |
 | `config` | no | – | – |
 | `energy_totals` | no | – | – |
-
-Depends on the resolution of OQ-18, which may add an input.
+| `industry_non_energy_shares` | no | Eurostat has no coke share; fallback `κ = 0` (D6) | – |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
@@ -85,13 +84,14 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock network with `coal for industry` Load of 10 MW at `A` over 2 snapshots (weighting 1), `κ = 0`: the result is `(A, …): 20`. With `κ = 0.5` (injected per the OQ-18 method): `20·0.5 + 20·0.5/1.366 ≈ 17.321`.
+- AC3: Mock network with `coal for industry` Load of 10 MW at `A` over 2 snapshots (weighting 1), `κ = 0`: the result is `(A, …): 20`. With `κ = 0.5` (injected, as from the physical method of D6): `20·0.5 + 20·0.5/1.366 ≈ 17.321`.
+- AC3b: With the fallback (network without industry production data), `κ = 0` and one `WARNING` naming the skipped coke correction is logged (`caplog`).
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6. A network without the `coal for industry` carrier returns a Series/DataFrame with `0.0` for every location, not `None`.
 
 ## 12. Open questions
-- OQ-18 (method for `κ`).
+- OQ-18 resolved (D6, C2.5).
 
 ## 13. Sources
 - #44, #2; definitions as in section 2

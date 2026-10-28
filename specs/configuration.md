@@ -21,6 +21,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 | `aggregation_level` | string | no | `"country"` | `"country"`, `"region"` | Output granularity (C8). | `ValueError` |
 | `aggregate_per_year` | bool | no | `true` | `true`, `false` | `true`: one value per investment year; `false`: full time series per investment year (C6, C10). | `ValueError` |
 | `map_country_codes_to_names` | bool | no | `false` | `true`, `false` | Map region labels via `utils.REGION_MAPPING` (e.g. `AT` → `Austria`) (C8). | `ValueError` (SC-2) |
+| `industry_non_energy_shares_path` | path (string) | no | – (not set) | CSV file written by `eurostat-energy-balance_processing` | Eurostat fallback for industrial non-energy use (C2.5, D5). Not set or not existing → variables needing it are skipped with `WARNING`. | wrong type: `ValueError`; invalid content: `ValueError` (C2.5) |
 
 Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
 
@@ -56,6 +57,9 @@ Packaged config: `true`. `false` switches statistics functions to time series ou
 
 ### `map_country_codes_to_names`
 Default `false` (owner decision). Region labels without an entry in `REGION_MAPPING` are kept. The common region definitions (`sister_packages/energy-scenarios-at-workflow/definitions/region/common.yaml`) currently list only `Austria`; see OQ-2.
+
+### `industry_non_energy_shares_path`
+Produced by `pixi run python workflow.py` in `eurostat-energy-balance_processing` (default output `resources/industry_non_energy_shares_<publication_year>.csv` there; maxnutz/eurostat-energy-balance_processing#8). The file is the interface between the two repositories; this package does not import the other one. Only used while the networks carry no industry production data (C2.5).
 
 ## Unknown keys
 > **Open question:** Keys not listed above are currently ignored silently. Per P5 ("loud") they SHOULD probably be logged as `WARNING` (typo protection). See OQ-10.
