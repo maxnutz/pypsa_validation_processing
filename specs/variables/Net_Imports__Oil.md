@@ -58,11 +58,12 @@ In PyPSA-AT, oil is one copperplate bus `EU oil` (measured 2020, 2040). Fossil o
 |---|---|---|---|---|---|
 | Link | every carrier withdrawing from `oil` buses (e.g. `land transport oil`, `kerosene for aviation`, `shipping oil`, `naphtha for industry`, `agriculture machinery oil`, `rural oil boiler`, `urban decentral oil boiler`, `oil`, `urban central oil CHP`) | `oil` | withdrawal (bus0), location per D1 | yes, × `f_oil` | measured withdrawal 2040 |
 | Link | `oil refining` | `oil` | supply (bus1) | yes, as domestic fossil production of its location | D2 |
-| Store | `oil` | `oil` | – | **no** (storage) | D2 |
+| Store | `oil` | `oil` | net withdrawal (charging positive, discharging negative), location of the Store's bus (`EU oil` → `EU`) | yes, × `f_oil` | owner review 2026-10-28 |
 | Link | renewable oil producers (`C_oil` \ {`oil refining`}) | `oil` | – | **no** (not fossil; enter only via `f_oil`) | D2 |
 
 ## 7. Accounting rule and sign convention
-- Formula: `NI_oil(l) = f_oil · Σ_c W[oil, c](l) − S[oil, oil refining](l)` (D1, D2)
+- Formula: `NI_oil(l) = f_oil · ( Σ_c W[oil, c](l) + ΔE_store(l) ) − S[oil, oil refining](l)` (D1, D2)
+- `ΔE_store(l)`: net withdrawal of the `oil` Stores at `l` from the oil bus, charging positive, discharging negative (= −`p` of the Store in PyPSA sign). Stored oil is assumed to have the fossil share `f_oil`. With the Store, the oil bus balance closes, so the yearly sum over all locations is 0 (AC5). Per snapshot the sum is `f_oil · S_t − S_t[oil refining]` with the total non-Store supply `S_t`, because `f_oil` is a yearly scalar. `f_oil` itself still excludes Stores (D2). Measured: one cyclic Store at `EU oil`, yearly net withdrawal 0 (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025); it changes the snapshot values of the pseudo-location `EU` only.
 - Sign convention: positive = net import. Values MAY be negative (e.g. the pseudo-location `EU`, which holds the refining; it is returned by the function but dropped from the output, C8.7, OQ-17).
 - Weighting: per C6.10; `f_oil` is a yearly scalar for every snapshot.
 - Model note: domestic crude production is not modelled in PyPSA-AT (`oil primary` is a single Generator). So for a regional location, net imports equal its fossil oil consumption.
@@ -88,7 +89,8 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC1 / AC2: C6-AC1 / C6-AC2.
 - AC3: Mock: bus `EU oil` (location `EU`); `oil refining` at `EU` supplies 80, `Fischer-Tropsch` at `A` supplies 20 (`f_oil = 0.8`). `land transport oil` link withdraws 60 into `A`, `rural oil boiler` withdraws 40 into `B`; 1 snapshot. Result `A: 48`, `B: 32`, `EU: −80`.
 - AC4: C6-AC3 (`flow`).
-- AC5: Sum over all locations = 0 when every supply and withdrawal is attributed (no Store change).
+- AC5: The yearly sum over all locations is 0, with Store charging and discharging included.
+- AC7: As AC3, but `rural oil boiler` withdraws 30 into `B` and the `oil` Store at `EU oil` charges 10: `A: 48`, `B: 24`, `EU: 0.8·10 − 80 = −72`; sum 0.
 - AC6: C6-AC6.
 
 ## 12. Open questions

@@ -67,7 +67,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Link | `electricity distribution grid`, `home battery charger`, `urban central air heat pump`, `urban central resistive heater` | `low voltage` | – | **no** (losses, storage, district-heat supply) | substring pattern l.2293 |
 | Link | `V2G`, `home battery discharger` | `low voltage` | supply | **no** (supply, not withdrawal) | l.2279 (`withdrawal` only) |
 
-All carriers exist in `resources/carriers_bus_carriers_components.csv`. Measured withdrawals from `low voltage` in 2040 (TWh): Load `electricity` 1578.22, `industry electricity` 1686.76, `BEV charger` 965.98, `urban decentral air heat pump` 347.01, `urban decentral resistive heater` 224.12, `rural ground heat pump` 194.93, `urban central air heat pump` 88.99 (excluded), `home battery charger` 7.05 (excluded).
+All carriers exist in `resources/carriers_bus_carriers_components.csv` (local and not versioned, see `resources/README.md`). The list can be reproduced on `resources/AT_KN2040/networks/base_s_adm__none_2040.nc` with `n.statistics.withdrawal(bus_carrier="low voltage", groupby="carrier")`. Measured withdrawals from `low voltage` in 2040 (TWh): Load `electricity` 1578.22, `industry electricity` 1686.76, `BEV charger` 965.98, `urban decentral air heat pump` 347.01, `urban decentral resistive heater` 224.12, `rural ground heat pump` 194.93, `urban central air heat pump` 88.99 (excluded), `home battery charger` 7.05 (excluded).
 
 ## 7. Accounting rule and sign convention
 - Formula, per location `l` (D1):

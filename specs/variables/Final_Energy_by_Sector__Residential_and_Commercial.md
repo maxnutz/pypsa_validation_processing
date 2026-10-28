@@ -56,15 +56,17 @@ Changes to the ported logic, with reason:
 ## 6. Components, carriers, bus carriers
 | Component | Carrier(s) | Bus carrier | Port | Included? | Source |
 |---|---|---|---|---|---|
-| Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution`, `rail`, `road`, and that is **not** a decentral heat technology of D8 (e.g. Load `electricity`; in `20261020_carbon_accounting_run` `electricity for residential`, `electricity for services`). `electricity for rail` is counted in Transportation, `electricity for road` in no sector (OQ-24) | `low voltage` | withdrawal | yes (electricity) | l.2278-2302 |
+| Load / Link | every carrier withdrawing from `low voltage` whose name does **not** contain `urban central`, `industry`, `agriculture`, `charger`, `distribution`, `rail`, `road`, and that is **not** an input Link of D8 (`rural`/`urban decentral` `resistive heater`, `air heat pump`, `ground heat pump`; they are counted only in the D8 row) (e.g. Load `electricity`; in `20261020_carbon_accounting_run` `electricity for residential`, `electricity for services`). `electricity for rail` is counted in Transportation, `electricity for road` in no sector (OQ-24) | `low voltage` | withdrawal | yes (electricity) | l.2278-2302 |
 | Load | `urban central heat` | `urban central heat` | withdrawal ÷ (1 + λ) | yes (heat) | l.2345-2348 |
 | Links / Generators | decentral heat supply of D8: `rural`/`urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`, `solar thermal`; CHPs on decentral heat buses (e.g. `biogas CHP`) with the heat received by consumers (G1) | `gas`, `oil`, `solid biomass`, `low voltage` (input); `rural heat`, `urban decentral heat` | input × `σ_b,rc(l)` (D8) | yes | l.2297-2409; D8 |
-| Link | `home battery charger`/`discharger`, `BEV charger`, `DAC`, water-tank/pit chargers | – | – | **no** | l.2293, 2316-2321 |
+| Link | `home battery charger`/`discharger` | `low voltage` | – | **no**: storage; the charged electricity returns to `low voltage` via the discharger and is counted where it is consumed (e.g. Load `electricity`). Owner decision 2026-10-28 | l.2293 |
+| Link | `BEV charger` (Transportation), `DAC`, water-tank/pit chargers | – | – | **no** | l.2293, 2316-2321 |
 
 `σ_b,rc(l)` = residential/commercial share of the heat demand on decentral bus type `b` at `l` (D8).
 
 ## 7. Accounting rule and sign convention
 - Formula: `FE_rc(l) = Σ W[low voltage, c](l) (set above) + L[urban central heat](l)/(1 + λ) + D8_rc(l)`
+- No double counting: every component flow enters at most one term. The electricity term excludes every input Link of D8, so the electricity of decentral heat pumps and resistive heaters enters only via `D8_rc(l)`.
 - `λ` as in the District Heat spec (`config["sector"]["district_heating"]["district_heating_loss"]`).
 - Sign convention: all terms positive (withdrawals and supply counted as positive amounts); result MUST be ≥ 0.
 - Weighting: per C6.10. `σ_b,rc(l)` is computed from yearly values and applied to every snapshot (D8).
@@ -87,7 +89,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock at `A`, 1 snapshot, `λ = 0.15`: LV Load `electricity` 10, `home battery charger` 1, `BEV charger` 3; `urban central heat` Load 23; rural heat inputs: `rural air heat pump` electricity 2 (at its `low voltage` port), `rural gas boiler` gas 4, `rural oil boiler` oil 2 from `EU oil` with heat bus at `A`, `rural biomass boiler` 1, rural solar thermal supply 2 (`I_rural = 11`); `rural heat` Load 6 and `agriculture heat` 2 the only decentral demands (`σ_rural,rc = 0.75`). Result `(A, MWh): 10 + 20 + 0.75·11 = 38.25`.
+- AC3: Mock at `A`, 1 snapshot, `λ = 0.15`: LV Load `electricity` 10, `home battery charger` 1, `BEV charger` 3; `urban central heat` Load 23; rural heat inputs: `rural air heat pump` electricity 2 (at its `low voltage` port), `rural gas boiler` gas 4, `rural oil boiler` oil 2 from `EU oil` with heat bus at `A`, `rural biomass boiler` 1, rural solar thermal supply 2 (`I_rural = 11`); `rural heat` Load 6 and `agriculture heat` 2 the only decentral demands (`σ_rural,rc = 0.75`). Result `(A, MWh): 10 + 20 + 0.75·11 = 38.25`. The heat pump electricity 2 enters only via `I_rural`, not the electricity term.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0 (regression: gas, oil and biomass boiler terms are positive).
 - AC6: C6-AC6.

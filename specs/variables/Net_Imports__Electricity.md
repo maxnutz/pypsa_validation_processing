@@ -46,7 +46,7 @@ Implementing PR: –
 
 Changes to the ported logic, only as needed for the function contract:
 - Sign flipped: net imports = imports − exports = −`Volume`.
-- Region = location instead of country prefix `bus.str[:2]`. Per-location net imports summed by C8 give the country value, because flows between locations of the same country cancel.
+- Region = location instead of country prefix `bus.str[:2]`. Per-location net imports are summed by C8 to the country value. Flows between locations of the same country cancel up to the losses of the branches between them (section 7).
 - Snapshot weighting per C6.10 instead of `snapshot_weightings.generators` (identical in PyPSA-AT, owner statement C6.12).
 
 ## 5. Match type
@@ -66,6 +66,7 @@ Measured 2040: 97 Lines and 138 `DC` Links; `DC` Links connect `AC` buses (e.g. 
 - Formula: for location `l`, `NI_el(l) = Σ_branches Σ_ports at buses in l (−p_port)`, i.e. the energy fed into `l` by Lines/`DC` Links minus the energy withdrawn from `l` by them. For a link with losses, the import is counted at the receiving port and the export at the sending port (as `get_export_import`, which uses `p0` for outgoing and `p1` for incoming).
 - Branches with both ends in `l` contribute 0.
 - Sign convention: positive = net import, negative = net export. Values MAY be negative.
+- Aggregation (owner decision 2026-10-28): the per-location values are summed by C8 (`flow`); no separate aggregation class. The losses of a branch between two locations of the same country stay in the country sum as negative net imports, so the country value equals its cross-border net imports minus its internal branch losses. Measured: `20261020_carbon_accounting_run` 2040, 15 AT-internal Lines with 0.98 TWh losses; `electricity_network_0p3` 2025, 47 Lines with 0.96 TWh; no AT-internal `DC` Links. The AT value is therefore about 3.5 PJ too low. This bias is accepted.
 - Weighting: per C6.10.
 
 ## 8. Optional kwargs

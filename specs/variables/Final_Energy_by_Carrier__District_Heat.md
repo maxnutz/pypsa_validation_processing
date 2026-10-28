@@ -60,7 +60,7 @@ Changes to the ported logic, with reason:
 |---|---|---|---|---|---|
 | Load | `urban central heat` | `urban central heat` | withdrawal ÷ (1 + λ) | yes | l.2345-2348; losses: `prepare_sector_network.py` l.3153-3160 |
 | Load | `low-temperature heat for industry` on `urban central heat` buses | `urban central heat` | withdrawal | yes (no loss factor is applied to this Load in pypsa-eur) | l.2121-2123; `prepare_sector_network.py` l.5280-5294 |
-| Link | `DAC` | `urban central heat` | withdrawal | yes (CDR heat demand, l.2575-2589) | l.2587-2589 |
+| Link | `DAC` | `urban central heat` | withdrawal only (heat port `bus1`, `efficiency` < 0) | yes, as heat consumer (CDR heat demand, l.2575-2589); **never** as heat producer | l.2587-2589 |
 | Link | `urban central water pits charger`, `urban central water tanks charger` | `urban central heat` | – | **no** (storage) | l.2316-2321 (decentral analogue) |
 | Generator | `urban central heat vent` | `urban central heat` | – | **no** (dumped heat, not consumed) | #73 |
 | Links | supplying links (CHP, boilers, heat pumps, …) | – | – | **no** (supply side; counted in the current code at bus0, SC-29) | #63 comment, #73 |
@@ -70,6 +70,7 @@ Measured withdrawals from `urban central heat` in 2040 (TWh): Load `urban centra
 ## 7. Accounting rule and sign convention
 - Formula: `FE_dh(l) = L[urban central heat](l) / (1 + λ) + L[low-temperature heat for industry @ urban central heat](l) + W[urban central heat, DAC](l)`
 - `λ = config["sector"]["district_heating"]["district_heating_loss"]` (measured: 0.15 in `config.base_s_adm__none_2040.yaml` l.1807).
+- `DAC` is counted only as a heat consumer. A `DAC` Link whose port at an `urban central heat` bus supplies heat (`efficiency` at that port > 0, or a negative withdrawal in any snapshot) → `ValueError` naming the Link (P5). Measured (`20261020_carbon_accounting_run` 2030–2050): every `DAC` Link has `bus1` = `… urban central heat` with `efficiency` = −2.545 and `p1 ≥ 0` in every snapshot (2050: 0.333 TWh withdrawal).
 - Any other component that withdraws from `urban central heat` buses with a carrier not listed in section 6 → `ValueError` naming the carrier (P5).
 - Sign convention: withdrawals positive; result MUST be ≥ 0.
 - Weighting: per C6.10.
@@ -99,6 +100,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_th` (or `MWh`).
 - AC6: C6-AC6.
 - AC7: The result does not depend on the efficiencies of the heat-supplying links (changing a CHP efficiency in the mock leaves the result unchanged).
 - AC8: An unknown withdrawing carrier on `urban central heat` raises `ValueError`.
+- AC9: A `DAC` Link with a positive `efficiency` at its `urban central heat` port (heat supply) raises `ValueError`; it is never counted as heat.
 
 ## 12. Open questions
 - None specific. OQ-6, OQ-21 resolved.

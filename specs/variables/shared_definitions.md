@@ -2,7 +2,7 @@
 
 Status: draft
 
-Rules and quantities used by more than one variable spec. Variable specs reference them as G1 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
+Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
@@ -17,6 +17,11 @@ Owner decision 2026-10-23. Every `Final Energy` variable measures energy where t
 - heat received by consumers from heat networks: from `urban central heat` (Loads, `Final Energy [by Carrier]|District Heat`) and, in D8, the heat that consumers on a decentral heat bus receive from heat-only sources without an input at the consumer (decentral solar thermal) and from CHPs.
 
 Outputs of conversion technologies (power plants, CHPs, refineries, fuel-supply Links, solar thermal, …) never count as final energy. Where D8 uses the heat supply of a CHP or a solar thermal Generator at a decentral bus, this is only because that bus has no losses, so the heat received by its consumers equals that supply; the quantity measured is still the heat received at the consumer. Production-side variables (e.g. `Secondary Energy|…`, not yet specified) count outputs: CHP heat output counts towards heat variables, CHP electricity output towards electricity variables, and a variable that combines both counts both. Supply flows used only to compute shares or imports (D2, D3, `Net Imports|Oil`) are not final energy and are not affected.
+
+## G2 Final energy is never negative
+Owner decision 2026-10-28 (on #97: "Final Energy - variables must stay positive or equal to Zero (= must NOT become negative. Never). Ever."). Every `Final Energy` variable MUST be `≥ 0` at every location: the yearly value for `aggregate_per_year=True` and every snapshot column for `aggregate_per_year=False`. Subtracted corrections (non-energy use D5, coke D6, distribution losses) MUST NOT make a location negative. Results are not clipped; a negative value is a spec or implementation error.
+
+Exception: `Final Energy [by Sector]|Transportation` subtracts the `V2G` feed-in per snapshot. Its snapshot values MAY be negative; its yearly values MUST be `≥ 0` (owner decision 2026-10-28).
 
 ## D1 Location attribution
 1. A Load flow is attributed to `n.buses.location` of the Load's bus.
@@ -74,7 +79,8 @@ d_k(c) = total domestic k / (total domestic k + total international k)
 - The values are read from the `energy_totals` table (C2.4: from `n.meta`, else from `energy_totals.csv`), columns `total domestic aviation`, `total international aviation`, `total domestic navigation`, `total international navigation`, row `country == c`.
 - The share MUST be determined per country, not one value for all locations (current `utils.get_energy_totals_domestic_share` uses `AT` for all, OQ-1).
 - The year is the energy totals year of the model run (`n.meta["energy"]["energy_totals_year"]` or `config["energy"]["energy_totals_year"]`, C2.4; OQ-1 resolved). The table passed holds that year only.
-- A location whose country has no row → `ValueError` naming the country.
+- The lookup is made only for locations with non-zero demand in a term weighted by `d_k`. A location whose weighted terms are all 0 (e.g. the pseudo-location `EU`, C6.13) gets 0 for them without a lookup.
+- A location with non-zero weighted demand whose country has no row → `ValueError` naming the country. Measured: the `energy_totals` tables hold all 34 countries of the networks, and aviation and navigation Loads exist only at country locations, none at `EU` (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
 - A denominator of 0 → `d_k(c) = 0`.
 - Energy totals not available → the variable is skipped per C2.4 / P5.
 
@@ -98,7 +104,7 @@ Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the net
   - The share is constant over snapshots; for time series output it is applied to every snapshot.
   - Measured (eurostat-energy-balance_processing#8, 2024): AT gas 0.104, AT oil 0.807; DE gas 0.103, DE oil 0.910; EU27_2020 gas 0.138. The current code uses one EU-27 gas factor of 0.060 (#61).
 - Functions that use D5 MUST declare `industry_non_energy_shares` (C5); without the table they are skipped (C2.5).
-- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l`, so that results stay ≥ 0. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5).
+- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l` at every location and in every snapshot, so that the energy part stays ≥ 0 (G2). `NE_x(l)` is computed from the demand at `l` itself, never from a country or system total. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5).
 
 ## D6 Coke correction for industrial coal `κ(l)`
 pypsa-de counts the coke part of `coal for industry` as secondary energy and converts it back with `mwh_coal_per_mwh_coke = 1.366`:

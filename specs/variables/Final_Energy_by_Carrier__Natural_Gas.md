@@ -27,7 +27,7 @@ Implementing PR: –
     unit: TJ
 # {Final Energy Carrier} = Natural Gas: "fossil methane"
 ```
-Issue #97 (owner): "Final Energy - variables must stay positive. Ever."
+Issue #97 (owner): "Final Energy - variables must stay positive. Ever." Clarified 2026-10-28: final energy variables MUST be ≥ 0, never negative (G2).
 
 ## 3. Unit
 | Item | Value | Source |
@@ -68,7 +68,7 @@ Changes to the ported logic, only as needed for the function contract:
 - Formula: `FE_ng(l) = f_gas · ( W[gas, rural gas boiler](l) + W[gas, urban decentral gas boiler](l) + L[gas for industry](l) − NE_gas(l) )`
 - Sign convention: withdrawals counted **positive**. The boiler flow is a withdrawal at bus0 and MUST enter with a positive sign. Result MUST be ≥ 0 (#97).
 - Weighting: per C6.10; `f_gas` is the yearly scalar for every snapshot (D3).
-- Special cases: non-energy use (D5).
+- Special cases: non-energy use (D5). The energy part of industry gas, `L[gas for industry](l) − NE_gas(l)`, MUST be ≥ 0 at every location and in every snapshot (D5, G2). `NE_gas(l)` is computed from the Load at `l` itself.
 
 ## 8. Optional kwargs
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
@@ -87,6 +87,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 | no gas boilers and no `gas for industry` in a location / in `n` | `0.0` per location (C6.13); never a zero-row Series (SC-25) |
 | no fossil gas supply (`f_gas = 0`) | `0.0` for all locations |
 | total gas supply 0 | `f_gas = 0` (D3) |
+| no non-energy use of gas: `S[c, Natural Gas] = 0`, or no row for country `c` (`WARNING`, D5) | `NE_gas = 0`; the full `gas for industry` Load counts: `f_gas · (boilers + L[gas for industry])` |
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
@@ -96,6 +97,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC6: C6-AC6.
 - AC7: `gas pipeline` flows and the `gas` Store do not change `f_gas`.
 - AC9: With `S[AA, Natural Gas] = 0.25` for location `A` (country `AA`) in the mock of AC3: `NE_gas = 5`, result `0.6·(10 + 20 − 5) = 15`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8). A country without a row gives `NE_gas = 0` and a `WARNING` naming the country.
+- AC10: With `S[AA, Natural Gas] = 1` in the mock of AC3 the industry term is `0` (not negative) and the result is `0.6·10 = 6`; with `S[AA, Natural Gas] = 0` it is `18`.
 - AC8: An unknown carrier with non-zero yearly supply to a gas bus raises `ValueError` naming the carrier (D3); an unknown carrier with zero supply is ignored. An `import gas` Link supplying 40 instead of `biogas to gas` in the mock of AC3 gives the same result (`f_gas = 0.6`).
 
 ## 12. Open questions

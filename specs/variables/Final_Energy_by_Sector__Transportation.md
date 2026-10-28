@@ -48,6 +48,7 @@ Implementing PR: –
 Changes to the ported logic, only as needed for the function contract:
 - Domestic shares per country (D4).
 - `electricity for rail` is counted, `electricity for road` is not (OQ-24 resolved; both Loads exist only in networks with the split base load, e.g. `20261020_carbon_accounting_run`; pypsa-de has neither).
+- `V2G` feed-in to `low voltage` is subtracted per snapshot (owner decision 2026-10-28); pypsa-de does not subtract it. Reason: electricity stored in EVs and fed back to the grid is used by other sectors (e.g. Residential and Commercial, Industry) and counted there. Without the subtraction it would also count in Transportation. The measured networks have no `V2G` Links (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
 - Per location (D1); no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
@@ -63,13 +64,13 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `shipping oil` | `shipping oil` | × `d_navigation` (D4) | yes | l.2468-2470 |
 | Load | `shipping methanol` | `shipping methanol` | × `d_navigation` (D4) | yes | l.2472-2474 |
 | Load | `land transport EV` | `EV battery` | – | **no** (the BEV charger withdrawal already counts it, incl. charging losses) | l.2437 |
-| Link | `V2G` | `low voltage` | – | **no** (pypsa-de does not subtract V2G feed-in) | l.2437-2439 |
+| Link | `V2G` | `low voltage` | supply (bus1), subtracted | yes, **negative** (owner decision 2026-10-28) | l.2437-2439 (pypsa-de does not subtract it) |
 | Load | `electricity for rail` | `low voltage` | withdrawal | yes | OQ-24 |
 | Load | `electricity for road` | `low voltage` | – | **no**: historic road electricity, already contained in the land transport demand served by the `BEV charger` chain (double count) | OQ-24 |
 
 ## 7. Accounting rule and sign convention
-- Formula: `FE_tr(l) = W[low voltage, BEV charger](l) + L[electricity for rail](l) + L[land transport fuel cell](l) + L[land transport oil](l) + d_aviation(c)·L[kerosene for aviation](l) + d_navigation(c)·( L[shipping oil](l) + L[shipping methanol](l) )`
-- Sign convention: withdrawals positive; result MUST be ≥ 0.
+- Formula: `FE_tr(l) = W[low voltage, BEV charger](l) − S[low voltage, V2G](l) + L[electricity for rail](l) + L[land transport fuel cell](l) + L[land transport oil](l) + d_aviation(c)·L[kerosene for aviation](l) + d_navigation(c)·( L[shipping oil](l) + L[shipping methanol](l) )`
+- Sign convention: withdrawals positive; the `V2G` feed-in is subtracted per snapshot, without clipping. Snapshot values MAY be negative (exception to G2); yearly values MUST be ≥ 0 (G2).
 - Weighting: per C6.10; `d_k` are scalars.
 - Special cases: D4, D7. The `BEV charger` withdrawal at bus0 is the electricity taken from the grid, i.e. it already includes charging losses. Dividing it by the efficiency (current code, l.851-871) counts the losses twice (SC-32).
 
@@ -92,9 +93,10 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock at `A` (country `AA`, `d_aviation = 0.5`, `d_navigation = 0.2`): `BEV charger` withdrawal 10 (efficiency 0.9), `land transport fuel cell` 5, `land transport oil` 40 (bus unit `land transport`), kerosene 20, shipping oil 10, shipping methanol 5; 1 snapshot. Result `(A, MWh): 10 + 5 + 40 + 10 + 3 = 68`. Adding `electricity for rail` 2 and `electricity for road` 4 gives `70` (road not counted).
+- AC3: Mock at `A` (country `AA`, `d_aviation = 0.5`, `d_navigation = 0.2`): `BEV charger` withdrawal 10 (efficiency 0.9), `land transport fuel cell` 5, `land transport oil` 40 (bus unit `land transport`), kerosene 20, shipping oil 10, shipping methanol 5; 1 snapshot. Result `(A, MWh): 10 + 5 + 40 + 10 + 3 = 68`. Adding `electricity for rail` 2 and `electricity for road` 4 gives `70` (road not counted). Adding a `V2G` feed-in of 3 to `low voltage` at `A` gives `67`.
 - AC4: C6-AC3 (`flow`).
-- AC5: Values ≥ 0; unit is `MWh`; no `land transport` unit.
+- AC5: Yearly values ≥ 0; unit is `MWh`; no `land transport` unit.
+- AC8: Time series, 2 snapshots, weighting 1, only `BEV charger` withdrawal 4 / 0 and `V2G` feed-in 0 / 3 at `A`: snapshot values `4 / −3` (not clipped), yearly value `1`.
 - AC6: C6-AC6.
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 

@@ -66,7 +66,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Link | `kerosene for aviation` (from `EU oil`), `methanol-to-kerosene` (from `EU methanol`) | `kerosene for aviation` | supply | share `s_ker` only | OQ-26 |
 | Load | `shipping oil` | `shipping oil` | withdrawal × `d_navigation` (D4) | yes | l.2468-2470 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` (D5) | yes | l.2192-2197 |
-| Load | `shipping methanol` | `shipping methanol` | – | **no** (OQ-20 resolved; counted in `E-Fuels`/`Biofuels`) | l.2472-2474 |
+| Load | `shipping methanol` | `shipping methanol` | – | **no**: not a final energy use of oil (methanol is not an oil product; OQ-20 resolved, counted in `E-Fuels`/`Biofuels`) | l.2472-2474 |
 | Link | `oil` (power plant), `urban central oil CHP` | `oil` | – | **no** (transformation) | l.2642-2647 |
 | Link | `agriculture machinery oil`, `land transport oil`, `kerosene for aviation`, `shipping oil`, `naphtha for industry` (oil → demand bus) | `oil` | – | **no** (delivery to the Load bus; the Load is counted) | carriers table |
 

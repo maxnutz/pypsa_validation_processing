@@ -46,7 +46,7 @@ Implementing PR: –
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, with reason:
-- `agriculture heat` is not counted as heat. Instead, the agricultural share of the decentral heat input of the `rural heat` bus is counted (D8, owner decision 2026-10-22, OQ-22 resolved). Reason: the delivered heat and the fuel producing it were counted in two sectors.
+- `agriculture heat` is not counted as heat, because final energy is measured at the consumer (G1). In PyPSA-AT the `agriculture heat` Load sits only on `rural heat` buses (measured: 51 of 51 Loads in `20261020_carbon_accounting_run` 2040, 76 of 76 in `electricity_network_0p3` 2025). It is met by decentral supply at the consumer, not by a heat network. Its final energy is therefore the input of that supply (electricity of heat pumps and resistive heaters, gas, oil, biomass) plus the heat received from decentral CHPs and solar thermal, i.e. the agricultural share of the `rural heat` input (D8; owner decision 2026-10-22, OQ-22 resolved). pypsa-de counts `agriculture heat` as heat and the same input again in Residential and Commercial (double count, D8).
 - Per location; no `MWh2TWh`; zero-fill (C6.13).
 
 ## 5. Match type
@@ -56,7 +56,7 @@ Changes to the ported logic, with reason:
 | Component | Carrier(s) | Bus carrier | Port | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `agriculture electricity`, `agriculture machinery electric` | `low voltage` | withdrawal | yes | l.2553-2555 |
-| Load | `agriculture heat` | `rural heat` | used only as heat demand for the share `σ_rural,agr(l)` (D8) | **no** (as heat) | l.2556 |
+| Load | `agriculture heat` | `rural heat` | used only as heat demand for the share `σ_rural,agr(l)` (D8) | **no** (as heat; decentral bus, its final energy is the D8 input, G1) | l.2556 |
 | Links / Generators | decentral heat supply of `rural heat` (D8) | input carriers | input × `σ_rural,agr(l)` | yes | D8 |
 | Load | `agriculture machinery oil` | `agriculture machinery oil` | withdrawal | yes | l.2557-2559 |
 | Link | `agriculture machinery oil` (supply), `agriculture machinery oil CC` | – | – | **no** (supply-link losses are not final energy) | l.2553-2565 |
@@ -81,6 +81,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 | Case | Expected behaviour |
 |---|---|
 | no agriculture loads in a location (e.g. `CH`, SC-26) / in `n` | `0.0` (C6.13) |
+| `agriculture heat` Load on an `urban central heat` bus | `ValueError` naming the Load (P5). Not in the measured networks; delivered district heat would count as heat (G1), which needs a spec change (loss factor, consistency with `Final Energy [by Carrier]\|District Heat`) |
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.

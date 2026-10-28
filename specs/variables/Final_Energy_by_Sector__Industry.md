@@ -28,6 +28,7 @@ Implementing PR: –
 # {Sector} = Industry: "industrial sector excluding non-energy use (e.g.feedstocks)"
 ```
 #74: "distinguish between energy use and non energy use in industry sector … stick to the implementation in export_adriane_variables."
+Owner statement (2026-10-28): the variable includes only the energy use of carriers; non-energy use (e.g. feedstocks) is excluded (D5).
 
 ## 3. Unit
 | Item | Value | Source |
