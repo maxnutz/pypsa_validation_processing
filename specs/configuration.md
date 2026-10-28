@@ -12,7 +12,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 |---|---|---|---|---|---|---|
 | `network_results_path` | path (string) | yes | – | existing directory | Results folder (C2). | missing or wrong type: `ValueError`; not existing: `FileNotFoundError` |
 | `definitions_path` | path (string) or `false` | yes | – | existing directory in IAMC-valid definitions format, or `false` / `"false"` (case-insensitive) | Folder → variables from definitions + unit conversion; `false` → all mapping variables, no conversion (C3). | missing/empty or wrong type: `ValueError`; not existing: `FileNotFoundError` |
-| `country` | string | yes | – | ISO 3166-1 alpha-2 code, incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
+| `country` | string | yes | – | ISO 3166-1 alpha-2 code, incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), `EU` (European Union = the 27 member states, C8.8), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
 | `model_name` | string | yes | – | non-empty string | IAMC `model`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `scenario_name` | string | yes | – | non-empty string | IAMC `scenario`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `convert_units` | bool | no | `true` | `true`, `false` | Convert to definition units (C9). Without effect if `definitions_path: false`. | `ValueError` (SC-5) |
@@ -21,6 +21,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 | `aggregation_level` | string | no | `"country"` | `"country"`, `"region"` | Output granularity (C8). | `ValueError` |
 | `aggregate_per_year` | bool | no | `true` | `true`, `false` | `true`: one value per investment year; `false`: full time series per investment year (C6, C10). | `ValueError` |
 | `map_country_codes_to_names` | bool | no | `false` | `true`, `false` | Map region labels via `utils.REGION_MAPPING` (e.g. `AT` → `Austria`) (C8). | `ValueError` (SC-2) |
+| `industry_non_energy_shares_path` | path (string) | no | – (not set) | CSV file written by `eurostat-energy-balance_processing` | Eurostat fallback for industrial non-energy use (C2.5, D5). Not set or not existing → variables needing it are skipped with `WARNING`. | wrong type: `ValueError`; invalid content: `ValueError` (C2.5) |
 
 Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
 
@@ -29,13 +30,13 @@ Sources: `class_definitions.py::Network_Processor.__init__` (l.165-279); `config
 ## Notes per key
 
 ### `network_results_path`
-Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder, so `config=None` is passed for every year in that setup.
+Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (optional), `resources/energy_totals.csv` (optional); see C2. The config and the energy totals are taken from `n.meta` if the networks carry them; the files are only the fallback (C2.3, C2.4). Example: `resources/AT_KN2040/`. `resources/AT_KN2040_1H/` (used by `config.region-timeseries.yaml`) has no `configs/` folder; its networks carry the config in `n.meta`.
 
 ### `definitions_path`
 Default choice and packaged config: `sister_packages/energy-scenarios-at-workflow/definitions` (the common definitions). Any other `definitions/` folder MAY be set, as long as it is a valid IAMC variable definition readable by `nomenclature.DataStructureDefinition` (owner decision, kick-off review). The key is required even when definitions are not used: then it MUST be set to `false` explicitly.
 
 ### `country`
-`all` keeps every country (or region) of the network. A specific code selects all locations whose label starts with that code (C8). Packaged config: `all`.
+`all` keeps every country (or region) of the network. A specific code selects all locations whose label starts with that code (C8). Packaged config: `all`. `EU` selects the locations of the 27 EU member states, not the copperplate pseudo-location `EU` of the networks, which is never part of the output (C8.7, C8.8).
 
 YAML 1.1 (`yaml.safe_load`) parses some unquoted codes as non-strings: `country: NO` becomes boolean `false` (checked 2026-10-07). Such codes MUST be quoted (`country: "NO"`); an unquoted one is rejected as a wrong type (C1.4).
 
@@ -56,6 +57,9 @@ Packaged config: `true`. `false` switches statistics functions to time series ou
 
 ### `map_country_codes_to_names`
 Default `false` (owner decision). Region labels without an entry in `REGION_MAPPING` are kept. The common region definitions (`sister_packages/energy-scenarios-at-workflow/definitions/region/common.yaml`) currently list only `Austria`; see OQ-2.
+
+### `industry_non_energy_shares_path`
+Produced by `pixi run python workflow.py` in `eurostat-energy-balance_processing` (default output `resources/industry_non_energy_shares_<publication_year>.csv` there; maxnutz/eurostat-energy-balance_processing#8). The file is the interface between the two repositories; this package does not import the other one. Only used while the networks carry no industry production data (C2.5).
 
 ## Unknown keys
 > **Open question:** Keys not listed above are currently ignored silently. Per P5 ("loud") they SHOULD probably be logged as `WARNING` (typo protection). See OQ-10.

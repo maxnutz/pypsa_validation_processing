@@ -27,7 +27,8 @@ specs/
 │   └── statistics_function.md    template for one IAMC variable spec
 └── variables/
     ├── README.md                 index of variable specs
-    └── <function_name>.md        one spec per IAMC variable (later)
+    ├── shared_definitions.md     rules and quantities shared by several variable specs (G1, D1–D8)
+    └── <function_name>.md        one spec per IAMC variable
 ```
 
 ### Why `constitution/principles.md` exists
