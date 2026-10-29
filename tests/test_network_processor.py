@@ -2490,7 +2490,12 @@ network_results_path: {tmp_path}
             if configured
             else ""
         )
-        with caplog.at_level(logging.WARNING):
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(
+                Network_Processor, "_selected_functions_declare", return_value=True
+            ),
+        ):
             processor = self._make_processor(tmp_path, extra=extra)
         assert processor.industry_non_energy_shares is None
         init_warnings = [
@@ -2507,6 +2512,16 @@ network_results_path: {tmp_path}
             and "needs_shares" in r.message
             and "2030" in r.message
             for r in caplog.records
+        )
+
+    def test_no_init_warning_if_no_function_declares_shares(
+        self, tmp_path: Path, caplog
+    ):
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(tmp_path)
+        assert not processor._selected_functions_declare("industry_non_energy_shares")
+        assert not any(
+            "No industry non-energy shares" in r.message for r in caplog.records
         )
 
     def test_physical_method_calls_function_without_file(self, tmp_path: Path, caplog):

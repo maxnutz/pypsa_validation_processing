@@ -630,6 +630,32 @@ class Network_Processor:
         selected["non_energy_share"] = values.astype(float)
         return selected
 
+    def _selected_functions_declare(self, parameter: str) -> bool:
+        """Return whether a function selected for evaluation declares *parameter*.
+
+        Parameters
+        ----------
+        parameter : str
+            Parameter name to look for, e.g. ``industry_non_energy_shares``.
+
+        Returns
+        -------
+        bool
+            ``True`` if at least one selected function declares *parameter*.
+        """
+        stats_module = importlib.import_module(
+            "pypsa_validation_processing.statistics_functions"
+        )
+        functions = [
+            getattr(stats_module, str(self.functions_dict[variable]), None)
+            for variable in self._get_selected_variables()
+        ]
+        return any(
+            parameter in inspect.signature(func).parameters
+            for func in functions
+            if callable(func)
+        )
+
     def _collect_network_inputs(self) -> list[dict]:
         """Determine investment year, config and energy totals per network.
 
@@ -663,7 +689,9 @@ class Network_Processor:
                     ),
                 }
             )
-        needs_shares = not all(entry["physical_non_energy_method"] for entry in inputs)
+        needs_shares = self._selected_functions_declare(
+            "industry_non_energy_shares"
+        ) and not all(entry["physical_non_energy_method"] for entry in inputs)
         if needs_shares and self.industry_non_energy_shares is None:
             logger.warning(
                 "No industry non-energy shares available ('industry_non_energy_shares_path' "
