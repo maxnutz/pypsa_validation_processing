@@ -29,4 +29,4 @@ Copy this block for every phase.
 ```
 
 ## Phases
-_None yet. Filled in after `TODO.md` exists._
+_None yet. Filled in once WP0 of `TODO.md` is done._

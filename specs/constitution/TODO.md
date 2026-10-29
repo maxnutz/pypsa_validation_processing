@@ -5,12 +5,12 @@ Status: draft (created 2026-10-29 from the open GitHub issues and the SC items o
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
 ## WP0 Spec gate (before any code)
-- [ ] Spec PR `spec/eurostat-shares-lookup` merged (ISO codes, `industry_non_energy_shares_year`, mean for missing countries).
-- [ ] maxnutz/eurostat-energy-balance_processing#10 merged (`EL` → `GR`, `UK` → `GB`); shares CSV regenerated.
+- [x] Spec PR `spec/eurostat-shares-lookup` merged (ISO codes, `industry_non_energy_shares_year`, mean for missing countries).
+- [x] maxnutz/eurostat-energy-balance_processing#10 merged (`EL` → `GR`, `UK` → `GB`); shares CSV regenerated.
 - [x] A-7 confirmed by the owner (2026-10-29: skip).
 - [x] Status of all specs merged in #108 and #110 set to `reviewed` (2026-10-29).
 - [x] Coal non-energy use specified (OQ-28, 2026-10-29).
-- [ ] maxnutz/eurostat-energy-balance_processing#11 merged (Coal share); shares CSV regenerated.
+- [x] maxnutz/eurostat-energy-balance_processing#11 merged (Coal share); shares CSV regenerated.
 
 ## WP1 Inputs of statistics functions (C2, C5) — depends on WP0
 - [ ] PR: investment year, `config` and `energy_totals` from `n.meta` (C2.2–C2.4; SC-11, SC-36, SC-7; #48).
@@ -22,7 +22,12 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 - [ ] PR: aggregation classes `flow` / `stock` / `intensive` in the mapping (C4.5, C8.2; SC-21).
 - [ ] PR: drop the copperplate `EU`, `country: EU` = 27 member states (C8.7–8; SC-37).
 
-## WP3 Shared definitions in `utils.py` — depends on WP1
+## WP3 Shared definitions in `utils.py` — depends on WP1 and on SC-14
+- [ ] SC-14 resolved before the first helper or statistics function is implemented (WP3, WP4). P6 (`specs/constitution/principles.md`) is binding: exact or semantic pypsa-de match → port the logic of `export_ariadne_variables.py` as is; `pypsa.statistics` only if no match exists; every change to the ported logic is listed in the variable spec. Two instruction files say otherwise and are read by the `developer` role:
+  - `CLAUDE.md` l.32 ("Blueprint"): "serves as blueprint for evaluations, but use `pypsa.statistics` more extensively" → contradicts P6. Proposed text: "`export_ariadne_variables.py` is the implementation source: port its logic for every variable it evaluates (exact or semantic match, P6 in `specs/constitution/principles.md`); use `pypsa.statistics` only for variables without a match."
+  - `sister_packages/CLAUDE.md` l.7-10: calls `get_final_energy` a "semantic map" and recommends reusing "the accounting logic per variable". Compatible with P6 in substance, but MUST name P6 as the rule, so that "semantic map" is not read as "inspiration only".
+  - Who: the owner. `CLAUDE.md` changes only on explicit request ("Forbidden Actions"), `sister_packages/` is read-only for both roles, and spec PRs change only `specs/`. So this is a separate, non-spec PR on explicit request; then mark SC-14 resolved in `open_questions.md` (spec PR).
+  - Not affected: WP1, WP2 and WP5 (no statistics logic).
 One PR per definition, each with unit tests; listed with the variables that need it.
 - [ ] D1 location attribution — Electricity, Natural Gas, Oil, Net Imports|Oil, Transportation, Residential and Commercial
 - [ ] D2 `f_oil` — Oil, Net Imports|Oil
@@ -33,7 +38,7 @@ One PR per definition, each with unit tests; listed with the variables that need
 - [ ] D7 unit of `land transport oil` — Oil, Transportation
 - [ ] D8 decentral heat split — Agriculture, Industry, Residential and Commercial
 
-## WP4 Statistics functions — each depends on WP1, WP2 and its D-helpers
+## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
 One PR per function. Order: few dependencies first, so the framework is exercised end-to-end early.
 - [ ] Net Imports|Electricity (none; SC-30; #70)
 - [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
