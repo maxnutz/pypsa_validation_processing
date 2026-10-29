@@ -1,6 +1,6 @@
 # Mission
 
-Status: draft
+Status: reviewed
 
 ## Purpose
 `pypsa_validation_processing` turns solved PyPSA network results into IAMC-formatted variables and writes them to Excel, so that PyPSA-AT results can be validated against IAMC-formatted reference data.

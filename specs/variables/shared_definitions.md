@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: draft
+Status: reviewed
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
@@ -100,11 +100,12 @@ Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the net
   ```
   - `naphtha for industry` uses the share of all oil products (`O4000XBIO`), not of naphtha alone: pypsa-eur's `naphtha for industry` holds the whole industrial oil demand, while Eurostat books naphtha as 100 % non-energy (AT 2024: `FC_IND_E` naphtha 0 GWh).
   - `NE_H2 = 0`: Eurostat has no hydrogen; H2 non-energy use is skipped (owner decision 2026-10-28), with one `WARNING` per call (C2.5).
-  - A country without a row for the carrier → `NE_x = 0` for its locations, with one `WARNING` per call naming country and carrier.
+  - `S` holds ISO 3166-1 alpha-2 codes (`GR`, `GB`), the same codes as the location prefixes (C2.5).
+  - A country without a row for the carrier (e.g. `CH`, which is not in the Eurostat energy balance) → `S[c, x]` is the arithmetic mean (unweighted) of `S[·, x]` over all countries in the table for that carrier (owner decision 2026-10-29), with one `WARNING` per call naming country and carrier. No `WARNING` is logged for the copperplate `EU` (dropped from the output, C8.7). Measured (`latest`, 2026-10-29): Oil 0.526 (mean of 40 countries), Natural Gas 0.150 (35 countries); the mean includes countries outside the model (e.g. `UA`, `TR`). Since `0 ≤ S ≤ 1` for every row, the mean is in `[0, 1]` too.
   - The share is constant over snapshots; for time series output it is applied to every snapshot.
   - Measured (eurostat-energy-balance_processing#8, 2024): AT gas 0.104, AT oil 0.807; DE gas 0.103, DE oil 0.910; EU27_2020 gas 0.138. The current code uses one EU-27 gas factor of 0.060 (#61).
 - Functions that use D5 MUST declare `industry_non_energy_shares` (C5); without the table they are skipped (C2.5).
-- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l` at every location and in every snapshot, so that the energy part stays ≥ 0 (G2). `NE_x(l)` is computed from the demand at `l` itself, never from a country or system total. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5).
+- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l` at every location and in every snapshot, so that the energy part stays ≥ 0 (G2). `NE_x(l)` is computed from the demand at `l` itself, never from a country or system total. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5; also holds for the mean).
 
 ## D6 Coke correction for industrial coal `κ(l)`
 pypsa-de counts the coke part of `coal for industry` as secondary energy and converts it back with `mwh_coal_per_mwh_coke = 1.366`:

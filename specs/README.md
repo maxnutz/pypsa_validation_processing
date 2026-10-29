@@ -57,3 +57,4 @@ A spec moves back to `draft` when its requirements change.
 4. Cite a source for every factual claim; mark open questions and assumptions explicitly ([constitution/principles.md](constitution/principles.md) P2).
 5. Add new open questions and spec-vs-code differences to [open_questions.md](open_questions.md).
 6. Commit only files under `specs/`; open a PR titled `spec: …` with the spec PR template.
+7. After the owner approves the PR, and before it is merged, set `Status: reviewed` in every spec file the PR adds or changes (and in the index of `variables/README.md`), as the last commit of the PR.

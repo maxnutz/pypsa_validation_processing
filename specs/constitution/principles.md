@@ -1,6 +1,6 @@
 # Principles
 
-Status: draft
+Status: reviewed
 
 Hard rules for all specs and code changes. Contracts in [contracts.md](../contracts.md) refine them.
 
