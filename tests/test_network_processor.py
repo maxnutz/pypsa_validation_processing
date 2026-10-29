@@ -2291,7 +2291,11 @@ def test_default_mapping_names_existing_functions():
         Path(statistics_functions.__file__).parent / "configs" / "mapping.default.yaml"
     )
     mapping = yaml.safe_load(mapping_path.read_text())
-    missing = [f for f in mapping.values() if not hasattr(statistics_functions, f)]
+    missing = [
+        f
+        for f in mapping.values()
+        if not callable(getattr(statistics_functions, f, None))
+    ]
     assert missing == []
 
 
