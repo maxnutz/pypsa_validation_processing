@@ -6,7 +6,7 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 
 ## WP0 Spec gate (before any code)
 - [ ] Spec PR `spec/eurostat-shares-lookup` merged (ISO codes, `industry_non_energy_shares_year`, mean for missing countries).
-- [ ] maxnutz/eurostat-energy-balance_processing branch `iso-country-codes` merged (`EL` → `GR`, `UK` → `GB`); shares CSV regenerated.
+- [ ] maxnutz/eurostat-energy-balance_processing maxnutz/eurostat-energy-balance_processing#10 merged (`EL` → `GR`, `UK` → `GB`); shares CSV regenerated.
 - [x] A-7 confirmed by the owner (2026-10-29: skip).
 - [x] Status of all specs merged in #108 and #110 set to `reviewed` (2026-10-29).
 - [ ] Coal non-energy use specified (discussion 2026-10-29).
