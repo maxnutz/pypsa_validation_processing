@@ -87,18 +87,20 @@ d_k(c) = total domestic k / (total domestic k + total international k)
 Source: `export_ariadne_variables.py::get_final_energy` l.2453-2474 (`international_*_fraction`; `d_k = 1 − international fraction`); `resources/AT_KN2040/resources/energy_totals.csv`.
 
 ## D5 Non-energy use `NE_x(l)`
-Non-energy use of carrier `x ∈ {gas, naphtha, H2}` in industry at location `l`. The sector definition excludes non-energy use: "industrial sector excluding non-energy use (e.g.feedstocks)" (`definitions/variable/tag_sector.yaml`). So final energy variables that contain industry demand of these carriers MUST subtract `NE_x(l)`.
+Non-energy use of carrier `x ∈ {gas, naphtha, H2, coal}` in industry at location `l`. The sector definition excludes non-energy use: "industrial sector excluding non-energy use (e.g.feedstocks)" (`definitions/variable/tag_sector.yaml`). So final energy variables that contain industry demand of these carriers MUST subtract `NE_x(l)`.
 
-Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the network provides the data, Eurostat shares otherwise (C2.5).
+Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the network provides the data, Eurostat shares otherwise (C2.5). Coal added by owner decision 2026-10-29 (OQ-28): the Eurostat non-energy use of coal is excluded; blast-furnace use is not affected (Eurostat books it as transformation).
 
-- **Physical method.** pypsa-de derives `NE_x` from `industry_production` and `industry_sector_ratios` (and, for ammonia, `config_industry`) (`get_final_energy` l.2034-2093). No PyPSA-AT network stores these tables yet; the method is specified in a follow-up spec once it does (C2.5).
+- **Physical method.** pypsa-de derives `NE_x` from `industry_production` and `industry_sector_ratios` (and, for ammonia, `config_industry`) (`get_final_energy` l.2034-2093). No PyPSA-AT network stores these tables yet; the method is specified in a follow-up spec once it does (C2.5). pypsa-de has no coal non-energy use ("no solids used for non-energy purposes", `export_ariadne_variables.py` l.2234); the follow-up spec MUST state how `NE_coal` is obtained then.
 - **Eurostat fallback.** With the table `S = industry_non_energy_shares` (C2.5) and `c` = the first two characters of `l`:
   ```
   NE_gas(l)     = S[c, Natural Gas] · L[gas for industry](l)
   NE_naphtha(l) = S[c, Oil]         · L[naphtha for industry](l)
+  NE_coal(l)    = S[c, Coal]        · L[coal for industry](l)
   NE_H2(l)      = 0
   ```
   - `naphtha for industry` uses the share of all oil products (`O4000XBIO`), not of naphtha alone: pypsa-eur's `naphtha for industry` holds the whole industrial oil demand, while Eurostat books naphtha as 100 % non-energy (AT 2024: `FC_IND_E` naphtha 0 GWh).
+  - `NE_coal` uses the share of solid fossil fuels (`C0000X0350-0370`) with the non-energy use of **all sectors**, `FC_NE / (FC_IND_E + FC_NE)`: Eurostat leaves `FC_IND_NE` empty for solids in all 40 countries (measured 2026-10-29), so all non-energy use of coal is assumed to be industrial (owner decision 2026-10-29, OQ-28). `NE_coal` is taken from the `coal for industry` Load before the coke correction (D6). The PyPSA-AT `industrial_demand_overrides` behind this Load contain the non-energy use (owner statement 2026-10-29), so nothing is subtracted twice. Measured (`latest`): AT 0.134, DE 0.123, CZ 0.340, PL 0.026, GB 0.042 (2019); mean of 39 countries 0.102.
   - `NE_H2 = 0`: Eurostat has no hydrogen; H2 non-energy use is skipped (owner decision 2026-10-28), with one `WARNING` per call (C2.5).
   - `S` holds ISO 3166-1 alpha-2 codes (`GR`, `GB`), the same codes as the location prefixes (C2.5).
   - A country without a row for the carrier (e.g. `CH`, which is not in the Eurostat energy balance) → `S[c, x]` is the arithmetic mean (unweighted) of `S[·, x]` over all countries in the table for that carrier (owner decision 2026-10-29), with one `WARNING` per call naming country and carrier. No `WARNING` is logged for the copperplate `EU` (dropped from the output, C8.7). Measured (`latest`, 2026-10-29): Oil 0.526 (mean of 40 countries), Natural Gas 0.150 (35 countries); the mean includes countries outside the model (e.g. `UA`, `TR`). Since `0 ≤ S ≤ 1` for every row, the mean is in `[0, 1]` too.
@@ -111,11 +113,11 @@ Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the net
 pypsa-de counts the coke part of `coal for industry` as secondary energy and converts it back with `mwh_coal_per_mwh_coke = 1.366`:
 
 ```
-FE_coal_industry = L[coal for industry]·(1 − κ) + L[coal for industry]·κ / 1.366
+FE_coal_industry = (L[coal for industry] − NE_coal)·(1 − κ) + (L[coal for industry] − NE_coal)·κ / 1.366
 κ = coke·1.366 / (coke·1.366 + coal)      from industrial_energy_demand
 ```
 
-(`get_final_energy` l.2208-2225.) Owner decision 2026-10-28 (OQ-18 resolved, option C):
+(`get_final_energy` l.2208-2225; pypsa-de has no `NE_coal`, added by owner decision 2026-10-29, OQ-28: non-energy use first, the coke correction applies to the energy part only.) Owner decision 2026-10-28 (OQ-18 resolved, option C):
 
 - **Physical method.** `κ` from the industry production data, once the networks carry it (C2.5, follow-up spec).
 - **Eurostat fallback.** `κ(l) = 0`, with one `WARNING` per call (C2.5). Eurostat gives no usable value: it books blast-furnace coke as transformation, not as industrial final consumption, and reports no non-energy coke for AT (`FC_IND_NE` `C0311`: `: m`). `n.meta["resources"]["industrial_demand_overrides"]` splits `coal` and `coke` per region, but only for 2025 (measured in `20261020_carbon_accounting_run`), so it is not used.

@@ -9,7 +9,8 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 - [ ] maxnutz/eurostat-energy-balance_processing#10 merged (`EL` → `GR`, `UK` → `GB`); shares CSV regenerated.
 - [x] A-7 confirmed by the owner (2026-10-29: skip).
 - [x] Status of all specs merged in #108 and #110 set to `reviewed` (2026-10-29).
-- [ ] Coal non-energy use specified (discussion 2026-10-29).
+- [x] Coal non-energy use specified (OQ-28, 2026-10-29).
+- [ ] maxnutz/eurostat-energy-balance_processing#11 merged (Coal share); shares CSV regenerated.
 
 ## WP1 Inputs of statistics functions (C2, C5) — depends on WP0
 - [ ] PR: investment year, `config` and `energy_totals` from `n.meta` (C2.2–C2.4; SC-11, SC-36, SC-7; #48).
@@ -27,7 +28,7 @@ One PR per definition, each with unit tests; listed with the variables that need
 - [ ] D2 `f_oil` — Oil, Net Imports|Oil
 - [ ] D3 `f_gas` — Natural Gas
 - [ ] D4 domestic shares `d_k(c)` (needs `energy_totals`) — Oil, Transportation
-- [ ] D5 non-energy use incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Industry
+- [ ] D5 non-energy use incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Coal, Industry
 - [ ] D6 coke correction `κ` — Coal, Industry
 - [ ] D7 unit of `land transport oil` — Oil, Transportation
 - [ ] D8 decentral heat split — Agriculture, Industry, Residential and Commercial
@@ -37,7 +38,7 @@ One PR per function. Order: few dependencies first, so the framework is exercise
 - [ ] Net Imports|Electricity (none; SC-30; #70)
 - [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
 - [ ] Final Energy [by Carrier]|Electricity (D1; SC-38; #43)
-- [ ] Final Energy [by Carrier]|Coal (D6; #44)
+- [ ] Final Energy [by Carrier]|Coal (D5, D6; #44)
 - [ ] Net Imports|Oil (D1, D2; SC-31; #69)
 - [ ] Final Energy [by Carrier]|Natural Gas (D1, D3, D5; SC-23, SC-27; #45, #61, #97)
 - [ ] Final Energy [by Sector]|Agriculture (D8; SC-34; #13)
