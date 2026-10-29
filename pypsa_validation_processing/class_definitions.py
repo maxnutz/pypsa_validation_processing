@@ -4,7 +4,6 @@ import glob
 import importlib
 import inspect
 import logging
-import os
 from pathlib import Path
 import re
 import yaml
@@ -17,9 +16,13 @@ from pypsa_validation_processing.utils import (
     EU27_COUNTRY_CODES,
     REGION_MAPPING,
     UNITS_MAPPING,
+    MissingInputError,
 )
 
 logger = logging.getLogger(__name__)
+
+# last group of exactly four digits not adjacent to other digits (C2.2)
+_YEAR_IN_FILE_NAME = re.compile(r"(?<!\d)\d{4}(?!\d)")
 
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
@@ -232,6 +235,7 @@ class Network_Processor:
         )
         self.country_path_token: str = self._sanitize_path_token(self.country)
         self.network_collection = self._read_pypsa_network_collection()
+        self.network_inputs: list[dict] = self._collect_network_inputs()
         self.dsd: nomenclature.DataStructureDefinition | None = (
             self.read_definitions() if self.use_definitions else None
         )
@@ -318,10 +322,174 @@ class Network_Processor:
             return yaml.safe_load(f)
 
     def _read_pypsa_network_collection(self) -> pypsa.NetworkCollection:
-        """Reads in pypsa networks as NetworkCollection from network_results_path / networks"""
+        """Reads in pypsa networks as NetworkCollection from network_results_path / networks.
+
+        The sorted file paths are stored in ``self.network_files``, in the
+        order of the networks in the collection.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the ``networks`` folder does not exist or contains no ``.nc`` file.
+        """
         nw_path = self.network_results_path / "networks"
-        file_list = [nw_path / f for f in os.listdir(nw_path) if f.endswith(".nc")]
-        return pypsa.NetworkCollection(file_list)
+        if not nw_path.is_dir():
+            raise FileNotFoundError(f"Networks folder does not exist: {nw_path}")
+        self.network_files: list[Path] = sorted(nw_path.glob("*.nc"))
+        if not self.network_files:
+            raise FileNotFoundError(f"No .nc files found in networks folder: {nw_path}")
+        return pypsa.NetworkCollection(self.network_files)
+
+    @staticmethod
+    def _get_investment_year(n: pypsa.Network, label: str) -> int:
+        """Return the investment year of a network (C2.2).
+
+        Uses ``n.meta["wildcards"]["planning_horizons"]``, else
+        ``n.meta["wildcards"]["horizon"]``, else the last four-digit group of
+        the file name (with a WARNING).
+
+        Parameters
+        ----------
+        n : pypsa.Network
+            Network to inspect.
+        label : str
+            File name of the network, used for the fallback and in messages.
+
+        Returns
+        -------
+        int
+            The investment year.
+
+        Raises
+        ------
+        ValueError
+            If neither ``n.meta`` nor the file name holds a year.
+        """
+        wildcards = (getattr(n, "meta", None) or {}).get("wildcards") or {}
+        for key in ("planning_horizons", "horizon"):
+            if wildcards.get(key) is not None:
+                return int(wildcards[key])
+        matches = _YEAR_IN_FILE_NAME.findall(label)
+        if not matches:
+            raise ValueError(
+                f"Cannot determine the investment year of network '{label}': "
+                "no 'planning_horizons' or 'horizon' in n.meta['wildcards'] and "
+                "no four-digit year in the file name."
+            )
+        year = int(matches[-1])
+        logger.warning(
+            "Network '%s' has no investment year in n.meta; using %s from the file name.",
+            label,
+            year,
+        )
+        return year
+
+    @staticmethod
+    def _stringify_keys(value: object) -> object:
+        """Recursively convert all mapping keys to ``str`` (C2.3)."""
+        if isinstance(value, dict):
+            return {
+                str(k): Network_Processor._stringify_keys(v) for k, v in value.items()
+            }
+        if isinstance(value, list):
+            return [Network_Processor._stringify_keys(v) for v in value]
+        return value
+
+    def _get_energy_totals(
+        self, n: pypsa.Network, config: dict | None, label: str
+    ) -> pd.DataFrame | None:
+        """Return the energy totals of one network, indexed by ``country`` (C2.4).
+
+        Uses ``n.meta["resources"]["energy_totals"]`` (pandas ``split``
+        orientation) if present, else the rows of
+        ``<network_results_path>/resources/energy_totals.csv`` with
+        ``year == config["energy"]["energy_totals_year"]``.
+
+        Parameters
+        ----------
+        n : pypsa.Network
+            Network to inspect.
+        config : dict | None
+            Network config of the same network (C2.3).
+        label : str
+            File name of the network, used in messages.
+
+        Returns
+        -------
+        pd.DataFrame | None
+            One row per country, or ``None`` (with a WARNING) if neither
+            source is available.
+        """
+        resources = (getattr(n, "meta", None) or {}).get("resources") or {}
+        table = resources.get("energy_totals")
+        if table is not None:
+            energy_totals = pd.DataFrame(
+                data=table["data"], index=table["index"], columns=table["columns"]
+            )
+            energy_totals.index.name = "country"
+            return energy_totals
+
+        csv_path = self.network_results_path / "resources" / "energy_totals.csv"
+        energy_config = (config or {}).get("energy")
+        year = (
+            energy_config.get("energy_totals_year")
+            if isinstance(energy_config, dict)
+            else None
+        )
+        if not csv_path.exists():
+            missing = f"file {csv_path}"
+        elif year is None:
+            missing = "config key 'energy.energy_totals_year'"
+        else:
+            energy_totals = pd.read_csv(csv_path, index_col=["country", "year"])
+            years = energy_totals.index.get_level_values("year")
+            if int(year) in years:
+                return energy_totals.xs(int(year), level="year")
+            missing = f"rows of year {year} in {csv_path}"
+        logger.warning(
+            "Network '%s': no energy totals available (missing %s). Variables "
+            "whose function declares 'energy_totals' are skipped.",
+            label,
+            missing,
+        )
+        return None
+
+    def _collect_network_inputs(self) -> list[dict]:
+        """Determine investment year, config and energy totals per network.
+
+        Returns
+        -------
+        list[dict]
+            One dict per network of ``self.network_collection`` (same order)
+            with keys ``investment_year``, ``config`` and ``energy_totals``.
+
+        Raises
+        ------
+        ValueError
+            If an investment year cannot be determined or occurs twice.
+        """
+        inputs: list[dict] = []
+        for i in range(len(self.network_collection)):
+            n = self.network_collection[i]
+            files = self.network_files
+            label = files[i].name if i < len(files) else str(n.name)
+            year = self._get_investment_year(n, label)
+            config = self._get_network_config(n, year)
+            inputs.append(
+                {
+                    "investment_year": year,
+                    "config": config,
+                    "energy_totals": self._get_energy_totals(n, config, label),
+                }
+            )
+        years = [entry["investment_year"] for entry in inputs]
+        duplicates = sorted({year for year in years if years.count(year) > 1})
+        if duplicates:
+            raise ValueError(
+                f"Several networks in {self.network_results_path / 'networks'} "
+                f"have the same investment year: {duplicates}"
+            )
+        return inputs
 
     def read_definitions(self) -> nomenclature.DataStructureDefinition:
         """Read IAMC variable definitions from the definitions folder.
@@ -339,7 +507,11 @@ class Network_Processor:
         return dsd
 
     def _execute_function_for_variable(
-        self, variable: str, n: pypsa.Network, config: dict | None = None
+        self,
+        variable: str,
+        n: pypsa.Network,
+        config: dict | None = None,
+        energy_totals: pd.DataFrame | None = None,
     ) -> pd.Series | None:
         """Look up and execute the statistics function for a single variable.
 
@@ -354,16 +526,22 @@ class Network_Processor:
         n : pypsa.Network
             PyPSA network to process.
         config : dict | None, optional
-            Configuration dictionary loaded from the network results config file
-            for the corresponding investment year. Passed to the statistics
-            function only if the function's signature includes a ``config``
-            parameter.
+            Network config of the corresponding investment year (C2.3).
+            Passed to the statistics function only if the function's
+            signature includes a ``config`` parameter.
+        energy_totals : pd.DataFrame | None, optional
+            Energy totals of the corresponding investment year (C2.4).
+            Passed only if the function's signature includes an
+            ``energy_totals`` parameter.
 
         Returns
         -------
         pd.Series | None
             Computed values for the variable, or ``None`` if no function
-            is registered for it.
+            is registered for it, if a declared input (``config``,
+            ``energy_totals``) is ``None``, or if the function raises
+            :class:`~pypsa_validation_processing.utils.MissingInputError`.
+            Each skip is logged as WARNING.
         """
         func_name = self.functions_dict.get(variable)
         if func_name is None:
@@ -386,16 +564,32 @@ class Network_Processor:
             params = set(inspect.signature(func).parameters)
             self._function_parameter_cache[func] = params
         kwargs: dict = {}
-        if "config" in params:
-            kwargs["config"] = config
         if "aggregate_per_year" in params:
             kwargs["aggregate_per_year"] = self.aggregate_per_year
-        if "energy_totals" in params:
-            kwargs["energy_totals"] = (
-                self.network_results_path / "resources" / "energy_totals.csv"
-            )
+        for name, value in (("config", config), ("energy_totals", energy_totals)):
+            if name not in params:
+                continue
+            if value is None:
+                logger.warning(
+                    "Variable %s: skipped, function '%s' declares '%s' but it is "
+                    "not available for this network.",
+                    variable,
+                    func_name,
+                    name,
+                )
+                return None
+            kwargs[name] = value
 
-        return func(n, **kwargs)
+        try:
+            return func(n, **kwargs)
+        except MissingInputError as exc:
+            logger.warning(
+                "Variable %s: skipped, function '%s' is missing input '%s'.",
+                variable,
+                func_name,
+                exc,
+            )
+            return None
 
     def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
         """Aggregate a regional Series/DataFrame to country level by summing regions.
@@ -755,36 +949,50 @@ class Network_Processor:
                 target_unit = "TJ"
         return str(target_unit)
 
-    def _get_network_config(self, investment_year):
-        """Loads the network configuration for a given investment year from the configs folder
-        of the respective network results path.
+    def _get_network_config(
+        self, n: pypsa.Network, investment_year: int
+    ) -> dict | None:
+        """Return the network config of one network (C2.3).
 
         Parameters
         ----------
+        n : pypsa.Network
+            Network whose ``n.meta`` is used if non-empty.
         investment_year : int
-            The investment year for which to load the network configuration.
+            Investment year of *n*, used to find the fallback config file.
 
         Returns
         -------
         dict | None
-            The network configuration as a dictionary, or None if no matching config file is found.
+            ``n.meta`` without ``wildcards`` and ``resources`` if ``n.meta``
+            is non-empty; else the content of
+            ``<network_results_path>/configs/config*<year>.yaml``; else
+            ``None``. All mapping keys are converted to ``str``.
 
         Notes
         -----
-        The method searches for a YAML configuration file in the 'configs' subdirectory of the network. If multiple matching
-        files are found, it uses the first one and logs a warning. If no matching file is found, it logs a warning and returns None.
+        If multiple config files match, the first one in lexicographic order
+        is used and a WARNING lists all matches. If no file matches or the file
+        cannot be read, a WARNING is logged and ``None`` is returned.
         """
+        meta = getattr(n, "meta", None) or {}
+        if meta:
+            return self._stringify_keys(
+                {k: v for k, v in meta.items() if k not in ("wildcards", "resources")}
+            )
+
         config_pattern = str(
             self.network_results_path / "configs" / f"config*{investment_year}.yaml"
         )
-        matching_files = glob.glob(config_pattern)
+        matching_files = sorted(glob.glob(config_pattern))
         network_config: dict | None = None
         if matching_files:
             selected_config_file = matching_files[0]
             if len(matching_files) > 1:
-                logger.info(
-                    "Multiple config files found for investment year %s; using '%s'",
+                logger.warning(
+                    "Multiple config files found for investment year %s: %s; using '%s'",
                     investment_year,
+                    matching_files,
                     selected_config_file,
                 )
             try:
@@ -800,7 +1008,7 @@ class Network_Processor:
                 investment_year,
                 config_pattern,
             )
-        return network_config
+        return self._stringify_keys(network_config)
 
     def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
@@ -833,8 +1041,8 @@ class Network_Processor:
         container_investment_years = []
         for i in range(0, self.network_collection.__len__()):
             n = self.network_collection[i]
-            investment_year = n.meta["wildcards"]["planning_horizons"]
-            network_config = self._get_network_config(investment_year)
+            network_inputs = self.network_inputs[i]
+            investment_year = network_inputs["investment_year"]
 
             variables = (
                 self.dsd.variable.to_pandas()["variable"]
@@ -844,7 +1052,10 @@ class Network_Processor:
             results = []
             for variable in variables:
                 result = self._execute_function_for_variable(
-                    variable, n, config=network_config
+                    variable,
+                    n,
+                    config=network_inputs["config"],
+                    energy_totals=network_inputs["energy_totals"],
                 )
                 if result is not None:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
