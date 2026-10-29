@@ -193,9 +193,9 @@ Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
 Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 ```
 
-At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped; mapped functions that do not exist in `statistics_functions.py` are skipped with a warning. With `definitions_path: false`, every variable in the mapping file is evaluated.
+At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. At initialisation, before any network is read, every selected variable is checked: a function that does not exist in `statistics_functions.py`, or that does not declare `n` and `aggregate_per_year` as its first two parameters (all further parameters with defaults), raises a `ValueError`. An empty mapping file raises a `ValueError`, too. With `definitions_path: false`, every variable in the mapping file is evaluated.
 
-The optional parameters `aggregate_per_year`, `config` and `energy_totals` are only passed to a function if they appear in its signature.
+`n` and `aggregate_per_year` are always passed. The optional parameters `config`, `energy_totals` and `industry_non_energy_shares` are only passed to a function if they appear in its signature.
 
 ### Register statistics for a new variable
 To register a new variable, please first open a new Issue and select Issue Template "New Variable Statistics". In this issue, the following steps are prepared: 

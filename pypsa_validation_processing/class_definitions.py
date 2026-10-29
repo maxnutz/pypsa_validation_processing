@@ -234,12 +234,13 @@ class Network_Processor:
             self.scenario_name
         )
         self.country_path_token: str = self._sanitize_path_token(self.country)
-        self.network_collection = self._read_pypsa_network_collection()
-        self.network_inputs: list[dict] = self._collect_network_inputs()
         self.dsd: nomenclature.DataStructureDefinition | None = (
             self.read_definitions() if self.use_definitions else None
         )
         self.functions_dict: dict[str, str | list] = self._read_mappings()
+        self._validate_mapped_functions()
+        self.network_collection = self._read_pypsa_network_collection()
+        self.network_inputs: list[dict] = self._collect_network_inputs()
         self.aggregation_level: str = self.config.get("aggregation_level", "country")
         if self.aggregation_level not in ["country", "region"]:
             raise ValueError(
@@ -315,11 +316,79 @@ class Network_Processor:
             return yaml.safe_load(f)
 
     def _read_mappings(self) -> dict:
-        """Read and return the YAML mapping file."""
+        """Read and return the YAML mapping file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the mapping file does not exist.
+        ValueError
+            If the mapping file is empty or not a YAML mapping.
+        """
         if not self.mappings_path.exists():
             raise FileNotFoundError(f"Mapping file not found: {self.mappings_path}")
         with open(self.mappings_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            mappings = yaml.safe_load(f)
+        if not isinstance(mappings, dict) or not mappings:
+            raise ValueError(
+                f"Mapping file {self.mappings_path} is empty or not a mapping of "
+                "IAMC variable to function name."
+            )
+        return mappings
+
+    def _get_selected_variables(self) -> list[str]:
+        """Return the variables selected for evaluation (C3).
+
+        With definitions, the definition variables that have a mapping entry,
+        in definition order; without definitions, all mapping variables.
+        """
+        if self.use_definitions:
+            return [
+                variable
+                for variable in self.dsd.variable.to_pandas()["variable"]
+                if variable in self.functions_dict
+            ]
+        return list(self.functions_dict)
+
+    def _validate_mapped_functions(self) -> None:
+        """Check that every selected variable maps to a valid statistics function (C4.4, C5.6).
+
+        Raises
+        ------
+        ValueError
+            If a function does not exist in ``statistics_functions.py``, does
+            not declare ``n`` and ``aggregate_per_year`` as its first two
+            parameters, or has a parameter other than ``n`` without default.
+        """
+        stats_module = importlib.import_module(
+            "pypsa_validation_processing.statistics_functions"
+        )
+        for variable in self._get_selected_variables():
+            func_name = self.functions_dict[variable]
+            func = (
+                getattr(stats_module, func_name, None)
+                if isinstance(func_name, str)
+                else None
+            )
+            if not callable(func):
+                raise ValueError(
+                    f"Variable '{variable}': function '{func_name}' not found in "
+                    f"statistics_functions.py (mapping file {self.mappings_path})."
+                )
+            params = [
+                p
+                for p in inspect.signature(func).parameters.values()
+                if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
+            ]
+            first_two = [p.name for p in params[:2]]
+            without_default = [p.name for p in params[1:] if p.default is p.empty]
+            if first_two != ["n", "aggregate_per_year"] or without_default:
+                raise ValueError(
+                    f"Variable '{variable}': function '{func_name}' must declare "
+                    "'n' and 'aggregate_per_year' as its first two parameters, "
+                    "and all parameters except 'n' need defaults; got "
+                    f"{inspect.signature(func)}."
+                )
 
     def _read_pypsa_network_collection(self) -> pypsa.NetworkCollection:
         """Reads in pypsa networks as NetworkCollection from network_results_path / networks.
@@ -517,6 +586,7 @@ class Network_Processor:
         n: pypsa.Network,
         config: dict | None = None,
         energy_totals: pd.DataFrame | None = None,
+        industry_non_energy_shares: pd.DataFrame | None = None,
     ) -> pd.Series | None:
         """Look up and execute the statistics function for a single variable.
 
@@ -538,13 +608,18 @@ class Network_Processor:
             Energy totals of the corresponding investment year.
             Passed only if the function's signature includes an
             ``energy_totals`` parameter.
+        industry_non_energy_shares : pd.DataFrame | None, optional
+            Eurostat industry non-energy shares (C2.5). Passed only if the
+            function's signature includes an ``industry_non_energy_shares``
+            parameter.
 
         Returns
         -------
         pd.Series | None
             Computed values for the variable, or ``None`` if no function
             is registered for it, if a declared input (``config``,
-            ``energy_totals``) is ``None``, or if the function raises
+            ``energy_totals``, ``industry_non_energy_shares``) is ``None``,
+            or if the function raises
             :class:`~pypsa_validation_processing.utils.MissingInputError`.
             Each skip is logged as WARNING.
         """
@@ -568,10 +643,13 @@ class Network_Processor:
         if params is None:
             params = set(inspect.signature(func).parameters)
             self._function_parameter_cache[func] = params
-        kwargs: dict = {}
-        if "aggregate_per_year" in params:
-            kwargs["aggregate_per_year"] = self.aggregate_per_year
-        for name, value in (("config", config), ("energy_totals", energy_totals)):
+        kwargs: dict = {"aggregate_per_year": self.aggregate_per_year}
+        optional_inputs = (
+            ("config", config),
+            ("energy_totals", energy_totals),
+            ("industry_non_energy_shares", industry_non_energy_shares),
+        )
+        for name, value in optional_inputs:
             if name not in params:
                 continue
             if value is None:
@@ -1121,6 +1199,9 @@ class Network_Processor:
                     n,
                     config=network_inputs["config"],
                     energy_totals=network_inputs["energy_totals"],
+                    industry_non_energy_shares=network_inputs.get(
+                        "industry_non_energy_shares"
+                    ),
                 )
                 if result is not None:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
