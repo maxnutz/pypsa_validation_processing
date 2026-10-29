@@ -806,7 +806,7 @@ def Final_Energy_by_Sector__Transportation(
         :class:`pandas.DataFrame` with snapshots as columns.
     energy_totals : pd.DataFrame | None, optional
         Energy totals of the investment year, indexed by ``country``
-        (contracts C2.4), used to determine domestic shares for aviation and
+        used to determine domestic shares for aviation and
         navigation liquid fuels via :func:`get_energy_totals_domestic_share`.
         Passed by ``Network_Processor``; the variable is skipped if no energy
         totals are available.

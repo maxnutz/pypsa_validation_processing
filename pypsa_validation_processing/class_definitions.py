@@ -418,7 +418,7 @@ class Network_Processor:
         -------
         pd.DataFrame | None
             One row per country, or ``None`` (with a WARNING) if neither
-            source is available.
+            source is available or the CSV cannot be read.
         """
         resources = (getattr(n, "meta", None) or {}).get("resources") or {}
         table = resources.get("energy_totals")
@@ -441,11 +441,16 @@ class Network_Processor:
         elif year is None:
             missing = "config key 'energy.energy_totals_year'"
         else:
-            energy_totals = pd.read_csv(csv_path, index_col=["country", "year"])
-            years = energy_totals.index.get_level_values("year")
-            if int(year) in years:
-                return energy_totals.xs(int(year), level="year")
-            missing = f"rows of year {year} in {csv_path}"
+            try:
+                energy_totals = pd.read_csv(csv_path, index_col=["country", "year"])
+            except Exception as exc:
+                energy_totals = None
+                missing = f"a readable file {csv_path} ({exc})"
+            if energy_totals is not None:
+                years = energy_totals.index.get_level_values("year")
+                if int(year) in years:
+                    return energy_totals.xs(int(year), level="year")
+                missing = f"rows of year {year} in {csv_path}"
         logger.warning(
             "Network '%s': no energy totals available (missing %s). Variables "
             "whose function declares 'energy_totals' are skipped.",
@@ -526,11 +531,11 @@ class Network_Processor:
         n : pypsa.Network
             PyPSA network to process.
         config : dict | None, optional
-            Network config of the corresponding investment year (C2.3).
+            Network config of the corresponding investment year.
             Passed to the statistics function only if the function's
             signature includes a ``config`` parameter.
         energy_totals : pd.DataFrame | None, optional
-            Energy totals of the corresponding investment year (C2.4).
+            Energy totals of the corresponding investment year.
             Passed only if the function's signature includes an
             ``energy_totals`` parameter.
 
@@ -949,66 +954,121 @@ class Network_Processor:
                 target_unit = "TJ"
         return str(target_unit)
 
+    @staticmethod
+    def _deep_merge(base: dict, override: dict) -> dict:
+        """Return *base* updated recursively with *override* (override wins)."""
+        merged = dict(base)
+        for key, value in override.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = Network_Processor._deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    def _read_network_config_file(
+        self, investment_year: int, log_level: int
+    ) -> dict | None:
+        """Read ``<network_results_path>/configs/config*<year>.yaml``.
+
+        Parameters
+        ----------
+        investment_year : int
+            Investment year used in the file pattern.
+        log_level : int
+            Logging level for problems (no file, several files, unreadable
+            file, root not a mapping).
+
+        Returns
+        -------
+        dict | None
+            Content of the first matching file in lexicographic order, or
+            ``None`` if no file matches, it cannot be read or its root is not
+            a mapping.
+        """
+        config_pattern = str(
+            self.network_results_path / "configs" / f"config*{investment_year}.yaml"
+        )
+        matching_files = sorted(glob.glob(config_pattern))
+        if not matching_files:
+            logger.log(
+                log_level,
+                "No config file found for investment year %s at pattern '%s'",
+                investment_year,
+                config_pattern,
+            )
+            return None
+        selected_config_file = matching_files[0]
+        if len(matching_files) > 1:
+            logger.log(
+                log_level,
+                "Multiple config files found for investment year %s: %s; using '%s'",
+                investment_year,
+                matching_files,
+                selected_config_file,
+            )
+        try:
+            with open(selected_config_file, "r") as f:
+                network_config = yaml.safe_load(f)
+        except Exception as exc:
+            logger.log(
+                log_level,
+                "Could not load config file '%s': %s",
+                selected_config_file,
+                exc,
+            )
+            return None
+        if not isinstance(network_config, dict):
+            logger.log(
+                log_level,
+                "Config file '%s' is not a mapping (got %s); it is ignored.",
+                selected_config_file,
+                type(network_config).__name__,
+            )
+            return None
+        return network_config
+
     def _get_network_config(
         self, n: pypsa.Network, investment_year: int
     ) -> dict | None:
         """Return the network config of one network (C2.3).
 
+        ``n.meta`` without ``wildcards`` and ``resources`` is deep-merged
+        over the content of ``<network_results_path>/configs/config*<year>.yaml``:
+        values in ``n.meta`` win, keys missing from ``n.meta`` are taken from
+        the file.
+
         Parameters
         ----------
         n : pypsa.Network
-            Network whose ``n.meta`` is used if non-empty.
+            Network whose ``n.meta`` is used.
         investment_year : int
-            Investment year of *n*, used to find the fallback config file.
+            Investment year of *n*, used to find the config file.
 
         Returns
         -------
         dict | None
-            ``n.meta`` without ``wildcards`` and ``resources`` if ``n.meta``
-            is non-empty; else the content of
-            ``<network_results_path>/configs/config*<year>.yaml``; else
-            ``None``. All mapping keys are converted to ``str``.
+            The merged config with all mapping keys converted to ``str``, or
+            ``None`` if neither ``n.meta`` nor a readable config file holds
+            any config.
 
         Notes
         -----
-        If multiple config files match, the first one in lexicographic order
-        is used and a WARNING lists all matches. If no file matches or the file
-        cannot be read, a WARNING is logged and ``None`` is returned.
+        Problems with the config file (none, several, unreadable, root not a
+        mapping) are logged as WARNING if ``n.meta`` holds no config, else as
+        INFO.
         """
         meta = getattr(n, "meta", None) or {}
-        if meta:
-            return self._stringify_keys(
-                {k: v for k, v in meta.items() if k not in ("wildcards", "resources")}
-            )
-
-        config_pattern = str(
-            self.network_results_path / "configs" / f"config*{investment_year}.yaml"
+        meta_config = self._stringify_keys(
+            {k: v for k, v in meta.items() if k not in ("wildcards", "resources")}
         )
-        matching_files = sorted(glob.glob(config_pattern))
-        network_config: dict | None = None
-        if matching_files:
-            selected_config_file = matching_files[0]
-            if len(matching_files) > 1:
-                logger.warning(
-                    "Multiple config files found for investment year %s: %s; using '%s'",
-                    investment_year,
-                    matching_files,
-                    selected_config_file,
-                )
-            try:
-                with open(selected_config_file, "r") as f:
-                    network_config = yaml.safe_load(f)
-            except Exception as exc:
-                logger.warning(
-                    "Could not load config file '%s': %s", selected_config_file, exc
-                )
-        else:
-            logger.warning(
-                "No config file found for investment year %s at pattern '%s'",
-                investment_year,
-                config_pattern,
+        file_config = self._stringify_keys(
+            self._read_network_config_file(
+                investment_year, logging.INFO if meta_config else logging.WARNING
             )
-        return self._stringify_keys(network_config)
+        )
+        if not meta_config and file_config is None:
+            return None
+        return self._deep_merge(file_config or {}, meta_config)
 
     def calculate_variables_values(self) -> None:
         """Calculate values for all defined variables.
@@ -1028,6 +1088,11 @@ class Network_Processor:
         contains the full time-series for that year.
 
         Applies aggregation based on ``self.aggregation_level`` config.
+
+        Raises
+        ------
+        RuntimeError
+            If no variable produced values for any network.
         """
         merge_keys = (
             ["variable", "country", "unit"]
@@ -1085,9 +1150,13 @@ class Network_Processor:
                     iam_df = self.structure_pyam_from_pandas(year_df)
                     container_investment_years.append((investment_year, iam_df))
 
+        if not container_investment_years:
+            raise RuntimeError(
+                "No variable produced values for any network in "
+                f"{self.network_results_path / 'networks'}; see the warnings above."
+            )
         if self.aggregate_per_year:
-            if len(container_investment_years) > 0:
-                ds_with_values = container_investment_years[0]
+            ds_with_values = container_investment_years[0]
             if len(container_investment_years) > 1:
                 for year_df in container_investment_years[1:]:
                     ds_with_values = ds_with_values.merge(

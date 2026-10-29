@@ -143,7 +143,7 @@ If a variable-specific function needs additional settings, optional function par
 - `config: dict`: dict of the configuration 
 - `energy_totals: pd.DataFrame`: energy totals of the run's energy totals year, one row per country (index `country`), needed to calculate domestic-to-international ratios. Taken from `n.meta["resources"]["energy_totals"]`, else from the rows of `<network_results_path>/resources/energy_totals.csv` for `config["energy"]["energy_totals_year"]`.
 
-`config` is `n.meta` without `wildcards` and `resources`; only for networks without `n.meta` it is read from `<network_results_path>/configs/config*<year>.yaml`. If a declared input is not available for a network, the variable is skipped for that network with a `WARNING`. A function that misses a required key raises `utils.MissingInputError`; the variable is then skipped with a `WARNING`.
+`config` is `n.meta` without `wildcards` and `resources`, deep-merged over `<network_results_path>/configs/config*<year>.yaml`: values in `n.meta` win, keys missing from `n.meta` are taken from the file. If a declared input is not available for a network, the variable is skipped for that network with a `WARNING`. A function that misses a required key raises `utils.MissingInputError`; the variable is then skipped with a `WARNING`.
 
 Return format rules:
 

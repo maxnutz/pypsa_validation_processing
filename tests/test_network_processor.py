@@ -1952,6 +1952,37 @@ network_results_path: {tmp_path}
             "co2_budget": {"2030": 0.45},
         }
 
+    def test_config_keys_missing_from_meta_taken_from_file(self, tmp_path: Path):
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "sector": {"district_heating": {"potential": 0.6}},
+        }
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text(
+            "sector: {district_heating: {potential: 0.3, district_heating_loss: 0.15}}\n"
+            "energy: {energy_totals_year: 2019}\n"
+        )
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {
+            "sector": {
+                "district_heating": {"potential": 0.6, "district_heating_loss": 0.15}
+            },
+            "energy": {"energy_totals_year": 2019},
+        }
+
+    def test_config_from_file_if_meta_has_only_wildcards(self, tmp_path: Path):
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("co2_budget: {2030: 0.9}\n")
+        meta = {"wildcards": {"planning_horizons": 2030}, "resources": {"x": 1}}
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {"co2_budget": {"2030": 0.9}}
+
     def test_config_from_file_has_str_keys(self, tmp_path: Path):
         configs_dir = tmp_path / "configs"
         configs_dir.mkdir()
@@ -2001,6 +2032,48 @@ network_results_path: {tmp_path}
         assert list(energy_totals.index) == ["AT"]
         assert energy_totals.index.name == "country"
         assert energy_totals.loc["AT", "total domestic aviation"] == 2.0
+
+    def test_config_file_not_a_mapping_is_unavailable(self, tmp_path: Path, caplog):
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("- a\n- b\n")
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["config"] is None
+        assert any("not a mapping" in r.message for r in caplog.records)
+
+    def test_unreadable_energy_totals_csv_is_unavailable(self, tmp_path: Path, caplog):
+        (tmp_path / "resources").mkdir()
+        (tmp_path / "resources" / "energy_totals.csv").write_text("foo,bar\n1,2\n")
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "energy": {"energy_totals_year": 2019},
+        }
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["energy_totals"] is None
+        assert any("no energy totals available" in r.message for r in caplog.records)
+
+    def test_no_values_for_any_network_raises(self, tmp_path: Path):
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+        )
+        processor.use_definitions = False
+        processor.functions_dict = {"Var Config": "with_config"}
+
+        def with_config(n, aggregate_per_year=True, config=None):
+            return _series_result()
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(with_config=with_config),
+        ):
+            with pytest.raises(RuntimeError, match="No variable produced values"):
+                processor.calculate_variables_values()
 
     def test_missing_inputs_skip_only_declaring_functions(self, tmp_path: Path, caplog):
         """C2-AC5, C2-AC6: missing config/energy totals skip declaring functions only."""

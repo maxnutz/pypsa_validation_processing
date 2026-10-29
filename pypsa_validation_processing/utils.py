@@ -181,7 +181,7 @@ class MissingInputError(Exception):
 
     The message names the missing key (e.g. a dotted config path such as
     ``sector.district_heating.district_heating_loss``). ``Network_Processor``
-    catches it and skips the variable for that network (contracts C2.3).
+    catches it and skips the variable for that network.
     """
 
 
@@ -195,7 +195,7 @@ def get_energy_totals_domestic_share(
     Parameters
     ----------
     energy_totals
-        Energy totals of one year, indexed by ``country`` (contracts C2.4).
+        Energy totals of one year, indexed by ``country``.
     kind: {'aviation', 'navigation'}
         The kind of energy totals to calculate the factor for.
 
