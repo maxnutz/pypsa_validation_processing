@@ -1,11 +1,11 @@
 # Roadmap
 
-Status: draft (structure only)
+Status: reviewed (structure only)
 
 ## Basis
 The roadmap MUST be derived from `specs/constitution/TODO.md`.
 
-> **Note:** `TODO.md` does not exist yet. It is created in a separate step from the existing GitHub issues and is not part of the kick-off scaffold. Until then, this file contains no phases.
+> **Note:** `TODO.md` exists since 2026-10-29 (work packages WP0–WP5). Phases are added here once WP0 is done.
 
 ## Rules
 - Phases are very small, incremental units of work (`CLAUDE.md`, "Working Principles": no big-bang changes).
@@ -29,4 +29,4 @@ Copy this block for every phase.
 ```
 
 ## Phases
-_None yet. Filled in after `TODO.md` exists._
+_None yet. Filled in once WP0 of `TODO.md` is done._

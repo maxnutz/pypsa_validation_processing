@@ -1,6 +1,6 @@
 # Tech stack
 
-Status: draft
+Status: reviewed
 
 Version constraints are taken from `pixi.toml` and `pyproject.toml`; locked versions from the committed `pixi.lock` (linux-64 / noarch / pure-Python wheels). Nothing here is a new requirement unless written with MUST/SHOULD.
 

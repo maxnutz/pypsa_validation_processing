@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|Natural Gas`
 
-Status: draft
+Status: reviewed
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -87,7 +87,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 | no gas boilers and no `gas for industry` in a location / in `n` | `0.0` per location (C6.13); never a zero-row Series (SC-25) |
 | no fossil gas supply (`f_gas = 0`) | `0.0` for all locations |
 | total gas supply 0 | `f_gas = 0` (D3) |
-| no non-energy use of gas: `S[c, Natural Gas] = 0`, or no row for country `c` (`WARNING`, D5) | `NE_gas = 0`; the full `gas for industry` Load counts: `f_gas · (boilers + L[gas for industry])` |
+| no non-energy use of gas: `S[c, Natural Gas] = 0` | `NE_gas = 0`; the full `gas for industry` Load counts: `f_gas · (boilers + L[gas for industry])` |
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
@@ -96,7 +96,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 - AC5: The result is ≥ 0 for every location, also when the renewable gas supply of one location exceeds its demand (regression for #97).
 - AC6: C6-AC6.
 - AC7: `gas pipeline` flows and the `gas` Store do not change `f_gas`.
-- AC9: With `S[AA, Natural Gas] = 0.25` for location `A` (country `AA`) in the mock of AC3: `NE_gas = 5`, result `0.6·(10 + 20 − 5) = 15`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8). A country without a row gives `NE_gas = 0` and a `WARNING` naming the country.
+- AC9: With `S[AA, Natural Gas] = 0.25` for location `A` (country `AA`) in the mock of AC3: `NE_gas = 5`, result `0.6·(10 + 20 − 5) = 15`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8). If the table has rows only for `AA` (0.25) and `BB` (0.75), a location of country `CC` uses the mean `0.5` (`NE_gas = 10` for a Load of 20), and a `WARNING` naming `CC` and `Natural Gas` is logged.
 - AC10: With `S[AA, Natural Gas] = 1` in the mock of AC3 the industry term is `0` (not negative) and the result is `0.6·10 = 6`; with `S[AA, Natural Gas] = 0` it is `18`.
 - AC8: An unknown carrier with non-zero yearly supply to a gas bus raises `ValueError` naming the carrier (D3); an unknown carrier with zero supply is ignored. An `import gas` Link supplying 40 instead of `biogas to gas` in the mock of AC3 gives the same result (`f_gas = 0.6`).
 

@@ -1,6 +1,6 @@
 # `Final Energy [by Sector]|Residential and Commercial`
 
-Status: draft
+Status: reviewed
 Implementing PR: –
 
 ## 1. Variable and function name

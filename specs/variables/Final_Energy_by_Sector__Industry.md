@@ -1,6 +1,6 @@
 # `Final Energy [by Sector]|Industry`
 
-Status: draft
+Status: reviewed
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -48,7 +48,7 @@ Owner statement (2026-10-28): the variable includes only the energy use of carri
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, only as needed for the function contract:
-- `NE_x` and `κ` cannot be computed from the pypsa-de inputs yet (D5, D6). OQ-18 resolved: physical method once the networks carry industry production data; until then Eurostat shares for gas and naphtha, `NE_H2 = 0` and `κ = 0`, each skipped correction with a `WARNING` (C2.5).
+- `NE_x` and `κ` cannot be computed from the pypsa-de inputs yet (D5, D6). OQ-18 resolved: physical method once the networks carry industry production data; until then Eurostat shares for gas, naphtha and coal (OQ-28), `NE_H2 = 0` and `κ = 0`, each skipped correction with a `WARNING` (C2.5).
 - Decentral `low-temperature heat for industry` (on `urban decentral heat`) is not counted as heat. Instead, the industrial share of the decentral heat input is counted (D8, owner decision 2026-10-22, OQ-22 resolved). The Load on `urban central heat` stays counted as delivered heat (district heat is a final energy carrier).
 - Per location; no `MWh2TWh`; zero-fill (C6.13).
 
@@ -67,7 +67,7 @@ Changes to the ported logic, only as needed for the function contract:
 | Load | `H2 for industry` | `H2` (`AT_KN2040`) or `H2 for industry` (`electricity_network_0p3`, `20261020_carbon_accounting_run`; supplied by the Links `H2 for industry` and `methane pyrolysis plasma`) | withdrawal − `NE_H2`; identified by the Load carrier, not by the bus carrier | yes | l.2157-2162 |
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal − `NE_naphtha` | yes | l.2192-2197 |
 | Load | `solid biomass for industry` | `solid biomass for industry` | withdrawal | yes | l.2201-2206 |
-| Load | `coal for industry` | `coal for industry` | withdrawal with coke correction (D6) | yes | l.2208-2228 |
+| Load | `coal for industry` | `coal for industry` | withdrawal − `NE_coal` (D5), with coke correction (D6) | yes | l.2208-2228 |
 | Load | `industry methanol` | `industry methanol` | – | **no** (not counted in pypsa-de; chemical feedstock) | l.2253-2262 |
 | Link | `… for industry CC`, `… for industry` (supply links) | – | – | **no** (efficiency losses of supply links are not final energy; the Load is counted) | l.2253-2262 |
 
@@ -82,7 +82,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `aggregate_per_year` | always | – | – |
 | `config` | no | not needed for the Eurostat fallback; the physical method (pypsa-de reads `config["sector"]["ammonia"]` and `config_industry`, l.2034-2058) is specified in a follow-up (C2.5) | – |
 | `energy_totals` | no | – | – |
-| `industry_non_energy_shares` | yes | `NE_gas`, `NE_naphtha` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
+| `industry_non_energy_shares` | yes | `NE_gas`, `NE_naphtha`, `NE_coal` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh`.
@@ -98,7 +98,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6.
-- AC7: In the mock of AC3 (country `AA`), with `S[AA, Natural Gas] = 0.25` and `S[AA, Oil] = 0.5`: `NE_gas = 2`, `NE_naphtha = 3`, `NE_H2 = 0`, `κ = 0`; the result is `38 − 5 = 33`, and `WARNING`s naming the skipped H2 and coke corrections are logged. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
+- AC7: In the mock of AC3 (country `AA`), with `S[AA, Natural Gas] = 0.25` and `S[AA, Oil] = 0.5`: `NE_gas = 2`, `NE_naphtha = 3`, `NE_H2 = 0`, `κ = 0`; the result is `38 − 5 = 33`; with additionally `S[AA, Coal] = 0.25`: `NE_coal = 1`, result `38 − 6 = 32`; and `WARNING`s naming the skipped H2 and coke corrections are logged. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 - AC8: Mock at `B` without `urban central heat` bus: `low-temperature heat for industry` 1 and `urban decentral heat` Load 3 on `urban decentral heat` (`σ = 0.25`), `urban decentral gas boiler` gas input 6. The decentral heat contribution to the result is `0.25·6 = 1.5`, not 1.
 
 ## 12. Open questions
