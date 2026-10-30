@@ -2489,6 +2489,7 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
     def test_invalid_intensive_result_raises(
         self, tmp_path: Path, rows: list[tuple], violation: str
     ):
+        """C6-AC4: an intensive result with a missing or invalid quantity level, unpaired rows or a negative weight raises."""
         processor = self._processor(tmp_path)
         processor.aggregation_classes = {"Var X": "intensive"}
         values = [row[3] if len(row) > 3 else 1.0 for row in rows]
@@ -2498,6 +2499,7 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
             processor._validate_result("Var X", result, self._network())
 
     def test_valid_intensive_result(self, tmp_path: Path):
+        """C6.12: paired value and weight rows with a zero weight are valid."""
         processor = self._processor(tmp_path)
         processor.aggregation_classes = {"Var X": "intensive"}
         index = _index(
