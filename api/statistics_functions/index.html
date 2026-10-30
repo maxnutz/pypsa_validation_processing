@@ -2197,7 +2197,7 @@ or Solids).</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Transportation" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Transportation</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">energy_totals</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Transportation</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
@@ -2259,13 +2259,15 @@ or Solids).</p>
                 <code>energy_totals</code>
             </td>
             <td>
-                  <code><span title="pathlib.Path">Path</span> | None</code>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an energy totals file used to determine domestic shares for
-aviation and navigation liquid fuels. If <code>None</code>, default domestic
-shares from :func:<code>get_energy_totals_domestic_share</code> are used.</p>
+                <p>Energy totals of the investment year, indexed by <code>country</code>
+used to determine domestic shares for aviation and
+navigation liquid fuels via :func:<code>get_energy_totals_domestic_share</code>.
+Passed by <code>Network_Processor</code>; the variable is skipped if no energy
+totals are available.</p>
               </div>
             </td>
             <td>
@@ -2714,7 +2716,7 @@ if the index cannot be reconstructed with the existing index names.</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.get_energy_totals_domestic_share" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
 
 </h3>
 
@@ -2740,11 +2742,11 @@ if the index cannot be reconstructed with the existing index names.</p>
                 <code>energy_totals</code>
             </td>
             <td>
-                  <code><span title="pathlib.Path">Path</span></code>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the energy totals csv file.</p>
+                <p>Energy totals of one year, indexed by <code>country</code>.</p>
               </div>
             </td>
             <td>
@@ -2782,7 +2784,7 @@ if the index cannot be reconstructed with the existing index names.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="pandas.Series">Series</span></code>
+                  <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">

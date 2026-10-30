@@ -1022,7 +1022,7 @@
 ) -&gt; pd.Series | pd.DataFrame:
     ...
 </code></pre>
-<p>Additional optional parameters can be added when a variable needs them, e.g. <code>config: dict</code> or <code>energy_totals: Path</code>. All class-Variables can be used as parameters. Additional parameters are identified automatically when processing the statistics-function.</p>
+<p>Additional optional parameters can be added when a variable needs them, e.g. <code>config: dict</code> or <code>energy_totals: pd.DataFrame</code>. All class-Variables can be used as parameters. Additional parameters are identified automatically when processing the statistics-function.</p>
 <h3 id="return-format">Return format</h3>
 <ul>
 <li><code>aggregate_per_year=True</code> → return a <code>pandas.Series</code>.</li>

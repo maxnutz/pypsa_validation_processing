@@ -620,6 +620,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.MissingInputError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MissingInputError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.utils.remap_unit_index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -766,6 +777,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.MissingInputError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MissingInputError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.utils.remap_unit_index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -858,6 +880,40 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="pypsa_validation_processing.utils.MissingInputError" class="doc doc-heading">
+            <code>MissingInputError</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Raised by a statistics function when a required input key is missing.</p>
+<p>The message names the missing key (e.g. a dotted config path such as
+<code>sector.district_heating.district_heating_loss</code>). <code>Network_Processor</code>
+catches it and skips the variable for that network.</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
 
 
 <div class="doc doc-object doc-function">
@@ -957,7 +1013,7 @@ direct comparison of input-output flows.</p>
 
 
 <h3 id="pypsa_validation_processing.utils.get_energy_totals_domestic_share" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span></code>
+            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
 
 </h3>
 
@@ -983,11 +1039,11 @@ direct comparison of input-output flows.</p>
                 <code>energy_totals</code>
             </td>
             <td>
-                  <code><span title="pathlib.Path">Path</span></code>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the energy totals csv file.</p>
+                <p>Energy totals of one year, indexed by <code>country</code>.</p>
               </div>
             </td>
             <td>
@@ -1025,7 +1081,7 @@ direct comparison of input-output flows.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="pandas.Series">Series</span></code>
+                  <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
