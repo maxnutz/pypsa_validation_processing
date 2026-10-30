@@ -2430,11 +2430,13 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
     def test_invalid_yearly_result_raises(
         self, tmp_path: Path, result: object, violation: str
     ):
+        """C6-AC4: each invalid yearly result raises ValueError naming the variable and the violation."""
         processor = self._processor(tmp_path)
         with pytest.raises(ValueError, match=f"Var X.*{re.escape(violation)}"):
             processor._validate_result("Var X", result, self._network())
 
     def test_invalid_timeseries_result_raises(self, tmp_path: Path):
+        """C6-AC4: each invalid time series result raises ValueError naming the variable and the violation."""
         processor = self._processor(tmp_path, aggregate_per_year=False)
         n = self._network()
         index = _index([("AT1", "MWh_el")])
@@ -2460,6 +2462,7 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
 
     @pytest.mark.parametrize("value", [0.0, float("nan")])
     def test_all_zero_or_nan_is_valid(self, tmp_path: Path, value: float):
+        """C6-AC5: a result whose values are all zero or all NaN is valid."""
         processor = self._processor(tmp_path)
         result = pd.Series(
             [value, value], index=_index([("AT1", "MWh_el"), ("DE1", "MWh_th")])
@@ -2467,6 +2470,7 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
         processor._validate_result("Var X", result, self._network())
 
     def test_valid_timeseries_with_extra_level(self, tmp_path: Path):
+        """C6.2, C6.3: a time series with an extra index level and a subset of snapshots is valid."""
         processor = self._processor(tmp_path, aggregate_per_year=False)
         n = self._network()
         index = _index([("AT1", "MWh_el", "gas")], ["location", "unit", "carrier"])
@@ -2475,6 +2479,7 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
         )
 
     def test_function_returning_none_aborts_run(self, tmp_path: Path):
+        """SC-25: a function returning None aborts calculate_variables_values."""
         processor = self._processor(tmp_path)
         with patch(
             "pypsa_validation_processing.class_definitions.importlib.import_module",
