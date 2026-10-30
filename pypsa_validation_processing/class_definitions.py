@@ -24,6 +24,19 @@ logger = logging.getLogger(__name__)
 # last group of exactly four digits not adjacent to other digits (C2.2)
 _YEAR_IN_FILE_NAME = re.compile(r"(?<!\d)\d{4}(?!\d)")
 
+# interface to eurostat-energy-balance_processing (C2.5)
+_SHARES_COLUMNS = [
+    "country",
+    "carrier",
+    "siec",
+    "year",
+    "unit",
+    "energy_use",
+    "non_energy_use",
+    "non_energy_share",
+]
+_SHARES_CARRIERS = ["Natural Gas", "Oil", "Coal"]
+
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize timestamp-like columns to tz-aware objects or
@@ -239,6 +252,9 @@ class Network_Processor:
         )
         self.functions_dict: dict[str, str | list] = self._read_mappings()
         self._validate_mapped_functions()
+        self.industry_non_energy_shares: pd.DataFrame | None = (
+            self._read_industry_non_energy_shares()
+        )
         self.network_collection = self._read_pypsa_network_collection()
         self.network_inputs: list[dict] = self._collect_network_inputs()
         self.aggregation_level: str = self.config.get("aggregation_level", "country")
@@ -528,6 +544,118 @@ class Network_Processor:
         )
         return None
 
+    @staticmethod
+    def _has_physical_non_energy_method(n: pypsa.Network) -> bool:
+        """Return whether *n* carries the inputs of the physical method (C2.5).
+
+        No PyPSA-AT network stores industry production and sector ratios in
+        ``n.meta["resources"]`` yet; their format is left to a follow-up spec.
+        Until then the physical method is never available.
+        """
+        return False
+
+    def _read_industry_non_energy_shares(self) -> pd.DataFrame | None:
+        """Read and select the Eurostat industry non-energy shares (C2.5).
+
+        Returns
+        -------
+        pd.DataFrame | None
+            Index (``country``, ``carrier``), column ``non_energy_share``,
+            one row per country and carrier for the configured
+            ``industry_non_energy_shares_year``; ``None`` if
+            ``industry_non_energy_shares_path`` is not set or does not exist.
+
+        Raises
+        ------
+        ValueError
+            If a config key has a wrong type, or the file fails a check of C2.5.
+        """
+        path_value = self.config.get("industry_non_energy_shares_path")
+        year = self.config.get("industry_non_energy_shares_year", "latest")
+        if path_value is not None and (
+            not isinstance(path_value, str) or not path_value.strip()
+        ):
+            raise ValueError(
+                "'industry_non_energy_shares_path' must be a non-empty path string, "
+                f"got: {path_value!r}"
+            )
+        if isinstance(year, bool) or not (year == "latest" or isinstance(year, int)):
+            raise ValueError(
+                "'industry_non_energy_shares_year' must be 'latest' or an integer "
+                f"year, got: {year!r}"
+            )
+        if path_value is None or not Path(path_value).exists():
+            return None
+
+        path = Path(path_value)
+        raw = pd.read_csv(path)
+        missing_columns = [c for c in _SHARES_COLUMNS if c not in raw.columns]
+        if missing_columns:
+            raise ValueError(f"Shares file {path} lacks the columns {missing_columns}.")
+        countries = raw["country"].astype(str)
+        if countries.isin(["EL", "UK"]).any():
+            raise ValueError(
+                f"Shares file {path} uses the Eurostat codes 'EL'/'UK' instead of "
+                "'GR'/'GB'. Regenerate the file with eurostat-energy-balance_processing."
+            )
+        shares = raw[countries.str.fullmatch(r"[A-Z]{2}")]
+
+        if year == "latest":
+            selected = (
+                shares.sort_values("year").groupby(["country", "carrier"]).tail(1)
+            )
+        else:
+            selected = shares[shares["year"] == year]
+            if selected.empty:
+                raise ValueError(f"Shares file {path} has no rows for year {year}.")
+        for carrier in _SHARES_CARRIERS:
+            if not (selected["carrier"] == carrier).any():
+                raise ValueError(
+                    f"Shares file {path} has no row for carrier '{carrier}' "
+                    f"(industry_non_energy_shares_year: {year})."
+                )
+        selected = selected.set_index(["country", "carrier"])[["non_energy_share"]]
+        if selected.index.duplicated().any():
+            raise ValueError(
+                f"Shares file {path} has several rows per country and carrier "
+                f"for year {year}."
+            )
+        values = pd.to_numeric(selected["non_energy_share"], errors="coerce")
+        invalid = ~(values.between(0, 1) & values.notna())
+        if invalid.any():
+            raise ValueError(
+                f"Shares file {path}: 'non_energy_share' is not a number in [0, 1] "
+                f"for {list(selected.index[invalid])}."
+            )
+        selected["non_energy_share"] = values.astype(float)
+        return selected
+
+    def _selected_functions_declare(self, parameter: str) -> bool:
+        """Return whether a function selected for evaluation declares *parameter*.
+
+        Parameters
+        ----------
+        parameter : str
+            Parameter name to look for, e.g. ``industry_non_energy_shares``.
+
+        Returns
+        -------
+        bool
+            ``True`` if at least one selected function declares *parameter*.
+        """
+        stats_module = importlib.import_module(
+            "pypsa_validation_processing.statistics_functions"
+        )
+        functions = [
+            getattr(stats_module, str(self.functions_dict[variable]), None)
+            for variable in self._get_selected_variables()
+        ]
+        return any(
+            parameter in inspect.signature(func).parameters
+            for func in functions
+            if callable(func)
+        )
+
     def _collect_network_inputs(self) -> list[dict]:
         """Determine investment year, config and energy totals per network.
 
@@ -535,7 +663,8 @@ class Network_Processor:
         -------
         list[dict]
             One dict per network of ``self.network_collection`` (same order)
-            with keys ``investment_year``, ``config`` and ``energy_totals``.
+            with keys ``investment_year``, ``config``, ``energy_totals``,
+            ``industry_non_energy_shares`` and ``physical_non_energy_method``.
 
         Raises
         ------
@@ -554,7 +683,22 @@ class Network_Processor:
                     "investment_year": year,
                     "config": config,
                     "energy_totals": self._get_energy_totals(n, config, label),
+                    "industry_non_energy_shares": self.industry_non_energy_shares,
+                    "physical_non_energy_method": self._has_physical_non_energy_method(
+                        n
+                    ),
                 }
+            )
+        needs_shares = self._selected_functions_declare(
+            "industry_non_energy_shares"
+        ) and not all(entry["physical_non_energy_method"] for entry in inputs)
+        if needs_shares and self.industry_non_energy_shares is None:
+            logger.warning(
+                "No industry non-energy shares available ('industry_non_energy_shares_path' "
+                "not set or file not existing: %s). Variables whose function declares "
+                "'industry_non_energy_shares' are skipped for networks without "
+                "industry production data.",
+                self.config.get("industry_non_energy_shares_path"),
             )
         years = [entry["investment_year"] for entry in inputs]
         duplicates = sorted({year for year in years if years.count(year) > 1})
@@ -587,6 +731,8 @@ class Network_Processor:
         config: dict | None = None,
         energy_totals: pd.DataFrame | None = None,
         industry_non_energy_shares: pd.DataFrame | None = None,
+        physical_non_energy_method: bool = False,
+        investment_year: int | None = None,
     ) -> pd.Series | None:
         """Look up and execute the statistics function for a single variable.
 
@@ -612,6 +758,12 @@ class Network_Processor:
             Eurostat industry non-energy shares (C2.5). Passed only if the
             function's signature includes an ``industry_non_energy_shares``
             parameter.
+        physical_non_energy_method : bool, optional
+            Whether *n* provides the physical method for non-energy use
+            (C2.5). If ``True``, a function declaring
+            ``industry_non_energy_shares`` is called even without the table.
+        investment_year : int | None, optional
+            Investment year of *n*, used in skip messages.
 
         Returns
         -------
@@ -652,13 +804,16 @@ class Network_Processor:
         for name, value in optional_inputs:
             if name not in params:
                 continue
-            if value is None:
+            if value is None and not (
+                name == "industry_non_energy_shares" and physical_non_energy_method
+            ):
                 logger.warning(
                     "Variable %s: skipped, function '%s' declares '%s' but it is "
-                    "not available for this network.",
+                    "not available for the network of investment year %s.",
                     variable,
                     func_name,
                     name,
+                    investment_year,
                 )
                 return None
             kwargs[name] = value
@@ -1202,6 +1357,10 @@ class Network_Processor:
                     industry_non_energy_shares=network_inputs.get(
                         "industry_non_energy_shares"
                     ),
+                    physical_non_energy_method=network_inputs.get(
+                        "physical_non_energy_method", False
+                    ),
+                    investment_year=investment_year,
                 )
                 if result is not None:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.

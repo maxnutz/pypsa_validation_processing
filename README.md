@@ -48,6 +48,13 @@ network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA
 model_name: pypsa-at            # name of the PyPSA model
 scenario_name: KN2040test        # name of the PyPSA scenario
 ```
+Optional keys for the Eurostat fallback of industrial non-energy use:
+```yaml
+industry_non_energy_shares_path: link_to_file.csv  # CSV written by eurostat-energy-balance_processing
+industry_non_energy_shares_year: latest  # "latest" (default; latest year per country and carrier) or a year, e.g. 2020
+```
+If the path is not set or the file does not exist, variables whose function declares `industry_non_energy_shares` are skipped with a `WARNING`. An invalid file (missing columns, `EL`/`UK` country codes, a carrier without rows, shares outside `[0, 1]`) raises a `ValueError` at initialisation.
+
 Personalized config files can be specified with `--config <path-to-config-file>`.
 
 ### Run the workflow

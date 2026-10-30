@@ -2314,3 +2314,230 @@ def test_statistics_functions_follow_signature_contract():
         params = list(inspect.signature(func).parameters.values())
         assert [p.name for p in params[:2]] == ["n", "aggregate_per_year"], func
         assert all(p.default is not p.empty for p in params[1:]), func
+
+
+# ---------------------------------------------------------------------------
+# Tests for the Eurostat industry non-energy shares (C2.5)
+# ---------------------------------------------------------------------------
+
+
+def _shares_rows(rows: list[tuple]) -> pd.DataFrame:
+    """Build a shares CSV table from (country, carrier, year, share) tuples."""
+    return pd.DataFrame(
+        [
+            {
+                "country": country,
+                "carrier": carrier,
+                "siec": "X",
+                "year": year,
+                "unit": "GWH",
+                "energy_use": 1.0,
+                "non_energy_use": 0.0,
+                "non_energy_share": share,
+            }
+            for country, carrier, year, share in rows
+        ]
+    )
+
+
+def _complete_shares(year: int) -> list[tuple]:
+    return [("DE", carrier, year, 0.2) for carrier in ["Natural Gas", "Oil", "Coal"]]
+
+
+class TestIndustryNonEnergyShares:
+    """Test C2.5: reading, selecting and passing the shares table."""
+
+    def _make_processor(
+        self,
+        tmp_path: Path,
+        shares: pd.DataFrame | None = None,
+        extra: str = "",
+        networks: list[MockPyPSANetwork] | None = None,
+    ) -> Network_Processor:
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        networks = networks or [
+            MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2030}})
+        ]
+        for i in range(len(networks)):
+            (nw_path / f"n_{i}.nc").touch()
+        shares_path = tmp_path / "shares.csv"
+        if shares is not None:
+            shares.to_csv(shares_path, index=False)
+            extra = f"industry_non_energy_shares_path: {shares_path}\n{extra}"
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: AT
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+{extra}
+""")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection(networks),
+        ):
+            return Network_Processor(config_path=config_file)
+
+    def _base_rows(self) -> list[tuple]:
+        return [
+            ("AT", "Natural Gas", 2023, 0.12),
+            ("AT", "Natural Gas", 2024, 0.10),
+            ("EU27_2020", "Natural Gas", 2024, 0.5),
+            *_complete_shares(2023),
+            *_complete_shares(2024),
+        ]
+
+    def test_latest_year_is_default(self, tmp_path: Path):
+        processor = self._make_processor(tmp_path, _shares_rows(self._base_rows()))
+        table = processor.industry_non_energy_shares
+        assert table.index.names == ["country", "carrier"]
+        assert list(table.columns) == ["non_energy_share"]
+        assert table.loc[("AT", "Natural Gas"), "non_energy_share"] == 0.10
+        assert "EU27_2020" not in table.index.get_level_values("country")
+        assert processor.network_inputs[0]["industry_non_energy_shares"] is table
+
+    def test_fixed_year(self, tmp_path: Path):
+        processor = self._make_processor(
+            tmp_path,
+            _shares_rows(self._base_rows()),
+            extra="industry_non_energy_shares_year: 2023",
+        )
+        table = processor.industry_non_energy_shares
+        assert table.loc[("AT", "Natural Gas"), "non_energy_share"] == 0.12
+
+    def test_year_not_in_file_raises(self, tmp_path: Path):
+        with pytest.raises(ValueError, match="shares.csv.*2019"):
+            self._make_processor(
+                tmp_path,
+                _shares_rows(self._base_rows()),
+                extra="industry_non_energy_shares_year: 2019",
+            )
+
+    @pytest.mark.parametrize("value", ['"2020"', "true", "[2020]"])
+    def test_invalid_year_type_raises(self, tmp_path: Path, value: str):
+        with pytest.raises(ValueError, match="industry_non_energy_shares_year"):
+            self._make_processor(
+                tmp_path,
+                _shares_rows(self._base_rows()),
+                extra=f"industry_non_energy_shares_year: {value}",
+            )
+
+    def test_invalid_path_type_raises(self, tmp_path: Path):
+        with pytest.raises(ValueError, match="industry_non_energy_shares_path"):
+            self._make_processor(tmp_path, extra="industry_non_energy_shares_path: 5")
+
+    def test_eurostat_codes_raise(self, tmp_path: Path):
+        rows = [*self._base_rows(), ("EL", "Oil", 2024, 0.36)]
+        with pytest.raises(ValueError, match="Regenerate"):
+            self._make_processor(tmp_path, _shares_rows(rows))
+
+    def test_missing_carrier_in_selected_year_raises(self, tmp_path: Path):
+        rows = [r for r in self._base_rows() if not (r[1] == "Coal" and r[2] == 2024)]
+        with pytest.raises(ValueError, match="Coal.*2024"):
+            self._make_processor(
+                tmp_path,
+                _shares_rows(rows),
+                extra="industry_non_energy_shares_year: 2024",
+            )
+
+    @pytest.mark.parametrize("share", [1.2, None, "abc", float("inf")])
+    def test_invalid_share_raises(self, tmp_path: Path, share):
+        rows = [*_complete_shares(2024), ("AT", "Oil", 2024, share)]
+        with pytest.raises(ValueError, match="shares.csv"):
+            self._make_processor(tmp_path, _shares_rows(rows))
+
+    def test_missing_column_raises(self, tmp_path: Path):
+        shares = _shares_rows(self._base_rows()).drop(columns="non_energy_share")
+        with pytest.raises(ValueError, match="shares.csv.*non_energy_share"):
+            self._make_processor(tmp_path, shares)
+
+    def _run_with_shares_function(self, processor: Network_Processor) -> list:
+        called = []
+
+        def needs_shares(n, aggregate_per_year=True, industry_non_energy_shares=None):
+            called.append(
+                (n.meta["wildcards"]["planning_horizons"], industry_non_energy_shares)
+            )
+            return _series_result()
+
+        def plain(n, aggregate_per_year=True):
+            called.append("plain")
+            return _series_result()
+
+        processor.aggregation_level = "region"
+        processor.functions_dict = {"Var Shares": "needs_shares", "Var Plain": "plain"}
+        module = MagicMock(needs_shares=needs_shares, plain=plain)
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.importlib.import_module",
+                return_value=module,
+            ),
+            patch.object(
+                processor, "structure_pyam_from_pandas", side_effect=lambda df: df
+            ),
+        ):
+            processor.calculate_variables_values()
+        return called
+
+    @pytest.mark.parametrize("configured", [False, True])
+    def test_missing_file_skips_declaring_function(
+        self, tmp_path: Path, caplog, configured: bool
+    ):
+        extra = (
+            f"industry_non_energy_shares_path: {tmp_path / 'missing.csv'}"
+            if configured
+            else ""
+        )
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(
+                Network_Processor, "_selected_functions_declare", return_value=True
+            ),
+        ):
+            processor = self._make_processor(tmp_path, extra=extra)
+        assert processor.industry_non_energy_shares is None
+        init_warnings = [
+            r for r in caplog.records if "No industry non-energy shares" in r.message
+        ]
+        assert len(init_warnings) == 1
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            called = self._run_with_shares_function(processor)
+        assert called == ["plain"]
+        assert any(
+            "Var Shares" in r.message
+            and "needs_shares" in r.message
+            and "2030" in r.message
+            for r in caplog.records
+        )
+
+    def test_no_init_warning_if_no_function_declares_shares(
+        self, tmp_path: Path, caplog
+    ):
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(tmp_path)
+        assert not processor._selected_functions_declare("industry_non_energy_shares")
+        assert not any(
+            "No industry non-energy shares" in r.message for r in caplog.records
+        )
+
+    def test_physical_method_calls_function_without_file(self, tmp_path: Path, caplog):
+        networks = [
+            MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2030}}),
+            MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2040}}),
+        ]
+        with patch.object(
+            Network_Processor,
+            "_has_physical_non_energy_method",
+            side_effect=lambda n: n.meta["wildcards"]["planning_horizons"] == 2030,
+        ):
+            processor = self._make_processor(tmp_path, networks=networks)
+        with caplog.at_level(logging.WARNING):
+            called = self._run_with_shares_function(processor)
+        assert (2030, None) in called
+        assert not any(c[0] == 2040 for c in called if isinstance(c, tuple))
+        skip_messages = [r.message for r in caplog.records if "Var Shares" in r.message]
+        assert len(skip_messages) == 1 and "2040" in skip_messages[0]
