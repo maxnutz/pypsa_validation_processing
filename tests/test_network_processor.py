@@ -407,7 +407,7 @@ class TestNetworkProcessorFunctionExecution:
                 # Create a mock function that accepts config
                 received_config = {}
 
-                def mock_func_with_config(n, config=None):
+                def mock_func_with_config(n, aggregate_per_year=True, config=None):
                     received_config["value"] = config
                     return pd.Series(
                         [1.0],
@@ -445,7 +445,7 @@ class TestNetworkProcessorFunctionExecution:
 
                 call_kwargs = {}
 
-                def mock_func_without_config(n):
+                def mock_func_without_config(n, aggregate_per_year=True):
                     call_kwargs["called_with_config"] = False
                     return pd.Series(
                         [1.0],
@@ -486,7 +486,9 @@ class TestNetworkProcessorFunctionExecution:
 
                 captured_kwargs = {}
 
-                def mock_func_with_energy_totals(n, energy_totals=None):
+                def mock_func_with_energy_totals(
+                    n, aggregate_per_year=True, energy_totals=None
+                ):
                     captured_kwargs["energy_totals"] = energy_totals
                     return pd.Series(
                         [1.0],
@@ -526,7 +528,7 @@ class TestNetworkProcessorFunctionExecution:
                 processor = Network_Processor(config_path=mock_config_file)
                 processor.functions_dict = {"Test Variable": "mock_func_with_config"}
 
-                def mock_func_with_config(n, config=None):
+                def mock_func_with_config(n, aggregate_per_year=True, config=None):
                     return pd.Series(
                         [1.0],
                         index=pd.MultiIndex.from_tuples(
@@ -2165,3 +2167,150 @@ network_results_path: {tmp_path}
                 processor._execute_function_for_variable(
                     "B", processor.network_collection[0], config={}
                 )
+
+
+# ---------------------------------------------------------------------------
+# Tests for mapping and statistics function interface checks (C4.2, C4.4, C5)
+# ---------------------------------------------------------------------------
+
+
+class TestStatisticsFunctionInterface:
+    """Test C5: signature check at initialisation and keyword passing."""
+
+    def _make_config(self, tmp_path: Path, mapping: str) -> Path:
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        (nw_path / "n_2030.nc").touch()
+        mapping_file = tmp_path / "mapping.yaml"
+        mapping_file.write_text(mapping)
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: AT
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+mapping_path: {mapping_file}
+""")
+        return config_file
+
+    def _init(self, config_file: Path, module: object | None = None):
+        network = MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2030}})
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection([network]),
+        ) as mock_collection:
+            if module is None:
+                return Network_Processor(config_path=config_file), mock_collection
+            with patch(
+                "pypsa_validation_processing.class_definitions.importlib.import_module",
+                return_value=module,
+            ):
+                return Network_Processor(config_path=config_file), mock_collection
+
+    @pytest.mark.parametrize("content", ["", "[a, b]\n"])
+    def test_empty_or_non_mapping_file_raises(self, tmp_path: Path, content: str):
+        with pytest.raises(ValueError, match="empty or not a mapping"):
+            self._init(self._make_config(tmp_path, content))
+
+    def test_missing_function_raises_before_networks_are_read(self, tmp_path: Path):
+        config_file = self._make_config(tmp_path, "X: does_not_exist\n")
+        network = MockPyPSANetwork()
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection([network]),
+        ) as mock_collection:
+            with pytest.raises(ValueError, match="X.*does_not_exist"):
+                Network_Processor(config_path=config_file)
+        mock_collection.assert_not_called()
+
+    def test_without_aggregate_per_year_raises(self, tmp_path: Path):
+        def f(n):
+            return None
+
+        with pytest.raises(ValueError, match="'X'.*'f'"):
+            self._init(self._make_config(tmp_path, "X: f\n"), MagicMock(f=f))
+
+    def test_parameter_without_default_raises(self, tmp_path: Path):
+        def f(n, aggregate_per_year=True, *, x):
+            return None
+
+        with pytest.raises(ValueError, match="'X'.*'f'"):
+            self._init(self._make_config(tmp_path, "X: f\n"), MagicMock(f=f))
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_passes_only_aggregate_per_year(self, tmp_path: Path, aggregate_per_year):
+        received = {}
+
+        def f(n, aggregate_per_year=True, **unused):
+            received.update(aggregate_per_year=aggregate_per_year, **unused)
+            return None
+
+        module = MagicMock(f=f)
+        processor, _ = self._init(self._make_config(tmp_path, "X: f\n"), module)
+        processor.aggregate_per_year = aggregate_per_year
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=module,
+        ):
+            processor._execute_function_for_variable(
+                "X",
+                MockPyPSANetwork(),
+                config={"a": 1},
+                energy_totals=pd.DataFrame(),
+                industry_non_energy_shares=pd.DataFrame(),
+            )
+        assert received == {"aggregate_per_year": aggregate_per_year}
+
+    def test_passes_industry_non_energy_shares_when_declared(self, tmp_path: Path):
+        received = {}
+
+        def f(n, aggregate_per_year=True, industry_non_energy_shares=None):
+            received["shares"] = industry_non_energy_shares
+            return None
+
+        module = MagicMock(f=f)
+        processor, _ = self._init(self._make_config(tmp_path, "X: f\n"), module)
+        shares = pd.DataFrame({"non_energy_share": [0.1]})
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=module,
+        ):
+            processor._execute_function_for_variable(
+                "X", MockPyPSANetwork(), industry_non_energy_shares=shares
+            )
+        assert received["shares"] is shares
+
+
+def test_default_mapping_names_existing_functions():
+    """C4-AC3: every entry of mapping.default.yaml names an existing function."""
+    import yaml
+    from pypsa_validation_processing import statistics_functions
+
+    mapping_path = (
+        Path(statistics_functions.__file__).parent / "configs" / "mapping.default.yaml"
+    )
+    mapping = yaml.safe_load(mapping_path.read_text())
+    missing = [
+        f
+        for f in mapping.values()
+        if not callable(getattr(statistics_functions, f, None))
+    ]
+    assert missing == []
+
+
+def test_statistics_functions_follow_signature_contract():
+    """C5-AC3: public statistics functions start with n, aggregate_per_year; defaults set."""
+    import inspect
+    from pypsa_validation_processing import statistics_functions
+
+    functions = [
+        f
+        for name, f in inspect.getmembers(statistics_functions, inspect.isfunction)
+        if f.__module__ == statistics_functions.__name__ and not name.startswith("_")
+    ]
+    assert functions
+    for func in functions:
+        params = list(inspect.signature(func).parameters.values())
+        assert [p.name for p in params[:2]] == ["n", "aggregate_per_year"], func
+        assert all(p.default is not p.empty for p in params[1:]), func
