@@ -158,6 +158,8 @@ Return format rules:
 - `aggregate_per_year=False`: return a `pandas.DataFrame` with snapshots as columns
 - In both cases, index levels must include at least `location` and `unit`
 - Do not aggregate to country level inside the function; this is done in post-processing.
+- At least one row, numeric values; `unit` values are keys of `utils.UNITS_MAPPING` (not empty, not a carrier label); `location` values are non-empty values of `n.buses.location`; with `aggregate_per_year=False`, columns are snapshots of `n`. Every location gets a row, with `0.0` where none of the function's carriers is present; never return `None`.
+- `Network_Processor` checks every result against these rules and aborts the run with a `ValueError` naming the variable and the violation. Values themselves (zero, NaN, sign) are not checked.
 
 Post-processing behavior:
 
