@@ -817,6 +817,12 @@ class Network_Processor:
             or if the function raises
             :class:`~pypsa_validation_processing.utils.MissingInputError`.
             Each skip is logged as WARNING.
+
+        Raises
+        ------
+        ValueError
+            If the function's return value is structurally invalid (C6.9),
+            including ``None``.
         """
         func_name = self.functions_dict.get(variable)
         if func_name is None:
@@ -862,7 +868,7 @@ class Network_Processor:
             kwargs[name] = value
 
         try:
-            return func(n, **kwargs)
+            result = func(n, **kwargs)
         except MissingInputError as exc:
             logger.warning(
                 "Variable %s: skipped, function '%s' is missing input '%s'.",
@@ -871,6 +877,107 @@ class Network_Processor:
                 exc,
             )
             return None
+        self._validate_result(variable, result, n)
+        return result
+
+    def _validate_result(self, variable: str, result: object, n: pypsa.Network) -> None:
+        """Check the structure of a statistics-function result (C6.8, C6.9).
+
+        Values themselves (zero, NaN, sign, magnitude) are not checked.
+
+        Parameters
+        ----------
+        variable : str
+            IAMC variable the result belongs to, used in the message.
+        result : object
+            Return value of the statistics function.
+        n : pypsa.Network
+            Evaluated network; its ``buses.location``, ``carriers`` and
+            ``snapshots`` define the valid locations, carrier labels and columns.
+
+        Raises
+        ------
+        ValueError
+            If the result violates C6.1, C6.2, C6.4–C6.7 or C6.10 (no
+            ``quantity`` level), naming the variable and the violation.
+        """
+        expected = pd.Series if self.aggregate_per_year else pd.DataFrame
+        violation = None
+        if not isinstance(result, expected):
+            violation = (
+                f"expected pd.{expected.__name__} for aggregate_per_year="
+                f"{self.aggregate_per_year}, got {type(result).__name__}"
+            )
+        elif not isinstance(result.index, pd.MultiIndex) or not {
+            "location",
+            "unit",
+        }.issubset(result.index.names):
+            violation = (
+                "index must be a MultiIndex with levels 'location' and 'unit', "
+                f"got {list(result.index.names)}"
+            )
+        elif result.empty:
+            violation = "result has zero rows"
+        elif not all(
+            pd.api.types.is_numeric_dtype(dtype)
+            for dtype in (
+                [result.dtype] if isinstance(result, pd.Series) else result.dtypes
+            )
+        ):
+            violation = "values must be numeric"
+        elif "quantity" in result.index.names:
+            violation = "level 'quantity' is reserved for intensive variables"
+        else:
+            violation = self._invalid_result_labels(result, n)
+        if violation is not None:
+            raise ValueError(
+                f"Variable '{variable}': invalid result of function "
+                f"'{self.functions_dict.get(variable)}': {violation}."
+            )
+
+    @staticmethod
+    def _invalid_result_labels(
+        result: pd.Series | pd.DataFrame, n: pypsa.Network
+    ) -> str | None:
+        """Return the first label violation of *result* (C6.2, C6.5, C6.6), if any.
+
+        Parameters
+        ----------
+        result : pd.Series | pd.DataFrame
+            Result with a MultiIndex containing ``location`` and ``unit``.
+        n : pypsa.Network
+            Evaluated network.
+
+        Returns
+        -------
+        str | None
+            Description of the violation, or ``None`` if all labels are valid.
+        """
+        carriers = set(n.carriers.index)
+        units = result.index.get_level_values("unit").unique()
+        invalid_units = [
+            u
+            for u in units
+            if not isinstance(u, str)
+            or not u.strip()
+            or u in carriers
+            or u not in UNITS_MAPPING
+        ]
+        if invalid_units:
+            return f"invalid units {invalid_units} (C9.1)"
+        locations = set(n.buses.location.dropna()) - {""}
+        invalid_locations = [
+            loc
+            for loc in result.index.get_level_values("location").unique()
+            if loc not in locations
+        ]
+        if invalid_locations:
+            return f"locations {invalid_locations} are not in n.buses.location"
+        if isinstance(result, pd.DataFrame):
+            foreign = result.columns[~result.columns.isin(n.snapshots)]
+            if len(foreign):
+                return f"columns {list(foreign[:3])} are not snapshots of the network"
+        return None
 
     def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
         """Aggregate a regional Series/DataFrame to country level by summing regions.
@@ -1407,12 +1514,8 @@ class Network_Processor:
                 )
                 if result is not None:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
-                    if self.aggregate_per_year == True:
+                    if self.aggregate_per_year:
                         result = result.to_frame(name="value")
-                    elif not isinstance(result, pd.DataFrame):
-                        raise RuntimeError(
-                            f"Expected DataFrame for variable '{variable}' when aggregate_per_year=False, got {type(result)}"
-                        )
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )

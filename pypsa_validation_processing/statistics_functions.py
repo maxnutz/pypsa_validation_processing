@@ -237,7 +237,7 @@ def Net_Imports__Electricity(
 def Final_Energy_by_Carrier__Coal(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
-) -> pd.Series | pd.DataFrame | None:
+) -> pd.Series | pd.DataFrame:
     """Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.
 
     Parameters
@@ -251,7 +251,7 @@ def Final_Energy_by_Carrier__Coal(
 
     Returns
     -------
-    pd.Series | pd.DataFrame | None
+    pd.Series | pd.DataFrame
         Pandas Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex of ``location`` and
         ``unit``.
@@ -263,10 +263,17 @@ def Final_Energy_by_Carrier__Coal(
     -----
     This function includes only the Final Energy consumption of coal. This excludes
     coal for electricity or CHP, but only focuses on the carrier ``coal for industry``
-    as Final Energy of Coal. Return None, if this carrier is not present in the network.
+    as Final Energy of Coal. If this carrier is not present in the network, every
+    location gets ``0.0`` with unit ``MWh`` (C6.13).
     """
     if "coal for industry" not in n.carriers.index:
-        return None
+        locations = [loc for loc in n.buses.location.dropna().unique() if loc]
+        index = pd.MultiIndex.from_product(
+            [locations, ["MWh"]], names=["location", "unit"]
+        )
+        if aggregate_per_year:
+            return pd.Series(0.0, index=index)
+        return pd.DataFrame(0.0, index=index, columns=n.snapshots)
     industry = n.statistics.withdrawal(
         bus_carrier="coal for industry",
         carrier="coal for industry",

@@ -412,7 +412,7 @@ class TestNetworkProcessorFunctionExecution:
                     return pd.Series(
                         [1.0],
                         index=pd.MultiIndex.from_tuples(
-                            [("AT", "MWh_el")], names=["country", "unit"]
+                            [("AT1", "MWh_el")], names=["location", "unit"]
                         ),
                     )
 
@@ -450,7 +450,7 @@ class TestNetworkProcessorFunctionExecution:
                     return pd.Series(
                         [1.0],
                         index=pd.MultiIndex.from_tuples(
-                            [("AT", "MWh_el")], names=["country", "unit"]
+                            [("AT1", "MWh_el")], names=["location", "unit"]
                         ),
                     )
 
@@ -493,7 +493,7 @@ class TestNetworkProcessorFunctionExecution:
                     return pd.Series(
                         [1.0],
                         index=pd.MultiIndex.from_tuples(
-                            [("AT", "MWh_el")], names=["country", "unit"]
+                            [("AT1", "MWh_el")], names=["location", "unit"]
                         ),
                     )
 
@@ -532,7 +532,7 @@ class TestNetworkProcessorFunctionExecution:
                     return pd.Series(
                         [1.0],
                         index=pd.MultiIndex.from_tuples(
-                            [("AT", "MWh_el")], names=["country", "unit"]
+                            [("AT1", "MWh_el")], names=["location", "unit"]
                         ),
                     )
 
@@ -1728,10 +1728,10 @@ output_path: {tmp_path / 'output.xlsx'}
             ):
                 return Network_Processor(config_path=config_file)
 
-    def test_raises_runtime_error_when_result_not_dataframe_and_not_aggregated(
+    def test_raises_value_error_when_result_not_dataframe_and_not_aggregated(
         self, tmp_path: Path
     ):
-        """Test RuntimeError when aggregate_per_year=False and result isn't a DataFrame."""
+        """Test ValueError when aggregate_per_year=False and result isn't a DataFrame."""
         processor = self._setup_processor(tmp_path)
         processor.aggregate_per_year = False
         processor.aggregation_level = "region"
@@ -1752,12 +1752,14 @@ output_path: {tmp_path / 'output.xlsx'}
             ),
         )
 
-        with patch.object(
-            processor,
-            "_execute_function_for_variable",
-            return_value=not_a_dataframe,
+        processor.functions_dict = {"Test Variable": "f"}
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(
+                f=lambda n, aggregate_per_year=True: not_a_dataframe
+            ),
         ):
-            with pytest.raises(RuntimeError, match="Expected DataFrame"):
+            with pytest.raises(ValueError, match="Test Variable.*pd.DataFrame"):
                 processor.calculate_variables_values()
 
     def test_merges_multiple_investment_years_when_aggregated(self, tmp_path: Path):
@@ -1852,6 +1854,16 @@ def _series_result(location: str = "AT1") -> pd.Series:
             [(location, "MWh_el")], names=["location", "unit"]
         ),
     )
+
+
+def _valid_result(
+    n: MockPyPSANetwork, aggregate_per_year: bool
+) -> pd.Series | pd.DataFrame:
+    """Structurally valid result for *n* (C6.1, C6.2)."""
+    series = _series_result()
+    if aggregate_per_year:
+        return series
+    return pd.DataFrame(1.0, index=series.index, columns=n.snapshots)
 
 
 _ENERGY_TOTALS_SHARE_COLUMNS = [
@@ -2312,7 +2324,7 @@ mapping_path: {mapping_file}
 
         def f(n, aggregate_per_year=True, **unused):
             received.update(aggregate_per_year=aggregate_per_year, **unused)
-            return None
+            return _valid_result(n, aggregate_per_year)
 
         module = MagicMock(f=f)
         processor, _ = self._init(self._make_config(tmp_path, "X: f\n"), module)
@@ -2335,7 +2347,7 @@ mapping_path: {mapping_file}
 
         def f(n, aggregate_per_year=True, industry_non_energy_shares=None):
             received["shares"] = industry_non_energy_shares
-            return None
+            return _series_result()
 
         module = MagicMock(f=f)
         processor, _ = self._init(self._make_config(tmp_path, "X: f\n"), module)
@@ -2348,6 +2360,133 @@ mapping_path: {mapping_file}
                 "X", MockPyPSANetwork(), industry_non_energy_shares=shares
             )
         assert received["shares"] is shares
+
+
+def _index(rows: list[tuple], names: list[str] | None = None) -> pd.MultiIndex:
+    return pd.MultiIndex.from_tuples(rows, names=names or ["location", "unit"])
+
+
+class TestResultValidation:
+    """Test C6.8–C6.9 (C6-AC4, C6-AC5): structural validation of every result."""
+
+    def _processor(
+        self, tmp_path: Path, aggregate_per_year: bool = True
+    ) -> Network_Processor:
+        (tmp_path / "networks").mkdir()
+        (tmp_path / "networks" / "n_2030.nc").touch()
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: AT
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+aggregate_per_year: {str(aggregate_per_year).lower()}
+""")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection([MockPyPSANetwork()]),
+        ):
+            processor = Network_Processor(config_path=config_file)
+        processor.functions_dict = {"Var X": "f"}
+        return processor
+
+    @staticmethod
+    def _network() -> MockPyPSANetwork:
+        return MockPyPSANetwork(carriers=pd.DataFrame(index=["land transport", "AC"]))
+
+    @pytest.mark.parametrize(
+        "result, violation",
+        [
+            (pd.Series([], dtype=float, index=_index([])), "zero rows"),
+            (pd.Series([1.0], index=pd.Index(["AT1"], name="location")), "MultiIndex"),
+            (pd.Series([1.0], index=_index([("AT1", "x")], ["location", "u"])), "unit"),
+            (
+                pd.Series([1.0], index=_index([("MWh_el", "x")], ["unit", "carrier"])),
+                "location",
+            ),
+            (pd.Series(["a"], index=_index([("AT1", "MWh_el")])), "numeric"),
+            (pd.Series([1.0], index=_index([("AT1", "")])), "units"),
+            (pd.Series([1.0], index=_index([("AT1", "land transport")])), "units"),
+            (pd.Series([1.0], index=_index([("AT1", "foo")])), "units"),
+            (pd.Series([1.0], index=_index([("", "MWh_el")])), "locations"),
+            (pd.Series([1.0], index=_index([("XX9", "MWh_el")])), "XX9"),
+            (
+                pd.DataFrame({"value": [1.0]}, index=_index([("AT1", "MWh_el")])),
+                "pd.Series",
+            ),
+            (None, "NoneType"),
+            (
+                pd.Series(
+                    [1.0],
+                    index=_index(
+                        [("AT1", "MWh_el", "value")], ["location", "unit", "quantity"]
+                    ),
+                ),
+                "quantity",
+            ),
+        ],
+    )
+    def test_invalid_yearly_result_raises(
+        self, tmp_path: Path, result: object, violation: str
+    ):
+        """C6-AC4: each invalid yearly result raises ValueError naming the variable and the violation."""
+        processor = self._processor(tmp_path)
+        with pytest.raises(ValueError, match=f"Var X.*{re.escape(violation)}"):
+            processor._validate_result("Var X", result, self._network())
+
+    def test_invalid_timeseries_result_raises(self, tmp_path: Path):
+        """C6-AC4: each invalid time series result raises ValueError naming the variable and the violation."""
+        processor = self._processor(tmp_path, aggregate_per_year=False)
+        n = self._network()
+        index = _index([("AT1", "MWh_el")])
+        cases = [
+            (pd.Series([1.0], index=index), "pd.DataFrame"),
+            (
+                pd.DataFrame(
+                    1.0, index=pd.Index(["MWh_el"], name="unit"), columns=n.snapshots
+                ),
+                "MultiIndex",
+            ),
+            (
+                pd.DataFrame(
+                    1.0, index=index, columns=pd.date_range("2030", periods=2)
+                ),
+                "not snapshots",
+            ),
+            (pd.DataFrame({n.snapshots[0]: ["a"]}, index=index), "numeric"),
+        ]
+        for result, violation in cases:
+            with pytest.raises(ValueError, match=f"Var X.*{violation}"):
+                processor._validate_result("Var X", result, n)
+
+    @pytest.mark.parametrize("value", [0.0, float("nan")])
+    def test_all_zero_or_nan_is_valid(self, tmp_path: Path, value: float):
+        """C6-AC5: a result whose values are all zero or all NaN is valid."""
+        processor = self._processor(tmp_path)
+        result = pd.Series(
+            [value, value], index=_index([("AT1", "MWh_el"), ("DE1", "MWh_th")])
+        )
+        processor._validate_result("Var X", result, self._network())
+
+    def test_valid_timeseries_with_extra_level(self, tmp_path: Path):
+        """C6.2, C6.3: a time series with an extra index level and a subset of snapshots is valid."""
+        processor = self._processor(tmp_path, aggregate_per_year=False)
+        n = self._network()
+        index = _index([("AT1", "MWh_el", "gas")], ["location", "unit", "carrier"])
+        processor._validate_result(
+            "Var X", pd.DataFrame(0.0, index=index, columns=n.snapshots[:2]), n
+        )
+
+    def test_function_returning_none_aborts_run(self, tmp_path: Path):
+        """SC-25: a function returning None aborts calculate_variables_values."""
+        processor = self._processor(tmp_path)
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(f=lambda n, aggregate_per_year=True: None),
+        ):
+            with pytest.raises(ValueError, match="Var X.*'f'.*NoneType"):
+                processor.calculate_variables_values()
 
 
 def test_default_mapping_names_existing_functions():
