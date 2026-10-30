@@ -2,7 +2,6 @@
 
 import logging
 import pandas as pd
-from pathlib import Path
 
 EU27_COUNTRY_CODES: dict[str, str] = {
     "AL": "Albania",
@@ -177,17 +176,26 @@ statistics_grouping_index = ["location", "unit"]
 ## UTILS FUNCTIONS
 
 
+class MissingInputError(Exception):
+    """Raised by a statistics function when a required input key is missing.
+
+    The message names the missing key (e.g. a dotted config path such as
+    ``sector.district_heating.district_heating_loss``). ``Network_Processor``
+    catches it and skips the variable for that network.
+    """
+
+
 def get_energy_totals_domestic_share(
-    energy_totals: Path,
+    energy_totals: pd.DataFrame | None,
     kind: str,
-) -> pd.Series:
+) -> float:
     """
     Return the domestic share of energy totals for a given kind.
 
     Parameters
     ----------
     energy_totals
-        Path to the energy totals csv file.
+        Energy totals of one year, indexed by ``country``.
     kind: {'aviation', 'navigation'}
         The kind of energy totals to calculate the factor for.
 
@@ -197,11 +205,12 @@ def get_energy_totals_domestic_share(
         The share of national aviation or navigation per country.
     """
     # TODO generalize energy totals for all countries
-    energy_totals = pd.read_csv(energy_totals, index_col="country").loc["AT"]
-    energy_totals = energy_totals[energy_totals.year == 2020]
+    if energy_totals is None:
+        raise ValueError("energy_totals is required to compute domestic shares.")
+    energy_totals = energy_totals.loc["AT"]
     domestic = energy_totals[f"total domestic {kind}"]
     international = energy_totals[f"total international {kind}"]
-    return (domestic / (domestic + international)).values[0]
+    return domestic / (domestic + international)
 
 
 def create_location_index_from_copperplate(

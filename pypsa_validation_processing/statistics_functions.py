@@ -28,7 +28,6 @@ from __future__ import annotations
 import logging
 import re
 from functools import reduce
-from pathlib import Path
 import pandas as pd
 import numpy as np
 import pypsa
@@ -790,7 +789,7 @@ def Final_Energy_by_Carrier__District_Heat(
 def Final_Energy_by_Sector__Transportation(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
-    energy_totals: Path | None = None,
+    energy_totals: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
     """Extract transportation-sector final energy from a PyPSA Network.
 
@@ -805,10 +804,12 @@ def Final_Energy_by_Sector__Transportation(
         If ``True`` (default), aggregate over all snapshots and return a
         :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
-    energy_totals : pathlib.Path | None, optional
-        Path to an energy totals file used to determine domestic shares for
-        aviation and navigation liquid fuels. If ``None``, default domestic
-        shares from :func:`get_energy_totals_domestic_share` are used.
+    energy_totals : pd.DataFrame | None, optional
+        Energy totals of the investment year, indexed by ``country``
+        used to determine domestic shares for aviation and
+        navigation liquid fuels via :func:`get_energy_totals_domestic_share`.
+        Passed by ``Network_Processor``; the variable is skipped if no energy
+        totals are available.
 
     Returns
     -------

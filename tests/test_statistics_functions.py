@@ -1483,58 +1483,58 @@ class TestFinalEnergyByCarrierCoal:
 class TestFinalEnergyBySectorTransportation:
     """Test suite for Final_Energy_by_Sector__Transportation function."""
 
-    def test_returns_series(self, mock_network: MockPyPSANetwork, energy_totals_csv):
+    def test_returns_series(self, mock_network: MockPyPSANetwork, energy_totals_df):
         """Test that the function returns a pandas Series."""
         result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_csv
+            mock_network, energy_totals=energy_totals_df
         )
         assert isinstance(result, pd.Series)
 
     def test_has_location_and_unit_multiindex(
-        self, mock_network: MockPyPSANetwork, energy_totals_csv
+        self, mock_network: MockPyPSANetwork, energy_totals_df
     ):
         """Test that result has MultiIndex with location and unit levels."""
         result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_csv
+            mock_network, energy_totals=energy_totals_df
         )
         assert isinstance(result.index, pd.MultiIndex)
         assert "location" in result.index.names
         assert "unit" in result.index.names
 
-    def test_not_empty(self, mock_network: MockPyPSANetwork, energy_totals_csv):
+    def test_not_empty(self, mock_network: MockPyPSANetwork, energy_totals_df):
         """Test that result is not empty."""
         result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_csv
+            mock_network, energy_totals=energy_totals_df
         )
         assert len(result) > 0
 
-    def test_numeric_values(self, mock_network: MockPyPSANetwork, energy_totals_csv):
+    def test_numeric_values(self, mock_network: MockPyPSANetwork, energy_totals_df):
         """Test that result values are numeric."""
         result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_csv
+            mock_network, energy_totals=energy_totals_df
         )
         assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
             result.dtype
         )
 
     def test_contains_multiple_locations(
-        self, mock_network: MockPyPSANetwork, energy_totals_csv
+        self, mock_network: MockPyPSANetwork, energy_totals_df
     ):
         """Test that result contains multiple locational data."""
         result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_csv
+            mock_network, energy_totals=energy_totals_df
         )
         locations = result.index.get_level_values("location").unique()
         assert len(locations) > 1
         assert all(r.startswith("AT") for r in locations)
 
     def test_multiple_networks(
-        self, mock_network_collection: MockNetworkCollection, energy_totals_csv
+        self, mock_network_collection: MockNetworkCollection, energy_totals_df
     ):
         """Test processing multiple networks from collection."""
         for network in mock_network_collection:
             result = Final_Energy_by_Sector__Transportation(
-                network, energy_totals=energy_totals_csv
+                network, energy_totals=energy_totals_df
             )
             assert isinstance(result, pd.Series)
             assert isinstance(result.index, pd.MultiIndex)
@@ -1548,7 +1548,7 @@ class TestFinalEnergyBySectorTransportation:
             Final_Energy_by_Sector__Transportation(mock_network)
 
     def test_uses_mean_efficiency_and_warns_for_differing_bev_chargers(
-        self, energy_totals_csv, caplog
+        self, energy_totals_df, caplog
     ):
         """Multiple distinct BEV charger efficiencies fall back to mean with WARNING."""
         network = MockPyPSANetwork(
@@ -1563,7 +1563,7 @@ class TestFinalEnergyBySectorTransportation:
 
         with caplog.at_level(logging.WARNING):
             result = Final_Energy_by_Sector__Transportation(
-                network, energy_totals=energy_totals_csv
+                network, energy_totals=energy_totals_df
             )
 
         assert any(
@@ -2069,13 +2069,13 @@ class TestAggregatePerYearFalse:
     ]
 
     def test_transportation_returns_dataframe(
-        self, mock_network: MockPyPSANetwork, energy_totals_csv
+        self, mock_network: MockPyPSANetwork, energy_totals_df
     ):
         """Transportation returns a DataFrame when aggregate_per_year=False."""
         result = Final_Energy_by_Sector__Transportation(
             mock_network,
             aggregate_per_year=False,
-            energy_totals=energy_totals_csv,
+            energy_totals=energy_totals_df,
         )
         assert isinstance(result, pd.DataFrame)
         assert isinstance(result.index, pd.MultiIndex)
