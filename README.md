@@ -12,6 +12,7 @@ This package processes a PyPSA `NetworkCollection` for a given set of IAMC varia
 - investment-year aggregates (`aggregate_per_year: true`) and full time series exports (`aggregate_per_year: false`)
 - region-level and country-level aggregation (`aggregation_level`)
 - single-country runs (`country: AT`) and all-country processing (`country: all`)
+- European Union runs (`country: EU`): the 27 member states; the copperplate pseudo-location `EU` of the networks is dropped from every output
 - optional mapping of country/region codes to readable names (`map_country_codes_to_names`)
 - optional conversion to units defined in the definitions folder (`convert_units`)
 
