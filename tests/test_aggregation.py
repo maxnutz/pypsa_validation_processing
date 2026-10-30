@@ -545,6 +545,7 @@ map_country_codes_to_names: {str(map_names).lower()}
         return dict(zip(data["region"], data["value"]))
 
     def test_country_all_drops_copperplate(self, tmp_path: Path, caplog):
+        """C8-AC9: country/all has no EU row, and one INFO names the dropped location."""
         assert self._run(tmp_path, caplog, "all") == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
         infos = [
             r.message
@@ -554,12 +555,15 @@ map_country_codes_to_names: {str(map_names).lower()}
         assert len(infos) == 1 and "'EU'" in infos[0]
 
     def test_country_eu_aggregates_member_states(self, tmp_path: Path, caplog):
+        """C8-AC9: country/EU sums the member states AT and DE, without CH and the copperplate."""
         assert self._run(tmp_path, caplog, "EU") == {"EU": 3.0}
 
     def test_region_eu_keeps_member_state_locations(self, tmp_path: Path, caplog):
+        """C8-AC9: region/EU keeps one row per member-state location."""
         out = self._run(tmp_path, caplog, "EU", aggregation_level="region")
         assert out == {"AT1": 1.0, "DE1": 2.0}
 
     def test_country_eu_mapped_to_name(self, tmp_path: Path, caplog):
+        """C8-AC10: with mapped names, the region is European Union and excludes the copperplate."""
         out = self._run(tmp_path, caplog, "EU", map_names=True)
         assert out == {"European Union": 3.0}
