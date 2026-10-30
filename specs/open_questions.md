@@ -1,6 +1,6 @@
 # Open questions, assumptions and spec-vs-code differences
 
-Status: draft
+Status: reviewed
 
 - **OQ-n:** open question, needs a decision by the owner.
 - **SC-n:** observed difference between spec and code, documentation or project instructions. Candidate for a GitHub issue; the spec wins (P1).
