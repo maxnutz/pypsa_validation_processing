@@ -45,6 +45,40 @@ EU27_COUNTRY_CODES: dict[str, str] = {
     "EU": "European Union",
 }
 
+# the 27 member states of the European Union, aggregated for ``country: EU`` (C1.6, C8.8)
+EU_MEMBER_STATES: tuple[str, ...] = (
+    "AT",
+    "BE",
+    "BG",
+    "CY",
+    "CZ",
+    "DE",
+    "DK",
+    "EE",
+    "ES",
+    "FI",
+    "FR",
+    "GR",
+    "HR",
+    "HU",
+    "IE",
+    "IT",
+    "LT",
+    "LU",
+    "LV",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SE",
+    "SI",
+    "SK",
+)
+
+# copperplate pseudo-location of pypsa-eur networks, never part of the output (C8.7)
+COPPERPLATE_LOCATION = "EU"
+
 COUNTRIES_SPECIAL_CASES: dict[str, str] = {
     "DE1": "Germany South-West",
     "DE2": "Germany South-East",

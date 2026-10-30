@@ -13,7 +13,9 @@ import nomenclature
 import pyam
 
 from pypsa_validation_processing.utils import (
+    COPPERPLATE_LOCATION,
     EU27_COUNTRY_CODES,
+    EU_MEMBER_STATES,
     REGION_MAPPING,
     UNITS_MAPPING,
     MissingInputError,
@@ -1048,14 +1050,28 @@ class Network_Processor:
                 result.values, index=new_index, columns=result.columns
             )
             return result.groupby(["country", "unit"]).sum()
-        mask = result.index.get_level_values("location").isin(
-            [
-                reg
-                for reg in result.index.get_level_values("location")
-                if reg.startswith(self.country)
-            ]
-        )
-        return result.loc[mask].groupby("unit").sum()
+        return result.loc[self._country_mask(result)].groupby("unit").sum()
+
+    def _country_mask(self, result: pd.DataFrame) -> list[bool]:
+        """Return which rows of *result* belong to the configured country (C8).
+
+        ``country: EU`` selects the locations of the 27 member states
+        (C8.8); every other code selects the locations starting with it.
+
+        Parameters
+        ----------
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing a ``location`` level.
+
+        Returns
+        -------
+        list[bool]
+            One flag per row.
+        """
+        locations = result.index.get_level_values("location")
+        if self.country == "EU":
+            return [loc[:2] in EU_MEMBER_STATES for loc in locations]
+        return [loc.startswith(self.country) for loc in locations]
 
     def _filter_to_regions(self, result: pd.DataFrame) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
@@ -1079,14 +1095,7 @@ class Network_Processor:
         """
         if self.country == "all":
             return result
-        mask = result.index.get_level_values("location").isin(
-            [
-                reg
-                for reg in result.index.get_level_values("location")
-                if reg.startswith(self.country)
-            ]
-        )
-        return result.loc[mask]
+        return result.loc[self._country_mask(result)]
 
     def _select_aggregation_result(
         self, result: pd.Series | pd.DataFrame
@@ -1562,6 +1571,7 @@ class Network_Processor:
                 else list(self.functions_dict.keys())
             )
             results = []
+            dropped_copperplate = False
             for variable in variables:
                 result = self._execute_function_for_variable(
                     variable,
@@ -1580,10 +1590,24 @@ class Network_Processor:
                     # if aggregate_per_year, function returns a Series - convert to DataFrame.
                     if self.aggregate_per_year:
                         result = result.to_frame(name="value")
+                    copperplate = (
+                        result.index.get_level_values("location")
+                        == COPPERPLATE_LOCATION
+                    )
+                    if copperplate.any():
+                        result = result.loc[~copperplate]
+                        dropped_copperplate = True
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
 
+            if dropped_copperplate:
+                logger.info(
+                    "Network of investment year %s: dropped the copperplate "
+                    "pseudo-location '%s' from all results (C8.7).",
+                    investment_year,
+                    COPPERPLATE_LOCATION,
+                )
             if results:
                 year_df = pd.concat(results, ignore_index=False)
                 if self.aggregate_per_year:

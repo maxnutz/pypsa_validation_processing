@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from pypsa_validation_processing.class_definitions import Network_Processor
-from conftest import MockPyPSANetwork
+from conftest import MockNetworkCollection, MockPyPSANetwork
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -481,3 +482,80 @@ class TestIntensiveAggregation:
         )
         out = processor._postprocess_statistics_result("Capacity", result)
         assert out["value"].to_dict() == {("Capacity", "MWh"): 150.0}
+
+
+# ---------------------------------------------------------------------------
+# Tests for the copperplate pseudo-location and country: EU (C8.7, C8.8)
+# ---------------------------------------------------------------------------
+
+
+class TestCopperplateAndEuropeanUnion:
+    """C8-AC9, C8-AC10."""
+
+    def _run(
+        self,
+        tmp_path: Path,
+        caplog,
+        country: str,
+        aggregation_level: str = "country",
+        map_names: bool = False,
+    ) -> dict:
+        (tmp_path / "networks").mkdir()
+        (tmp_path / "networks" / "n_2030.nc").touch()
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: {country}
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+aggregation_level: {aggregation_level}
+map_country_codes_to_names: {str(map_names).lower()}
+""")
+        locations = ["AT1", "DE1", "CH", "EU"]
+        network = MockPyPSANetwork(
+            meta={"wildcards": {"planning_horizons": 2030}},
+            buses=pd.DataFrame({"location": locations}, index=locations),
+        )
+        result = pd.Series(
+            [1.0, 2.0, 4.0, -8.0],
+            index=pd.MultiIndex.from_tuples(
+                [(loc, "MWh") for loc in locations], names=["location", "unit"]
+            ),
+        )
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection([network]),
+        ):
+            processor = Network_Processor(config_path=config_file)
+        processor.functions_dict = {"Var": "f"}
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.importlib.import_module",
+                return_value=MagicMock(f=lambda n, aggregate_per_year=True: result),
+            ),
+            caplog.at_level(logging.INFO),
+        ):
+            processor.calculate_variables_values()
+        data = processor.dsd_with_values.data
+        return dict(zip(data["region"], data["value"]))
+
+    def test_country_all_drops_copperplate(self, tmp_path: Path, caplog):
+        assert self._run(tmp_path, caplog, "all") == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
+        infos = [
+            r.message
+            for r in caplog.records
+            if r.levelno == logging.INFO and "copperplate" in r.message
+        ]
+        assert len(infos) == 1 and "'EU'" in infos[0]
+
+    def test_country_eu_aggregates_member_states(self, tmp_path: Path, caplog):
+        assert self._run(tmp_path, caplog, "EU") == {"EU": 3.0}
+
+    def test_region_eu_keeps_member_state_locations(self, tmp_path: Path, caplog):
+        out = self._run(tmp_path, caplog, "EU", aggregation_level="region")
+        assert out == {"AT1": 1.0, "DE1": 2.0}
+
+    def test_country_eu_mapped_to_name(self, tmp_path: Path, caplog):
+        out = self._run(tmp_path, caplog, "EU", map_names=True)
+        assert out == {"European Union": 3.0}
