@@ -42,6 +42,14 @@ _SHARES_CARRIERS = ["Natural Gas", "Oil", "Coal"]
 # aggregation classes of a mapped variable (C4.5)
 _AGGREGATION_CLASSES = ("flow", "stock", "intensive")
 
+# share columns of D4, required in every energy totals table (C2.4)
+_ENERGY_TOTALS_REQUIRED_COLUMNS = [
+    "total domestic aviation",
+    "total international aviation",
+    "total domestic navigation",
+    "total international navigation",
+]
+
 
 def format_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize timestamp-like columns to tz-aware objects or
@@ -538,39 +546,52 @@ class Network_Processor:
         -------
         pd.DataFrame | None
             One row per country, or ``None`` (with a WARNING) if neither
-            source is available or the CSV cannot be read.
+            source is available, the CSV cannot be read, or the selected table
+            lacks a column of ``_ENERGY_TOTALS_REQUIRED_COLUMNS``. There is no
+            fallback from an incomplete ``n.meta`` table to the CSV.
         """
         resources = (getattr(n, "meta", None) or {}).get("resources") or {}
         table = resources.get("energy_totals")
+        csv_path = self.network_results_path / "resources" / "energy_totals.csv"
+        energy_totals = None
         if table is not None:
+            source = "n.meta['resources']['energy_totals']"
             energy_totals = pd.DataFrame(
                 data=table["data"], index=table["index"], columns=table["columns"]
             )
             energy_totals.index.name = "country"
-            return energy_totals
-
-        csv_path = self.network_results_path / "resources" / "energy_totals.csv"
-        energy_config = (config or {}).get("energy")
-        year = (
-            energy_config.get("energy_totals_year")
-            if isinstance(energy_config, dict)
-            else None
-        )
-        if not csv_path.exists():
-            missing = f"file {csv_path}"
-        elif year is None:
-            missing = "config key 'energy.energy_totals_year'"
         else:
-            try:
-                energy_totals = pd.read_csv(csv_path, index_col=["country", "year"])
-            except Exception as exc:
-                energy_totals = None
-                missing = f"a readable file {csv_path} ({exc})"
-            if energy_totals is not None:
-                years = energy_totals.index.get_level_values("year")
-                if int(year) in years:
-                    return energy_totals.xs(int(year), level="year")
-                missing = f"rows of year {year} in {csv_path}"
+            source = str(csv_path)
+            energy_config = (config or {}).get("energy")
+            year = (
+                energy_config.get("energy_totals_year")
+                if isinstance(energy_config, dict)
+                else None
+            )
+            if not csv_path.exists():
+                missing = f"file {csv_path}"
+            elif year is None:
+                missing = "config key 'energy.energy_totals_year'"
+            else:
+                try:
+                    csv = pd.read_csv(csv_path, index_col=["country", "year"])
+                except Exception as exc:
+                    csv = None
+                    missing = f"a readable file {csv_path} ({exc})"
+                if csv is not None:
+                    if int(year) in csv.index.get_level_values("year"):
+                        energy_totals = csv.xs(int(year), level="year")
+                    else:
+                        missing = f"rows of year {year} in {csv_path}"
+        if energy_totals is not None:
+            missing_columns = [
+                c
+                for c in _ENERGY_TOTALS_REQUIRED_COLUMNS
+                if c not in energy_totals.columns
+            ]
+            if not missing_columns:
+                return energy_totals
+            missing = f"columns {missing_columns} in {source}"
         logger.warning(
             "Network '%s': no energy totals available (missing %s). Variables "
             "whose function declares 'energy_totals' are skipped.",
@@ -598,32 +619,49 @@ class Network_Processor:
             Index (``country``, ``carrier``), column ``non_energy_share``,
             one row per country and carrier for the configured
             ``industry_non_energy_shares_year``; ``None`` if
-            ``industry_non_energy_shares_path`` is not set or does not exist.
+            ``industry_non_energy_shares_path`` is not set (``null`` or an
+            empty string), does not exist or cannot be read. A read error is
+            kept in ``self.industry_non_energy_shares_error`` for the WARNING
+            of ``_collect_network_inputs``.
 
         Raises
         ------
         ValueError
-            If a config key has a wrong type, or the file fails a check of C2.5.
+            If ``industry_non_energy_shares_path`` is not a string, or the file
+            was read and ``industry_non_energy_shares_year`` has a wrong type or
+            the file fails a check of C2.5.
         """
+        self.industry_non_energy_shares_error: str | None = None
         path_value = self.config.get("industry_non_energy_shares_path")
-        year = self.config.get("industry_non_energy_shares_year", "latest")
-        if path_value is not None and (
-            not isinstance(path_value, str) or not path_value.strip()
-        ):
+        if isinstance(path_value, str) and not path_value.strip():
+            path_value = None
+        if path_value is not None and not isinstance(path_value, str):
             raise ValueError(
-                "'industry_non_energy_shares_path' must be a non-empty path string, "
+                "'industry_non_energy_shares_path' must be a path string, "
                 f"got: {path_value!r}"
-            )
-        if isinstance(year, bool) or not (year == "latest" or isinstance(year, int)):
-            raise ValueError(
-                "'industry_non_energy_shares_year' must be 'latest' or an integer "
-                f"year, got: {year!r}"
             )
         if path_value is None or not Path(path_value).exists():
             return None
 
         path = Path(path_value)
-        raw = pd.read_csv(path)
+        try:
+            raw = pd.read_csv(path)
+        except (
+            OSError,
+            UnicodeDecodeError,
+            pd.errors.EmptyDataError,
+            pd.errors.ParserError,
+        ) as exc:
+            self.industry_non_energy_shares_error = f"{path} ({exc})"
+            return None
+        year = self.config.get("industry_non_energy_shares_year")
+        if year is None:
+            year = "latest"
+        if isinstance(year, bool) or not (year == "latest" or isinstance(year, int)):
+            raise ValueError(
+                "'industry_non_energy_shares_year' must be 'latest' or an integer "
+                f"year, got: {year!r}"
+            )
         missing_columns = [c for c in _SHARES_COLUMNS if c not in raw.columns]
         if missing_columns:
             raise ValueError(f"Shares file {path} lacks the columns {missing_columns}.")
@@ -728,12 +766,17 @@ class Network_Processor:
             "industry_non_energy_shares"
         ) and not all(entry["physical_non_energy_method"] for entry in inputs)
         if needs_shares and self.industry_non_energy_shares is None:
+            reason = (
+                f"file not readable: {self.industry_non_energy_shares_error}"
+                if self.industry_non_energy_shares_error
+                else "'industry_non_energy_shares_path' not set or file not "
+                f"existing: {self.config.get('industry_non_energy_shares_path')!r}"
+            )
             logger.warning(
-                "No industry non-energy shares available ('industry_non_energy_shares_path' "
-                "not set or file not existing: %s). Variables whose function declares "
-                "'industry_non_energy_shares' are skipped for networks without "
-                "industry production data.",
-                self.config.get("industry_non_energy_shares_path"),
+                "No industry non-energy shares available (%s). Variables whose "
+                "function declares 'industry_non_energy_shares' are skipped for "
+                "networks without industry production data.",
+                reason,
             )
         years = [entry["investment_year"] for entry in inputs]
         duplicates = sorted({year for year in years if years.count(year) > 1})

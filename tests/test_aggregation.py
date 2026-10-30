@@ -417,10 +417,12 @@ class TestIntensiveAggregation:
         )
 
     def test_country_weighted_mean(self, tmp_path: Path):
+        """C8-AC6: country/AT gives the weighted mean of AT1 and AT2."""
         out = self._run(tmp_path, self._ac6_input())
         assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
 
     def test_country_all_weighted_mean(self, tmp_path: Path):
+        """C8-AC6: country/all gives one weighted mean per country."""
         out = self._run(tmp_path, self._ac6_input(), country="all")
         assert out.to_dict() == {
             ("Price", "AT", "EUR/MWh"): 30.0,
@@ -428,6 +430,7 @@ class TestIntensiveAggregation:
         }
 
     def test_region_keeps_locations(self, tmp_path: Path):
+        """C8-AC6: region/AT keeps the values of AT1 and AT2 and drops DE1."""
         out = self._run(tmp_path, self._ac6_input(), aggregation_level="region")
         assert out.to_dict() == {
             ("Price", "AT1", "EUR/MWh"): 10.0,
@@ -459,6 +462,7 @@ class TestIntensiveAggregation:
         }
 
     def test_timeseries_per_column(self, tmp_path: Path):
+        """C8-AC5: the weighted mean is computed per snapshot column."""
         result = self._ac6_input()
         result["t1"] = result["value"] * 2
         processor = _make_processor(tmp_path)
