@@ -265,18 +265,14 @@ network_results_path: /tmp/network_results
 
 
 @pytest.fixture
-def energy_totals_csv(tmp_path: Path) -> Path:
-    """Fixture providing a minimal energy_totals.csv for domestic-share tests."""
-    energy_totals = pd.DataFrame(
+def energy_totals_df() -> pd.DataFrame:
+    """Fixture providing minimal one-year energy totals indexed by ``country`` (C2.4)."""
+    return pd.DataFrame(
         {
-            "country": ["AT", "AT"],
-            "year": [2020, 2021],
-            "total domestic aviation": [30.0, 0.0],
-            "total international aviation": [70.0, 0.0],
-            "total domestic navigation": [20.0, 0.0],
-            "total international navigation": [80.0, 0.0],
-        }
+            "total domestic aviation": [30.0],
+            "total international aviation": [70.0],
+            "total domestic navigation": [20.0],
+            "total international navigation": [80.0],
+        },
+        index=pd.Index(["AT"], name="country"),
     )
-    csv_path = tmp_path / "energy_totals.csv"
-    energy_totals.to_csv(csv_path, index=False)
-    return csv_path

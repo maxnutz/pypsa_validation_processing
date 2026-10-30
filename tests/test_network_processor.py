@@ -472,7 +472,7 @@ class TestNetworkProcessorFunctionExecution:
     def test_execute_function_passes_energy_totals_when_accepted(
         self, mock_config_file: Path
     ):
-        """Test that energy_totals path is passed to functions that accept it."""
+        """Test that the energy_totals table is passed to functions that accept it."""
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
         ):
@@ -505,14 +505,15 @@ class TestNetworkProcessorFunctionExecution:
                     mock_import.return_value = mock_module
 
                     mock_network = MockPyPSANetwork()
+                    energy_totals = pd.DataFrame(
+                        {"x": [1.0]}, index=pd.Index(["AT"], name="country")
+                    )
                     result = processor._execute_function_for_variable(
-                        "Test Variable", mock_network
+                        "Test Variable", mock_network, energy_totals=energy_totals
                     )
 
                 assert isinstance(result, pd.Series)
-                assert captured_kwargs["energy_totals"] == (
-                    processor.network_results_path / "resources" / "energy_totals.csv"
-                )
+                assert captured_kwargs["energy_totals"] is energy_totals
 
     def test_execute_function_caches_signature_parameters(self, mock_config_file: Path):
         """Test that function signature inspection is cached per function."""
@@ -733,6 +734,7 @@ output_path: {tmp_path / 'output'}
                 network = MockPyPSANetwork()
                 network.meta["wildcards"]["planning_horizons"] = investment_year
                 processor.network_collection = MockNetworkCollection([network])
+                processor.network_inputs = processor._collect_network_inputs()
 
                 processor.dsd = MagicMock()
                 processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
@@ -1391,16 +1393,12 @@ class TestNetworkProcessorFileIO:
                         "pypsa_validation_processing.class_definitions.Path.exists",
                         return_value=True,
                     ):
-                        with patch(
-                            "pypsa_validation_processing.class_definitions.os.listdir",
-                            return_value=["test.nc"],
-                        ):
-                            processor = MagicMock(spec=["definitions_path"])
-                            processor.definitions_path = Path("/tmp/definitions")
+                        processor = MagicMock(spec=["definitions_path"])
+                        processor.definitions_path = Path("/tmp/definitions")
 
-                            result = Network_Processor.read_definitions(processor)
+                        result = Network_Processor.read_definitions(processor)
 
-                            assert result == mock_dsd
+                        assert result == mock_dsd
 
     def test_read_mappings_missing_file(self, tmp_path: Path):
         """Test _read_mappings raises FileNotFoundError if file missing."""
@@ -1648,20 +1646,22 @@ output_path: {tmp_path / 'output.xlsx'}
     def test_warns_and_uses_first_of_multiple_matching_config_files(
         self, tmp_path: Path, caplog
     ):
-        """Test that multiple matching config files trigger an INFO message and use the first."""
+        """Test that multiple matching config files trigger a WARNING and use the first."""
         processor = self._setup_processor(tmp_path)
         configs_dir = processor.network_results_path / "configs"
         configs_dir.mkdir(parents=True, exist_ok=True)
         (configs_dir / "config_a_2020.yaml").write_text("foo: bar\n")
         (configs_dir / "config_b_2020.yaml").write_text("foo: baz\n")
 
-        with caplog.at_level(logging.INFO):
-            result = processor._get_network_config(2020)
+        with caplog.at_level(logging.WARNING):
+            result = processor._get_network_config(MockPyPSANetwork(meta={}), 2020)
 
         assert any(
-            "Multiple config files found" in record.message for record in caplog.records
+            record.levelno == logging.WARNING
+            and "Multiple config files found" in record.message
+            for record in caplog.records
         )
-        assert result is not None
+        assert result == {"foo": "bar"}
 
     def test_warns_and_returns_none_on_malformed_yaml(self, tmp_path: Path, caplog):
         """Test that malformed YAML in the matched config file triggers a WARNING."""
@@ -1671,7 +1671,7 @@ output_path: {tmp_path / 'output.xlsx'}
         (configs_dir / "config_2020.yaml").write_text("foo: [unclosed\n")
 
         with caplog.at_level(logging.WARNING):
-            result = processor._get_network_config(2020)
+            result = processor._get_network_config(MockPyPSANetwork(meta={}), 2020)
 
         assert any(
             "Could not load config file" in record.message for record in caplog.records
@@ -1685,7 +1685,7 @@ output_path: {tmp_path / 'output.xlsx'}
         processor = self._setup_processor(tmp_path)
 
         with caplog.at_level(logging.WARNING):
-            result = processor._get_network_config(2020)
+            result = processor._get_network_config(MockPyPSANetwork(meta={}), 2020)
 
         assert any(
             "No config file found" in record.message for record in caplog.records
@@ -1736,6 +1736,7 @@ output_path: {tmp_path / 'output.xlsx'}
 
         network = MockPyPSANetwork()
         processor.network_collection = MockNetworkCollection([network])
+        processor.network_inputs = processor._collect_network_inputs()
 
         processor.dsd = MagicMock()
         processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
@@ -1770,13 +1771,14 @@ output_path: {tmp_path / 'output.xlsx'}
         processor.network_collection = MockNetworkCollection(
             [network_2020, network_2030]
         )
+        processor.network_inputs = processor._collect_network_inputs()
 
         processor.dsd = MagicMock()
         processor.dsd.variable.to_pandas.return_value = pd.DataFrame(
             {"variable": ["Test Variable"]}
         )
 
-        def fake_execute(variable, n, config=None):
+        def fake_execute(variable, n, **kwargs):
             year = n.meta["wildcards"]["planning_horizons"]
             return pd.Series(
                 [float(year)],
@@ -1813,8 +1815,9 @@ output_path: {tmp_path / 'output.xlsx'}
 
         network = MockPyPSANetwork()
         processor.network_collection = MockNetworkCollection([network])
+        processor.network_inputs = processor._collect_network_inputs()
 
-        def fake_execute(variable, n, config=None):
+        def fake_execute(variable, n, **kwargs):
             return pd.Series(
                 [1.0],
                 index=pd.MultiIndex.from_tuples(
@@ -1833,3 +1836,332 @@ output_path: {tmp_path / 'output.xlsx'}
         assert mock_execute.call_count == 2
         called_variables = {call.args[0] for call in mock_execute.call_args_list}
         assert called_variables == {"Variable One", "Variable Two"}
+
+
+# ---------------------------------------------------------------------------
+# Tests for per-network inputs: investment year, config, energy totals (C2)
+# ---------------------------------------------------------------------------
+
+
+def _series_result(location: str = "AT1") -> pd.Series:
+    return pd.Series(
+        [1.0],
+        index=pd.MultiIndex.from_tuples(
+            [(location, "MWh_el")], names=["location", "unit"]
+        ),
+    )
+
+
+class TestNetworkInputs:
+    """Test C2.1–C2.4: networks folder, investment year, config, energy totals."""
+
+    def _make_processor(
+        self,
+        tmp_path: Path,
+        networks: list[MockPyPSANetwork],
+        file_names: list[str],
+    ) -> Network_Processor:
+        nw_path = tmp_path / "networks"
+        nw_path.mkdir(parents=True, exist_ok=True)
+        for file_name in file_names:
+            (nw_path / file_name).touch()
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: AT
+model_name: test_model
+scenario_name: test_scenario
+definitions_path: false
+network_results_path: {tmp_path}
+output_path: {tmp_path / 'out'}
+""")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection(networks),
+        ):
+            return Network_Processor(config_path=config_file)
+
+    def test_missing_networks_folder_raises(self, tmp_path: Path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: AT
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+""")
+        with pytest.raises(FileNotFoundError, match="Networks folder"):
+            Network_Processor(config_path=config_file)
+
+    def test_empty_networks_folder_raises(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError, match="No .nc files"):
+            self._make_processor(tmp_path, [], [])
+
+    def test_year_from_planning_horizons_beats_file_name(self, tmp_path: Path, caplog):
+        network = MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2040}})
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [network], ["base_s_adm__none_2030.nc"]
+            )
+        assert processor.network_inputs[0]["investment_year"] == 2040
+        assert not any("file name" in r.message for r in caplog.records)
+
+    def test_year_from_horizon(self, tmp_path: Path):
+        network = MockPyPSANetwork(meta={"wildcards": {"horizon": "2040"}})
+        processor = self._make_processor(tmp_path, [network], ["solved_2030.nc"])
+        assert processor.network_inputs[0]["investment_year"] == 2040
+
+    def test_year_from_file_name_with_warning(self, tmp_path: Path, caplog):
+        network = MockPyPSANetwork(meta={})
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [network], ["base_s_adm__none_2040_1H.nc"]
+            )
+        assert processor.network_inputs[0]["investment_year"] == 2040
+        assert any(
+            r.levelno == logging.WARNING and "base_s_adm__none_2040_1H.nc" in r.message
+            for r in caplog.records
+        )
+
+    def test_no_year_raises(self, tmp_path: Path):
+        with pytest.raises(ValueError, match="network.nc"):
+            self._make_processor(tmp_path, [MockPyPSANetwork(meta={})], ["network.nc"])
+
+    def test_duplicate_years_raise(self, tmp_path: Path):
+        networks = [
+            MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2030}}),
+            MockPyPSANetwork(meta={}),
+        ]
+        with pytest.raises(ValueError, match="same investment year"):
+            self._make_processor(tmp_path, networks, ["a.nc", "b_2030.nc"])
+
+    def test_config_from_meta_without_wildcards_and_resources(self, tmp_path: Path):
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "resources": {"x": 1},
+            "sector": {"district_heating": {"district_heating_loss": 0.15}},
+            "co2_budget": {"2030": 0.45},
+        }
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("co2_budget: {2030: 0.9}\n")
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {
+            "sector": {"district_heating": {"district_heating_loss": 0.15}},
+            "co2_budget": {"2030": 0.45},
+        }
+
+    def test_config_keys_missing_from_meta_taken_from_file(self, tmp_path: Path):
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "sector": {"district_heating": {"potential": 0.6}},
+        }
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text(
+            "sector: {district_heating: {potential: 0.3, district_heating_loss: 0.15}}\n"
+            "energy: {energy_totals_year: 2019}\n"
+        )
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {
+            "sector": {
+                "district_heating": {"potential": 0.6, "district_heating_loss": 0.15}
+            },
+            "energy": {"energy_totals_year": 2019},
+        }
+
+    def test_config_from_file_if_meta_has_only_wildcards(self, tmp_path: Path):
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("co2_budget: {2030: 0.9}\n")
+        meta = {"wildcards": {"planning_horizons": 2030}, "resources": {"x": 1}}
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {"co2_budget": {"2030": 0.9}}
+
+    def test_config_from_file_has_str_keys(self, tmp_path: Path):
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("co2_budget: {2030: 0.9}\n")
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+        )
+        assert processor.network_inputs[0]["config"] == {"co2_budget": {"2030": 0.9}}
+
+    def test_energy_totals_from_meta(self, tmp_path: Path):
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "resources": {
+                "energy_totals": {
+                    "index": ["AT", "DE"],
+                    "columns": ["total domestic aviation"],
+                    "data": [[1.0], [2.0]],
+                    "index_names": ["country"],
+                    "column_names": [None],
+                }
+            },
+        }
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        energy_totals = processor.network_inputs[0]["energy_totals"]
+        assert energy_totals.index.name == "country"
+        assert energy_totals.loc["DE", "total domestic aviation"] == 2.0
+
+    def test_energy_totals_from_csv_for_configured_year(self, tmp_path: Path):
+        (tmp_path / "resources").mkdir()
+        pd.DataFrame(
+            {
+                "country": ["AT", "AT", "AT"],
+                "year": [2018, 2019, 2020],
+                "total domestic aviation": [1.0, 2.0, 3.0],
+            }
+        ).to_csv(tmp_path / "resources" / "energy_totals.csv", index=False)
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "energy": {"energy_totals_year": 2019},
+        }
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+        )
+        energy_totals = processor.network_inputs[0]["energy_totals"]
+        assert list(energy_totals.index) == ["AT"]
+        assert energy_totals.index.name == "country"
+        assert energy_totals.loc["AT", "total domestic aviation"] == 2.0
+
+    def test_config_file_not_a_mapping_is_unavailable(self, tmp_path: Path, caplog):
+        configs_dir = tmp_path / "configs"
+        configs_dir.mkdir()
+        (configs_dir / "config_2030.yaml").write_text("- a\n- b\n")
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["config"] is None
+        assert any("not a mapping" in r.message for r in caplog.records)
+
+    def test_unreadable_energy_totals_csv_is_unavailable(self, tmp_path: Path, caplog):
+        (tmp_path / "resources").mkdir()
+        (tmp_path / "resources" / "energy_totals.csv").write_text("foo,bar\n1,2\n")
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "energy": {"energy_totals_year": 2019},
+        }
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["energy_totals"] is None
+        assert any("no energy totals available" in r.message for r in caplog.records)
+
+    def test_no_values_for_any_network_raises(self, tmp_path: Path):
+        processor = self._make_processor(
+            tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+        )
+        processor.use_definitions = False
+        processor.functions_dict = {"Var Config": "with_config"}
+
+        def with_config(n, aggregate_per_year=True, config=None):
+            return _series_result()
+
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(with_config=with_config),
+        ):
+            with pytest.raises(RuntimeError, match="No variable produced values"):
+                processor.calculate_variables_values()
+
+    def test_missing_inputs_skip_only_declaring_functions(self, tmp_path: Path, caplog):
+        """C2-AC5, C2-AC6: missing config/energy totals skip declaring functions only."""
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta={})], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["config"] is None
+        assert processor.network_inputs[0]["energy_totals"] is None
+        assert any("no energy totals available" in r.message for r in caplog.records)
+
+        called = []
+
+        def with_config(n, aggregate_per_year=True, config=None):
+            called.append("with_config")
+            return _series_result()
+
+        def with_energy_totals(n, aggregate_per_year=True, energy_totals=None):
+            called.append("with_energy_totals")
+            return _series_result()
+
+        def plain(n, aggregate_per_year=True):
+            called.append("plain")
+            return _series_result()
+
+        processor.use_definitions = False
+        processor.aggregation_level = "region"
+        processor.functions_dict = {
+            "Var Config": "with_config",
+            "Var Totals": "with_energy_totals",
+            "Var Plain": "plain",
+        }
+        module = MagicMock(
+            with_config=with_config, with_energy_totals=with_energy_totals, plain=plain
+        )
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.importlib.import_module",
+                return_value=module,
+            ),
+            patch.object(
+                processor, "structure_pyam_from_pandas", side_effect=lambda df: df
+            ),
+        ):
+            caplog.clear()
+            with caplog.at_level(logging.WARNING):
+                processor.calculate_variables_values()
+
+        assert called == ["plain"]
+        assert set(processor.dsd_with_values.index.get_level_values("variable")) == {
+            "Var Plain"
+        }
+        messages = [r.message for r in caplog.records]
+        assert any("Var Config" in m and "with_config" in m for m in messages)
+        assert any("Var Totals" in m and "with_energy_totals" in m for m in messages)
+
+    def test_missing_input_error_skips_variable(self, tmp_path: Path, caplog):
+        """C2-AC5c: MissingInputError skips the variable, KeyError aborts."""
+        from pypsa_validation_processing.utils import MissingInputError
+
+        processor = self._make_processor(
+            tmp_path,
+            [MockPyPSANetwork(meta={"wildcards": {"planning_horizons": 2030}})],
+            ["n_2030.nc"],
+        )
+
+        def needs_key(n, aggregate_per_year=True, config=None):
+            raise MissingInputError("sector.district_heating.district_heating_loss")
+
+        def raises_key_error(n, aggregate_per_year=True, config=None):
+            raise KeyError("sector")
+
+        processor.functions_dict = {"A": "needs_key", "B": "raises_key_error"}
+        module = MagicMock(needs_key=needs_key, raises_key_error=raises_key_error)
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=module,
+        ):
+            with caplog.at_level(logging.WARNING):
+                result = processor._execute_function_for_variable(
+                    "A", processor.network_collection[0], config={}
+                )
+            assert result is None
+            assert any(
+                "district_heating_loss" in r.message and "A" in r.message
+                for r in caplog.records
+            )
+            with pytest.raises(KeyError):
+                processor._execute_function_for_variable(
+                    "B", processor.network_collection[0], config={}
+                )

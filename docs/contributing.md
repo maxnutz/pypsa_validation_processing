@@ -44,7 +44,7 @@ def <function_name>(
     ...
 ```
 
-Additional optional parameters can be added when a variable needs them, e.g. `config: dict` or `energy_totals: Path`. All class-Variables can be used as parameters. Additional parameters are identified automatically when processing the statistics-function.
+Additional optional parameters can be added when a variable needs them, e.g. `config: dict` or `energy_totals: pd.DataFrame`. All class-Variables can be used as parameters. Additional parameters are identified automatically when processing the statistics-function.
 
 ### Return format
 
