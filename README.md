@@ -202,6 +202,20 @@ Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
 Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 ```
 
+The short form `<variable>: <function>` is the aggregation class `flow`. The long form sets the class explicitly:
+
+```yaml
+Prices|Final Energy|Electricity: {function: Prices__Final_Energy__Electricity, aggregation: intensive}
+```
+
+| Class | Over time (inside the function) | Over regions and extra index levels (post-processing) |
+|---|---|---|
+| `flow` (default) | sum over snapshots, weighted | sum |
+| `stock` | end-of-year value | sum |
+| `intensive` | weighted mean, computed by the function | weighted mean; the result carries an index level `quantity` with paired `value` and `weight` rows |
+
+Any other entry (missing `function`, unknown key, unknown class, a list) raises a `ValueError` naming the variable.
+
 At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. At initialisation, before any network is read, every selected variable is checked: a function that does not exist in `statistics_functions.py`, or that does not declare `n` and `aggregate_per_year` as its first two parameters (all further parameters with defaults), raises a `ValueError`. An empty mapping file raises a `ValueError`, too. With `definitions_path: false`, every variable in the mapping file is evaluated.
 
 `n` and `aggregate_per_year` are always passed. The optional parameters `config`, `energy_totals` and `industry_non_energy_shares` are only passed to a function if they appear in its signature.

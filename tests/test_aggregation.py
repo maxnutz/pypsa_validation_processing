@@ -371,3 +371,113 @@ aggregation_level: "country"
             ):
                 with pytest.raises(ValueError, match="'country' must be"):
                     Network_Processor(config_path=config_file)
+
+
+# ---------------------------------------------------------------------------
+# Tests for aggregation classes (C4.5, C8.2)
+# ---------------------------------------------------------------------------
+
+_PRICE_UNITS = {"EUR/MWh_el": "EUR/MWh", "EUR/MWh_th": "EUR/MWh", "EUR/MWh": "EUR/MWh"}
+
+
+def _intensive(rows: list[tuple], extra: str | None = None) -> pd.DataFrame:
+    """Build an intensive result from (location, unit, [extra,] value, weight)."""
+    names = ["location", "unit"] + ([extra] if extra else []) + ["quantity"]
+    tuples, data = [], []
+    for row in rows:
+        *labels, value, weight = row
+        tuples += [(*labels, "value"), (*labels, "weight")]
+        data += [value, weight]
+    index = pd.MultiIndex.from_tuples(tuples, names=names)
+    return pd.DataFrame({"value": data}, index=index)
+
+
+class TestIntensiveAggregation:
+    """C8.2: weighted mean for ``intensive`` variables, sum for ``stock``."""
+
+    def _run(self, tmp_path: Path, result: pd.DataFrame, **kwargs) -> pd.Series:
+        processor = _make_processor(tmp_path, **kwargs)
+        processor.aggregation_classes = {"Price": "intensive"}
+        with patch.dict(
+            "pypsa_validation_processing.class_definitions.UNITS_MAPPING",
+            _PRICE_UNITS,
+        ):
+            out = processor._postprocess_statistics_result("Price", result)
+        assert "quantity" not in out.index.names
+        return out["value"]
+
+    def _ac6_input(self) -> pd.DataFrame:
+        return _intensive(
+            [
+                ("AT1", "EUR/MWh", 10.0, 1.0),
+                ("AT2", "EUR/MWh", 40.0, 2.0),
+                ("DE1", "EUR/MWh", 5.0, 1.0),
+            ]
+        )
+
+    def test_country_weighted_mean(self, tmp_path: Path):
+        out = self._run(tmp_path, self._ac6_input())
+        assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
+
+    def test_country_all_weighted_mean(self, tmp_path: Path):
+        out = self._run(tmp_path, self._ac6_input(), country="all")
+        assert out.to_dict() == {
+            ("Price", "AT", "EUR/MWh"): 30.0,
+            ("Price", "DE", "EUR/MWh"): 5.0,
+        }
+
+    def test_region_keeps_locations(self, tmp_path: Path):
+        out = self._run(tmp_path, self._ac6_input(), aggregation_level="region")
+        assert out.to_dict() == {
+            ("Price", "AT1", "EUR/MWh"): 10.0,
+            ("Price", "AT2", "EUR/MWh"): 40.0,
+        }
+
+    def test_units_combined_after_normalisation(self, tmp_path: Path):
+        """C8-AC3b: EUR/MWh_el and EUR/MWh_th are averaged after step 2."""
+        result = _intensive(
+            [("AT1", "EUR/MWh_el", 10.0, 1.0), ("AT1", "EUR/MWh_th", 40.0, 2.0)]
+        )
+        out = self._run(tmp_path, result, aggregation_level="region")
+        assert out.to_dict() == {("Price", "AT1", "EUR/MWh"): 30.0}
+
+    def test_extra_level_and_zero_weight(self, tmp_path: Path):
+        """C8-AC7: weighted mean over 'carrier'; all weights 0 → 0.0, not NaN."""
+        result = _intensive(
+            [
+                ("AT1", "EUR/MWh", "gas", 20.0, 1.0),
+                ("AT1", "EUR/MWh", "oil", 50.0, 0.0),
+                ("AT2", "EUR/MWh", "gas", 30.0, 0.0),
+            ],
+            extra="carrier",
+        )
+        out = self._run(tmp_path, result, aggregation_level="region")
+        assert out.to_dict() == {
+            ("Price", "AT1", "EUR/MWh"): 20.0,
+            ("Price", "AT2", "EUR/MWh"): 0.0,
+        }
+
+    def test_timeseries_per_column(self, tmp_path: Path):
+        result = self._ac6_input()
+        result["t1"] = result["value"] * 2
+        processor = _make_processor(tmp_path)
+        processor.aggregation_classes = {"Price": "intensive"}
+        with patch.dict(
+            "pypsa_validation_processing.class_definitions.UNITS_MAPPING",
+            _PRICE_UNITS,
+        ):
+            out = processor._postprocess_statistics_result("Price", result)
+        assert out.loc[("Price", "EUR/MWh")].to_dict() == {"value": 30.0, "t1": 60.0}
+
+    def test_stock_is_summed(self, tmp_path: Path):
+        """C8-AC8: stock aggregates like flow."""
+        processor = _make_processor(tmp_path)
+        processor.aggregation_classes = {"Capacity": "stock"}
+        result = pd.DataFrame(
+            {"value": [100.0, 50.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh"), ("AT2", "MWh")], names=["location", "unit"]
+            ),
+        )
+        out = processor._postprocess_statistics_result("Capacity", result)
+        assert out["value"].to_dict() == {("Capacity", "MWh"): 150.0}

@@ -2225,6 +2225,42 @@ mapping_path: {mapping_file}
         with pytest.raises(ValueError, match="empty or not a mapping"):
             self._init(self._make_config(tmp_path, content))
 
+    def test_short_and_long_form_give_aggregation_class(self, tmp_path: Path):
+        """C4-AC4."""
+
+        def f(n, aggregate_per_year=True):
+            return _series_result()
+
+        mapping = "A: f\nB: {function: f}\nC: {function: f, aggregation: intensive}\n"
+        processor, _ = self._init(self._make_config(tmp_path, mapping), MagicMock(f=f))
+        assert processor.functions_dict == {"A": "f", "B": "f", "C": "f"}
+        assert processor.aggregation_classes == {
+            "A": "flow",
+            "B": "flow",
+            "C": "intensive",
+        }
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            "{aggregation: flow}",
+            "{function: f, aggregation: mean}",
+            "{function: f, weight: g}",
+            "[f]",
+        ],
+    )
+    def test_invalid_mapping_entry_raises_before_networks_are_read(
+        self, tmp_path: Path, entry: str
+    ):
+        """C4-AC5."""
+        config_file = self._make_config(tmp_path, f"X: {entry}\n")
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+        ) as mock_collection:
+            with pytest.raises(ValueError, match="'X'.*invalid mapping entry"):
+                Network_Processor(config_path=config_file)
+        mock_collection.assert_not_called()
+
     def test_missing_function_raises_before_networks_are_read(self, tmp_path: Path):
         config_file = self._make_config(tmp_path, "X: does_not_exist\n")
         network = MockPyPSANetwork()
@@ -2365,6 +2401,43 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
         processor = self._processor(tmp_path)
         with pytest.raises(ValueError, match=f"Var X.*{re.escape(violation)}"):
             processor._validate_result("Var X", result, self._network())
+
+    @pytest.mark.parametrize(
+        "rows, violation",
+        [
+            ([("AT1", "MWh_el")], "needs a level 'quantity'"),
+            ([("AT1", "MWh_el", "value"), ("AT1", "MWh_el", "mean")], "mean"),
+            (
+                [("AT1", "MWh_el", "value"), ("AT2", "MWh_el", "weight")],
+                "without matching",
+            ),
+            (
+                [("AT1", "MWh_el", "value"), ("AT1", "MWh_el", "weight", -1.0)],
+                "negative",
+            ),
+        ],
+    )
+    def test_invalid_intensive_result_raises(
+        self, tmp_path: Path, rows: list[tuple], violation: str
+    ):
+        processor = self._processor(tmp_path)
+        processor.aggregation_classes = {"Var X": "intensive"}
+        values = [row[3] if len(row) > 3 else 1.0 for row in rows]
+        names = ["location", "unit", "quantity"][: len(rows[0][:3])]
+        result = pd.Series(values, index=_index([row[:3] for row in rows], names))
+        with pytest.raises(ValueError, match=f"Var X.*{violation}"):
+            processor._validate_result("Var X", result, self._network())
+
+    def test_valid_intensive_result(self, tmp_path: Path):
+        processor = self._processor(tmp_path)
+        processor.aggregation_classes = {"Var X": "intensive"}
+        index = _index(
+            [("AT1", "MWh_el", "value"), ("AT1", "MWh_el", "weight")],
+            ["location", "unit", "quantity"],
+        )
+        processor._validate_result(
+            "Var X", pd.Series([30.0, 0.0], index=index), self._network()
+        )
 
     def test_invalid_timeseries_result_raises(self, tmp_path: Path):
         processor = self._processor(tmp_path, aggregate_per_year=False)
