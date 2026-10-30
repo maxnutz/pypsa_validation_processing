@@ -1854,6 +1854,36 @@ def _series_result(location: str = "AT1") -> pd.Series:
     )
 
 
+_ENERGY_TOTALS_SHARE_COLUMNS = [
+    "total domestic aviation",
+    "total international aviation",
+    "total domestic navigation",
+    "total international navigation",
+]
+
+
+def _energy_totals_meta(columns: list[str] = _ENERGY_TOTALS_SHARE_COLUMNS) -> dict:
+    """Energy totals in ``split`` orientation for AT and DE (C2.4)."""
+    return {
+        "index": ["AT", "DE"],
+        "columns": columns,
+        "data": [[1.0] * len(columns), [2.0] * len(columns)],
+        "index_names": ["country"],
+        "column_names": [None],
+    }
+
+
+def _write_energy_totals_csv(tmp_path: Path, **overrides: list) -> None:
+    """Write ``resources/energy_totals.csv`` for AT with years 2018–2020."""
+    (tmp_path / "resources").mkdir(exist_ok=True)
+    columns = {c: [1.0, 2.0, 3.0] for c in _ENERGY_TOTALS_SHARE_COLUMNS}
+    data = {"country": ["AT"] * 3, "year": [2018, 2019, 2020], **columns}
+    data.update(overrides)
+    pd.DataFrame({k: v for k, v in data.items() if v is not None}).to_csv(
+        tmp_path / "resources" / "energy_totals.csv", index=False
+    )
+
+
 class TestNetworkInputs:
     """Test C2.1–C2.4: networks folder, investment year, config, energy totals."""
 
@@ -1997,15 +2027,7 @@ network_results_path: {tmp_path}
     def test_energy_totals_from_meta(self, tmp_path: Path):
         meta = {
             "wildcards": {"planning_horizons": 2030},
-            "resources": {
-                "energy_totals": {
-                    "index": ["AT", "DE"],
-                    "columns": ["total domestic aviation"],
-                    "data": [[1.0], [2.0]],
-                    "index_names": ["country"],
-                    "column_names": [None],
-                }
-            },
+            "resources": {"energy_totals": _energy_totals_meta()},
         }
         processor = self._make_processor(
             tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
@@ -2015,14 +2037,7 @@ network_results_path: {tmp_path}
         assert energy_totals.loc["DE", "total domestic aviation"] == 2.0
 
     def test_energy_totals_from_csv_for_configured_year(self, tmp_path: Path):
-        (tmp_path / "resources").mkdir()
-        pd.DataFrame(
-            {
-                "country": ["AT", "AT", "AT"],
-                "year": [2018, 2019, 2020],
-                "total domestic aviation": [1.0, 2.0, 3.0],
-            }
-        ).to_csv(tmp_path / "resources" / "energy_totals.csv", index=False)
+        _write_energy_totals_csv(tmp_path)
         meta = {
             "wildcards": {"planning_horizons": 2030},
             "energy": {"energy_totals_year": 2019},
@@ -2059,6 +2074,59 @@ network_results_path: {tmp_path}
             )
         assert processor.network_inputs[0]["energy_totals"] is None
         assert any("no energy totals available" in r.message for r in caplog.records)
+
+    @pytest.mark.parametrize(
+        "overrides, expected",
+        [
+            ({"year": None}, "year"),
+            ({"country": None}, "country"),
+            ({"total international aviation": None}, "total international aviation"),
+        ],
+    )
+    def test_incomplete_energy_totals_csv_is_unavailable(
+        self, tmp_path: Path, caplog, overrides: dict, expected: str
+    ):
+        """C2-AC6c: a CSV without `year`, `country` or a D4 column is unavailable, one WARNING."""
+        _write_energy_totals_csv(tmp_path, **overrides)
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "energy": {"energy_totals_year": 2019},
+        }
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["energy_totals"] is None
+        warnings = [
+            r.message for r in caplog.records if "no energy totals" in r.message
+        ]
+        assert len(warnings) == 1
+        assert "n_2030.nc" in warnings[0] and expected in warnings[0]
+
+    def test_incomplete_meta_energy_totals_no_csv_fallback(
+        self, tmp_path: Path, caplog
+    ):
+        """C2-AC6b: an n.meta table without a D4 column is unavailable, no fallback to the CSV."""
+        _write_energy_totals_csv(tmp_path)
+        columns = [
+            c for c in _ENERGY_TOTALS_SHARE_COLUMNS if c != "total domestic navigation"
+        ]
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "energy": {"energy_totals_year": 2019},
+            "resources": {"energy_totals": _energy_totals_meta(columns)},
+        }
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+            )
+        assert processor.network_inputs[0]["energy_totals"] is None
+        warnings = [
+            r.message for r in caplog.records if "no energy totals" in r.message
+        ]
+        assert len(warnings) == 1
+        assert "n_2030.nc" in warnings[0]
+        assert "total domestic navigation" in warnings[0]
 
     def test_no_values_for_any_network_raises(self, tmp_path: Path):
         processor = self._make_processor(
@@ -2427,6 +2495,65 @@ network_results_path: {tmp_path}
     def test_invalid_path_type_raises(self, tmp_path: Path):
         with pytest.raises(ValueError, match="industry_non_energy_shares_path"):
             self._make_processor(tmp_path, extra="industry_non_energy_shares_path: 5")
+
+    @pytest.mark.parametrize("value", ['""', '"  "'])
+    def test_empty_path_string_is_not_set(self, tmp_path: Path, value: str):
+        """C2-AC8c: an empty or whitespace-only shares path behaves like a missing key."""
+        processor = self._make_processor(
+            tmp_path, extra=f"industry_non_energy_shares_path: {value}"
+        )
+        assert processor.industry_non_energy_shares is None
+        assert processor.industry_non_energy_shares_error is None
+
+    @pytest.mark.parametrize("value", ["abc", ""])
+    def test_year_ignored_without_path(self, tmp_path: Path, value: str):
+        """C2-AC8c: without a shares path, an invalid or empty year is ignored."""
+        processor = self._make_processor(
+            tmp_path, extra=f"industry_non_energy_shares_year: {value}"
+        )
+        assert processor.industry_non_energy_shares is None
+
+    def test_empty_year_means_latest(self, tmp_path: Path):
+        """C2-AC8c: an empty year selects the same table as `latest`."""
+        processor = self._make_processor(
+            tmp_path,
+            _shares_rows(self._base_rows()),
+            extra="industry_non_energy_shares_year:",
+        )
+        table = processor.industry_non_energy_shares
+        assert table.loc[("AT", "Natural Gas"), "non_energy_share"] == 0.10
+
+    def test_unreadable_file_skips_declaring_function(self, tmp_path: Path, caplog):
+        """C2-AC8: a 0-byte shares file gives one WARNING with the read error and a skip."""
+        shares_path = tmp_path / "shares.csv"
+        shares_path.write_bytes(b"")
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(
+                Network_Processor, "_selected_functions_declare", return_value=True
+            ),
+        ):
+            processor = self._make_processor(
+                tmp_path,
+                extra=(
+                    f"industry_non_energy_shares_path: {shares_path}\n"
+                    "industry_non_energy_shares_year: abc"
+                ),
+            )
+        assert processor.industry_non_energy_shares is None
+        init_warnings = [
+            r.message
+            for r in caplog.records
+            if "No industry non-energy shares" in r.message
+        ]
+        assert len(init_warnings) == 1
+        assert "shares.csv" in init_warnings[0] and "not readable" in init_warnings[0]
+        assert processor.industry_non_energy_shares_error in init_warnings[0]
+        assert "No columns to parse" in init_warnings[0]
+
+        with caplog.at_level(logging.WARNING):
+            called = self._run_with_shares_function(processor)
+        assert called == ["plain"]
 
     def test_eurostat_codes_raise(self, tmp_path: Path):
         rows = [*self._base_rows(), ("EL", "Oil", 2024, 0.36)]
