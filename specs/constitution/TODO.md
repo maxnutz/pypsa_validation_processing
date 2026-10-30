@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -13,13 +13,15 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 - [x] maxnutz/eurostat-energy-balance_processing#11 merged (Coal share); shares CSV regenerated.
 
 ## WP1 Inputs of statistics functions (C2, C5) — depends on WP0
-- [ ] PR: investment year, `config` and `energy_totals` from `n.meta` (C2.2–C2.4; SC-11, SC-36, SC-7; #48).
-- [ ] PR: signature check at initialisation and kwarg passing incl. `industry_non_energy_shares` (C5; SC-6).
-- [ ] PR: read the shares file, `industry_non_energy_shares_year`, checks and skip logic (C2.5); add `industry_non_energy_shares_path` to `configs/config.{country,region}-{year,timeseries}.yaml` (owner decision 2026-10-29).
+- [x] PR #112: investment year, `config` and `energy_totals` from `n.meta` (C2.2–C2.4; SC-11, SC-36, SC-7; #48).
+- [x] PR #113: signature check at initialisation and kwarg passing incl. `industry_non_energy_shares` (C5; SC-6).
+- [x] PR #114: read the shares file, `industry_non_energy_shares_year`, checks and skip logic (C2.5); add `industry_non_energy_shares_path` to `configs/config.{country,region}-{year,timeseries}.yaml` (owner decision 2026-10-29).
+- [x] Spec review after WP1 (2026-10-30): C2.3, C2.4, C2.6 and C2.5 aligned with the owner decisions in the reviews of #112–#114.
+- [ ] PR: follow-up from the WP1 spec review: `industry_non_energy_shares_year` checked only if the shares file is read, unreadable shares file → `WARNING` and skip, empty path string = not set (C2.5, C2-AC8, C2-AC8c; SC-39, SC-40, SC-41); energy totals without the D4 share columns → `WARNING` and skip (C2.4, C2-AC6b, C2-AC6c; SC-42).
 
 ## WP2 Result validation and aggregation (C6, C8) — depends on WP0, parallel to WP1
 - [ ] PR: structural validation of every result, abort on violation (C6.8–9; SC-8, SC-25).
-- [ ] PR: aggregation classes `flow` / `stock` / `intensive` in the mapping (C4.5, C8.2; SC-21).
+- [ ] PR: aggregation classes `flow` / `stock` / `intensive` in the mapping (C4.5, C8.2; SC-21). Includes parsing the long form of C4.1: until then, a long-form entry is rejected at initialisation as "function not found" (owner decision 2026-10-29, PR #113 review).
 - [ ] PR: drop the copperplate `EU`, `country: EU` = 27 member states (C8.7–8; SC-37).
 
 ## WP3 Shared definitions in `utils.py` — depends on WP1 and on SC-14
