@@ -2086,6 +2086,7 @@ network_results_path: {tmp_path}
     def test_incomplete_energy_totals_csv_is_unavailable(
         self, tmp_path: Path, caplog, overrides: dict, expected: str
     ):
+        """C2-AC6c: a CSV without `year`, `country` or a D4 column is unavailable, one WARNING."""
         _write_energy_totals_csv(tmp_path, **overrides)
         meta = {
             "wildcards": {"planning_horizons": 2030},
@@ -2105,6 +2106,7 @@ network_results_path: {tmp_path}
     def test_incomplete_meta_energy_totals_no_csv_fallback(
         self, tmp_path: Path, caplog
     ):
+        """C2-AC6b: an n.meta table without a D4 column is unavailable, no fallback to the CSV."""
         _write_energy_totals_csv(tmp_path)
         columns = [
             c for c in _ENERGY_TOTALS_SHARE_COLUMNS if c != "total domestic navigation"
@@ -2496,6 +2498,7 @@ network_results_path: {tmp_path}
 
     @pytest.mark.parametrize("value", ['""', '"  "'])
     def test_empty_path_string_is_not_set(self, tmp_path: Path, value: str):
+        """C2-AC8c: an empty or whitespace-only shares path behaves like a missing key."""
         processor = self._make_processor(
             tmp_path, extra=f"industry_non_energy_shares_path: {value}"
         )
@@ -2504,12 +2507,14 @@ network_results_path: {tmp_path}
 
     @pytest.mark.parametrize("value", ["abc", ""])
     def test_year_ignored_without_path(self, tmp_path: Path, value: str):
+        """C2-AC8c: without a shares path, an invalid or empty year is ignored."""
         processor = self._make_processor(
             tmp_path, extra=f"industry_non_energy_shares_year: {value}"
         )
         assert processor.industry_non_energy_shares is None
 
     def test_empty_year_means_latest(self, tmp_path: Path):
+        """C2-AC8c: an empty year selects the same table as `latest`."""
         processor = self._make_processor(
             tmp_path,
             _shares_rows(self._base_rows()),
@@ -2519,6 +2524,7 @@ network_results_path: {tmp_path}
         assert table.loc[("AT", "Natural Gas"), "non_energy_share"] == 0.10
 
     def test_unreadable_file_skips_declaring_function(self, tmp_path: Path, caplog):
+        """C2-AC8: a 0-byte shares file gives one WARNING with the read error and a skip."""
         shares_path = tmp_path / "shares.csv"
         shares_path.write_bytes(b"")
         with (
@@ -2542,6 +2548,8 @@ network_results_path: {tmp_path}
         ]
         assert len(init_warnings) == 1
         assert "shares.csv" in init_warnings[0] and "not readable" in init_warnings[0]
+        assert processor.industry_non_energy_shares_error in init_warnings[0]
+        assert "No columns to parse" in init_warnings[0]
 
         with caplog.at_level(logging.WARNING):
             called = self._run_with_shares_function(processor)
