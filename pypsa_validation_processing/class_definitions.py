@@ -37,6 +37,9 @@ _SHARES_COLUMNS = [
 ]
 _SHARES_CARRIERS = ["Natural Gas", "Oil", "Coal"]
 
+# aggregation classes of a mapped variable (C4.5)
+_AGGREGATION_CLASSES = ("flow", "stock", "intensive")
+
 # share columns of D4, required in every energy totals table (C2.4)
 _ENERGY_TOTALS_REQUIRED_COLUMNS = [
     "total domestic aviation",
@@ -258,7 +261,9 @@ class Network_Processor:
         self.dsd: nomenclature.DataStructureDefinition | None = (
             self.read_definitions() if self.use_definitions else None
         )
-        self.functions_dict: dict[str, str | list] = self._read_mappings()
+        self.functions_dict: dict[str, str]
+        self.aggregation_classes: dict[str, str]
+        self.functions_dict, self.aggregation_classes = self._read_mappings()
         self._validate_mapped_functions()
         self.industry_non_energy_shares: pd.DataFrame | None = (
             self._read_industry_non_energy_shares()
@@ -339,15 +344,25 @@ class Network_Processor:
         with open(self.config_path, "r") as f:
             return yaml.safe_load(f)
 
-    def _read_mappings(self) -> dict:
-        """Read and return the YAML mapping file.
+    def _read_mappings(self) -> tuple[dict[str, str], dict[str, str]]:
+        """Read the YAML mapping file (C4.1, C4.2).
+
+        An entry is either a function name (short form, class ``flow``) or a
+        mapping ``{function: <name>, aggregation: <class>}`` (long form,
+        ``aggregation`` optional, default ``flow``).
+
+        Returns
+        -------
+        tuple[dict[str, str], dict[str, str]]
+            Function name per variable and aggregation class per variable.
 
         Raises
         ------
         FileNotFoundError
             If the mapping file does not exist.
         ValueError
-            If the mapping file is empty or not a YAML mapping.
+            If the mapping file is empty or not a YAML mapping, or an entry is
+            neither of the two forms.
         """
         if not self.mappings_path.exists():
             raise FileNotFoundError(f"Mapping file not found: {self.mappings_path}")
@@ -358,7 +373,25 @@ class Network_Processor:
                 f"Mapping file {self.mappings_path} is empty or not a mapping of "
                 "IAMC variable to function name."
             )
-        return mappings
+        functions: dict[str, str] = {}
+        classes: dict[str, str] = {}
+        for variable, entry in mappings.items():
+            if isinstance(entry, str):
+                entry = {"function": entry}
+            if (
+                not isinstance(entry, dict)
+                or not isinstance(entry.get("function"), str)
+                or set(entry) - {"function", "aggregation"}
+                or entry.get("aggregation", "flow") not in _AGGREGATION_CLASSES
+            ):
+                raise ValueError(
+                    f"Variable '{variable}': invalid mapping entry {entry!r} in "
+                    f"{self.mappings_path}; expected a function name or "
+                    "{function: <name>, aggregation: flow | stock | intensive}."
+                )
+            functions[variable] = entry["function"]
+            classes[variable] = entry.get("aggregation", "flow")
+        return functions, classes
 
     def _get_selected_variables(self) -> list[str]:
         """Return the variables selected for evaluation (C3).
@@ -925,15 +958,60 @@ class Network_Processor:
             )
         ):
             violation = "values must be numeric"
-        elif "quantity" in result.index.names:
-            violation = "level 'quantity' is reserved for intensive variables"
         else:
-            violation = self._invalid_result_labels(result, n)
+            violation = self._invalid_quantity_level(
+                result, self.aggregation_classes.get(variable, "flow")
+            ) or self._invalid_result_labels(result, n)
         if violation is not None:
             raise ValueError(
                 f"Variable '{variable}': invalid result of function "
                 f"'{self.functions_dict.get(variable)}': {violation}."
             )
+
+    @staticmethod
+    def _invalid_quantity_level(
+        result: pd.Series | pd.DataFrame, aggregation: str
+    ) -> str | None:
+        """Return the violation of the ``quantity`` level rules (C6.10–C6.12), if any.
+
+        Parameters
+        ----------
+        result : pd.Series | pd.DataFrame
+            Result with a MultiIndex.
+        aggregation : str
+            Aggregation class of the variable (C4.5).
+
+        Returns
+        -------
+        str | None
+            Description of the violation, or ``None`` if the level is valid.
+        """
+        names = list(result.index.names)
+        if aggregation != "intensive":
+            if "quantity" in names:
+                return f"level 'quantity' is reserved for intensive variables, class is '{aggregation}'"
+            return None
+        if "quantity" not in names:
+            return "intensive result needs a level 'quantity' with 'value' and 'weight'"
+        quantity = result.index.get_level_values("quantity")
+        foreign = sorted(set(quantity) - {"value", "weight"})
+        if foreign:
+            return (
+                f"level 'quantity' has values {foreign}; allowed are 'value', 'weight'"
+            )
+        others = [name for name in names if name != "quantity"]
+        keys = result.index.droplevel("quantity")
+        value_keys = keys[quantity == "value"]
+        weight_keys = keys[quantity == "weight"]
+        if value_keys.duplicated().any() or weight_keys.duplicated().any():
+            return "duplicate rows per 'quantity'"
+        unpaired = value_keys.symmetric_difference(weight_keys)
+        if len(unpaired):
+            return f"rows without matching 'value'/'weight' row {list(unpaired[:3])} (levels {others})"
+        weights = result[quantity == "weight"]
+        if (weights < 0).to_numpy().any():
+            return "negative weight"
+        return None
 
     @staticmethod
     def _invalid_result_labels(
@@ -1093,6 +1171,11 @@ class Network_Processor:
         - ``"region"``: keeps all regions, returns a DataFrame grouped
           by ``["variable", "location", "unit"]``.
 
+        ``flow`` and ``stock`` variables are summed. ``intensive`` variables
+        (C4.5) are aggregated as weighted mean Σ vᵢ·wᵢ / Σ wᵢ using their
+        ``weight`` rows; a group with Σ wᵢ = 0 gets ``0.0``. The ``quantity``
+        level and the ``weight`` rows are dropped (C8.2, C8.6).
+
         When ``self.aggregate_per_year`` is ``True`` the input *result* is a
         :class:`pandas.Series` and a ``"value"`` column is produced.
         When ``False`` the input is a :class:`pandas.DataFrame` with snapshot
@@ -1114,6 +1197,30 @@ class Network_Processor:
             DataFrame with ``variable``, ``unit`` (and ``location`` when
             ``aggregation_level="region"``), and ``value`` column or snapshot
             columns, grouped accordingly.
+        """
+        if self.aggregation_classes.get(variable, "flow") == "intensive":
+            values = result.xs("value", level="quantity")
+            weights = result.xs("weight", level="quantity").reindex(values.index)
+            weighted = self._sum_over_groups(variable, values * weights)
+            total = self._sum_over_groups(variable, weights)
+            # weighted mean; a group without weight gets 0.0 (C8.2, A-5)
+            return (weighted / total).where(total != 0, 0.0)
+        return self._sum_over_groups(variable, result)
+
+    def _sum_over_groups(self, variable: str, result: pd.DataFrame) -> pd.DataFrame:
+        """Sum *result* per region label and normalised unit (C8 steps 1–3).
+
+        Parameters
+        ----------
+        variable : str
+            IAMC variable name, added as index level ``variable``.
+        result : pd.DataFrame
+            DataFrame with MultiIndex containing ``location`` and ``unit``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Sums grouped by :meth:`_postprocess_group_levels`.
         """
         processed = self._select_aggregation_result(result)
         processed = self._map_unit_level(processed)
