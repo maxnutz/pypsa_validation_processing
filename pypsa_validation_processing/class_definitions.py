@@ -1748,15 +1748,35 @@ class Network_Processor:
         else:
             self.dsd_with_values = container_investment_years
 
+    def _output_name(self) -> str:
+        """Return ``<model>_<scenario>_<level>[_<country>]`` for output names (C10.3).
+
+        ``_<country>`` is omitted for ``country: all``; all tokens are
+        sanitised by :meth:`_sanitize_path_token`.
+        """
+        tokens = [
+            self.model_name_path_token,
+            self.scenario_name_path_token,
+            self.aggregation_level,
+        ]
+        if self.country != "all":
+            tokens.append(self.country_path_token)
+        return "_".join(tokens)
+
     def write_output_to_xlsx(self) -> Path:
-        """Write the computed IAMC data to an Excel file (or files).
+        """Write the computed IAMC data to an Excel file (or files) (C10).
+
+        ``<name>`` is ``<model>_<scenario>_<level>[_<country>]``
+        (:meth:`_output_name`), ``<level>`` the ``aggregation_level``.
 
         - When ``aggregate_per_year=True``: writes a single file
-          ``<self.path_dsd_with_values>/PYPSA_{model}_{scenario}_{country}.xlsx``.
+          ``<self.path_dsd_with_values>/PYPSA_<name>.xlsx``.
         - When ``aggregate_per_year=False``: creates a sub-folder
-          ``<self.path_dsd_with_values>/PYPSA_timeseries_{model}_{scenario}_{country}/``
+          ``<self.path_dsd_with_values>/PYPSA_timeseries_<name>/``
           and writes one file per investment year named
-          ``PYPSA_{model}_{scenario}_{country}_{year}.xlsx``.
+          ``PYPSA_<name>_<year>.xlsx``.
+
+        The output directory is created if it does not exist.
 
         Returns
         -------
@@ -1774,27 +1794,14 @@ class Network_Processor:
                 "No data available. Call calculate_variables_values() first."
             )
 
-        base_dir = self.path_dsd_with_values
-        if self.country == "all":
-            base_filename = (
-                f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}"
-            )
-        else:
-            base_filename = f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
-
+        name = self._output_name()
         if self.aggregate_per_year:
-            file_path = base_dir / f"{base_filename}.xlsx"
+            file_path = self.path_dsd_with_values / f"PYPSA_{name}.xlsx"
             file_path.parent.mkdir(parents=True, exist_ok=True)
             self.dsd_with_values.to_excel(file_path)
             return file_path
-        else:
-            if self.country == "all":
-                folder_name = f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}"
-            else:
-                folder_name = f"PYPSA_timeseries_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}"
-            folder_path = base_dir / folder_name
-            folder_path.mkdir(parents=True, exist_ok=True)
-            for investment_year, iam_df in self.dsd_with_values:
-                file_name = f"{base_filename}_{investment_year}.xlsx"
-                iam_df.to_excel(folder_path / file_name)
-            return folder_path
+        folder_path = self.path_dsd_with_values / f"PYPSA_timeseries_{name}"
+        folder_path.mkdir(parents=True, exist_ok=True)
+        for investment_year, iam_df in self.dsd_with_values:
+            iam_df.to_excel(folder_path / f"PYPSA_{name}_{investment_year}.xlsx")
+        return folder_path

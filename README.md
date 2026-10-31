@@ -86,10 +86,12 @@ This statement runs `pytest tests/ -v` with coverage reporting and fails if cove
 
 ### Output behavior
 
-- `aggregate_per_year: true` writes one xlsx file.
-- `aggregate_per_year: false` writes one folder with one xlsx file per investment year.
+Output goes to the directory `output_path` (default `resources`, created if missing). `<name>` is `<model_name>_<scenario_name>_<aggregation_level>[_<country>]`; `_<country>` is omitted for `country: all`.
+- `aggregate_per_year: true` writes one file `PYPSA_<name>.xlsx`; year columns are integers.
+- `aggregate_per_year: false` writes one folder `PYPSA_timeseries_<name>/` with one file `PYPSA_<name>_<year>.xlsx` per investment year.
+- Runs that differ only in `aggregation_level` do not overwrite each other; files with the same name are overwritten.
 - Generated output file and folder names are sanitized (whitespace collapsed to `_`).
-- Time-like columns are normalized to timezone-aware timestamps using a fixed `+01:00` offset before `pyam.IamDataFrame` creation.
+- Time series columns are timezone-aware timestamps in UTC (`+00:00`); the year of every snapshot is replaced by the investment year.
 
 ## Project structure
 

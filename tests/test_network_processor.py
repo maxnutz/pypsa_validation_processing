@@ -772,7 +772,7 @@ class TestNetworkProcessorOutputGeneration:
 
                 expected_path = (
                     processor.path_dsd_with_values
-                    / "PYPSA_AT_KN2040_test_scenario_AT.xlsx"
+                    / "PYPSA_AT_KN2040_test_scenario_country_AT.xlsx"
                 )
                 assert result_path == expected_path
                 # Verify to_excel was called
@@ -802,15 +802,15 @@ class TestNetworkProcessorOutputGeneration:
 
                 expected_folder = (
                     processor.path_dsd_with_values
-                    / "PYPSA_timeseries_AT_KN2040_test_scenario_AT"
+                    / "PYPSA_timeseries_AT_KN2040_test_scenario_country_AT"
                 )
                 assert result_path == expected_folder
                 assert result_path.is_dir()
                 mock_iam_2020.to_excel.assert_called_once_with(
-                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2020.xlsx"
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_country_AT_2020.xlsx"
                 )
                 mock_iam_2030.to_excel.assert_called_once_with(
-                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_country_AT_2030.xlsx"
                 )
 
     def test_write_output_sanitizes_whitespace_in_aggregate_filename(
@@ -845,7 +845,7 @@ output_path: {tmp_path / 'output'}
 
                 result_path = processor.write_output_to_xlsx()
 
-                assert result_path.name == "PYPSA_My_Model_Name_Scenario_Name_AT.xlsx"
+                assert result_path.name == "PYPSA_My_Model_Name_Scenario_Name_country_AT.xlsx"
                 assert re.search(r"\s", str(result_path)) is None
 
     def test_write_output_sanitizes_whitespace_in_timeseries_naming(
@@ -882,9 +882,9 @@ output_path: {tmp_path / 'output'}
 
                 result_path = processor.write_output_to_xlsx()
 
-                assert result_path.name == "PYPSA_timeseries_Model_Name_Scenario_Name"
+                assert result_path.name == "PYPSA_timeseries_Model_Name_Scenario_Name_country"
                 mock_iam_2020.to_excel.assert_called_once_with(
-                    result_path / "PYPSA_Model_Name_Scenario_Name_2020.xlsx"
+                    result_path / "PYPSA_Model_Name_Scenario_Name_country_2020.xlsx"
                 )
                 assert re.search(r"\s", str(result_path)) is None
 
@@ -1734,8 +1734,8 @@ output_path: {tmp_path / 'output.xlsx'}
                 result_path = processor.write_output_to_xlsx()
 
                 # For country="all", filename should not include country suffix
-                assert "PYPSA_MyModel_MyScenario.xlsx" in str(result_path)
-                assert "PYPSA_MyModel_MyScenario_all.xlsx" not in str(result_path)
+                assert "PYPSA_MyModel_MyScenario_country.xlsx" in str(result_path)
+                assert "PYPSA_MyModel_MyScenario_country_all.xlsx" not in str(result_path)
 
     def test_default_output_path_is_resources_directory(self, tmp_path: Path):
         """C1-AC6: without output_path, the output directory is the relative path 'resources' (SC-1)."""
@@ -3048,3 +3048,96 @@ network_results_path: {tmp_path}
         assert not any(c[0] == 2040 for c in called if isinstance(c, tuple))
         skip_messages = [r.message for r in caplog.records if "Var Shares" in r.message]
         assert len(skip_messages) == 1 and "2040" in skip_messages[0]
+
+
+# ---------------------------------------------------------------------------
+# Tests for output names (C10)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputNames:
+    """Test output file and folder names with the aggregation level (C10.3–C10.5)."""
+
+    @staticmethod
+    def _processor(
+        tmp_path: Path, mock_network_results_path: Path, **config: object
+    ) -> Network_Processor:
+        config = {
+            "network_results_path": str(mock_network_results_path),
+            "definitions_path": False,
+            "country": "AT",
+            "model_name": "Pypsa-AT v1.0",
+            "scenario_name": "KN 2040",
+            **config,
+        }
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.safe_dump(config))
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            processor = Network_Processor(config_path=config_file)
+        iam_df = MagicMock()
+        iam_df.to_excel.side_effect = lambda path: Path(path).write_text(
+            processor.aggregation_level
+        )
+        processor.dsd_with_values = iam_df
+        return processor
+
+    def test_default_output_directory(
+        self, tmp_path: Path, mock_network_results_path: Path, monkeypatch
+    ):
+        """C10-AC1: without output_path and aggregation_level, the file is <cwd>/resources/PYPSA_<model>_<scenario>_country_<country>.xlsx."""
+        monkeypatch.chdir(tmp_path)
+        processor = self._processor(tmp_path, mock_network_results_path)
+        path = processor.write_output_to_xlsx()
+        assert path.resolve() == (
+            tmp_path / "resources" / "PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx"
+        )
+        assert path.exists()
+
+    @pytest.mark.parametrize(
+        ("level", "country", "expected"),
+        [
+            ("country", "AT", "PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx"),
+            ("country", "all", "PYPSA_Pypsa-AT_v1.0_KN_2040_country.xlsx"),
+            ("region", "AT", "PYPSA_Pypsa-AT_v1.0_KN_2040_region_AT.xlsx"),
+        ],
+    )
+    def test_file_name_contains_level(
+        self,
+        tmp_path: Path,
+        mock_network_results_path: Path,
+        level: str,
+        country: str,
+        expected: str,
+    ):
+        """C10-AC3: the file name is PYPSA_<model>_<scenario>_<level>[_<country>].xlsx."""
+        processor = self._processor(
+            tmp_path,
+            mock_network_results_path,
+            aggregation_level=level,
+            country=country,
+            output_path=str(tmp_path / "out"),
+        )
+        assert processor.write_output_to_xlsx().name == expected
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_country_and_region_runs_do_not_overwrite(
+        self, tmp_path: Path, mock_network_results_path: Path, aggregate_per_year: bool
+    ):
+        """C10-AC8: a country and a region run into one output_path leave two outputs, the first unchanged."""
+        paths = []
+        for level in ("country", "region"):
+            processor = self._processor(
+                tmp_path,
+                mock_network_results_path,
+                aggregation_level=level,
+                aggregate_per_year=aggregate_per_year,
+                output_path=str(tmp_path / "out"),
+            )
+            if not aggregate_per_year:
+                processor.dsd_with_values = [(2030, processor.dsd_with_values)]
+            paths.append(processor.write_output_to_xlsx())
+        assert paths[0] != paths[1]
+        first = paths[0] if aggregate_per_year else next(paths[0].iterdir())
+        assert first.read_text() == "country"
