@@ -14,8 +14,8 @@ import pyam
 
 from pypsa_validation_processing.utils import (
     COPPERPLATE_LOCATION,
-    EU27_COUNTRY_CODES,
     EU_MEMBER_STATES,
+    ISO_3166_ALPHA2_CODES,
     REGION_MAPPING,
     UNITS_MAPPING,
     MissingInputError,
@@ -38,6 +38,30 @@ _SHARES_COLUMNS = [
     "non_energy_share",
 ]
 _SHARES_CARRIERS = ["Natural Gas", "Oil", "Coal"]
+
+# required keys of the package config (C1.2)
+_REQUIRED_CONFIG_KEYS = (
+    "network_results_path",
+    "definitions_path",
+    "country",
+    "model_name",
+    "scenario_name",
+)
+
+# data type and its description per config key (C1.4, configuration.md)
+_CONFIG_TYPES: dict[str, tuple[type | tuple[type, ...], str]] = {
+    "network_results_path": (str, "a path string"),
+    "definitions_path": ((str, bool), "a folder path or false"),
+    "country": (str, "a string"),
+    "model_name": (str, "a string"),
+    "scenario_name": (str, "a string"),
+    "convert_units": (bool, "true or false"),
+    "mapping_path": (str, "a path string"),
+    "output_path": (str, "a path string"),
+    "aggregation_level": (str, "'country' or 'region'"),
+    "aggregate_per_year": (bool, "true or false"),
+    "map_country_codes_to_names": (bool, "true or false"),
+}
 
 # aggregation classes of a mapped variable (C4.5)
 _AGGREGATION_CLASSES = ("flow", "stock", "intensive")
@@ -184,41 +208,26 @@ class Network_Processor:
         Raises
         ------
         ValueError
-            If required configuration entries are missing or invalid, or if
-            ``definitions_path`` is unset/empty.
+            If a required key is missing, ``null`` or empty, or a key has a
+            wrong data type or a value outside the allowed values (C1.2–C1.6).
+            All config checks run before any network is read (C1.7).
         FileNotFoundError
-            If the configured network results or definitions directories do
-            not exist.
+            If the configured network results folder, definitions folder or
+            mapping file does not exist.
         """
 
         self.config_path = config_path
         self.config = self._read_config()
+        self._validate_config()
 
-        network_results_path = self.config.get("network_results_path")
-        if network_results_path is None:
-            raise ValueError(
-                f"'network_results_path' not set in config at {self.config_path}"
-            )
-        self.network_results_path: Path = Path(network_results_path)
+        self.network_results_path: Path = Path(self.config["network_results_path"])
         if not self.network_results_path.exists():
             raise FileNotFoundError(
                 f"Network results folder does not exist: {self.network_results_path}"
             )
 
-        definitions_path = self.config.get("definitions_path", None)
-        is_empty = definitions_path is None or (
-            isinstance(definitions_path, str) and definitions_path.strip() == ""
-        )
-        if is_empty:
-            raise ValueError(
-                f"'definitions_path' not set in config at {self.config_path}. "
-                "Set it to a valid definitions folder path, or to False to "
-                "evaluate all variables from the mapping file without unit "
-                "conversion."
-            )
-
+        definitions_path = self.config["definitions_path"]
         self.use_definitions: bool = not self._is_definitions_disabled(definitions_path)
-
         if self.use_definitions:
             self.definitions_path: Path | None = Path(definitions_path)
             if not self.definitions_path.exists():
@@ -228,38 +237,38 @@ class Network_Processor:
         else:
             self.definitions_path = None
 
-        if self.use_definitions and self.config.get("convert_units", True):
-            self.common_dsd: nomenclature.DataStructureDefinition | None = (
-                nomenclature.DataStructureDefinition(self.definitions_path)
-            )
-        else:
-            self.common_dsd = None
-
         default_mappings_path = (
             Path(__file__).resolve().parent / "configs" / "mapping.default.yaml"
         )
-        self.mappings_path: Path = (
-            Path(self.config["mapping_path"])
-            if "mapping_path" in self.config
-            else default_mappings_path
+        self.mappings_path: Path = Path(
+            self.config.get("mapping_path", default_mappings_path)
         )
 
-        self.country: str = self.config.get("country", None)
-        if self.country is None or not self._is_valid_country_identifier(self.country):
-            raise ValueError(
-                f"'country' must be an ISO 3166-1 alpha-2 code or 'all', got: {self.country!r}"
-            )
+        self.country: str = self.config["country"]
         self.model_name: str = self.config["model_name"]
         self.scenario_name: str = self.config["scenario_name"]
-        if self.model_name == None or self.scenario_name == None:
-            raise ValueError(
-                f"'model_name' and 'scenario_name' must be set in config at {self.config_path}"
-            )
+        self.aggregation_level: str = self.config.get("aggregation_level", "country")
+        self.aggregate_per_year: bool = self.config.get("aggregate_per_year", True)
+        self.map_country_codes_to_names: bool = self.config.get(
+            "map_country_codes_to_names", False
+        )
+        self.convert_units: bool = self.config.get("convert_units", True)
+        # output_path is always a directory, relative to the working directory (C10.2, A-1)
+        self.path_dsd_with_values: Path = Path(
+            self.config.get("output_path", "resources")
+        )
         self.model_name_path_token: str = self._sanitize_path_token(self.model_name)
         self.scenario_name_path_token: str = self._sanitize_path_token(
             self.scenario_name
         )
         self.country_path_token: str = self._sanitize_path_token(self.country)
+
+        if self.use_definitions and self.convert_units:
+            self.common_dsd: nomenclature.DataStructureDefinition | None = (
+                nomenclature.DataStructureDefinition(self.definitions_path)
+            )
+        else:
+            self.common_dsd = None
         self.dsd: nomenclature.DataStructureDefinition | None = (
             self.read_definitions() if self.use_definitions else None
         )
@@ -270,49 +279,13 @@ class Network_Processor:
         self.industry_non_energy_shares: pd.DataFrame | None = (
             self._read_industry_non_energy_shares()
         )
-        self.network_collection = self._read_pypsa_network_collection()
-        self.network_inputs: list[dict] = self._collect_network_inputs()
-        self.aggregation_level: str = self.config.get("aggregation_level", "country")
-        if self.aggregation_level not in ["country", "region"]:
-            raise ValueError(
-                f"Invalid aggregation_level: '{self.aggregation_level}'. "
-                f"Must be 'country' or 'region'."
-            )
-        self.aggregate_per_year: bool = self.config.get("aggregate_per_year", True)
-        if not isinstance(self.aggregate_per_year, bool):
-            raise ValueError(
-                f"Invalid aggregate_per_year: '{self.aggregate_per_year}'. "
-                f"Must be true or false."
-            )
-        self.map_country_codes_to_names: bool = self.config.get(
-            "map_country_codes_to_names", True
-        )
-        if not isinstance(self.map_country_codes_to_names, bool):
-            raise ValueError(
-                f"Invalid map_country_codes_to_names: '{self.map_country_codes_to_names}'. "
-                f"Must be true or false."
-            )
         self._function_parameter_cache: dict[object, set[str]] = {}
         self.dsd_with_values: (
             pyam.IamDataFrame | list[tuple[int, pyam.IamDataFrame]] | None
         ) = None
-        if self.country == "all":
-            default_path_dsd_with_values = (
-                Path(__file__).resolve().parent
-                / "resources"
-                / f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}.xlsx"
-            )
-        else:
-            default_path_dsd_with_values = (
-                Path(__file__).resolve().parent
-                / "resources"
-                / f"PYPSA_{self.model_name_path_token}_{self.scenario_name_path_token}_{self.country_path_token}.xlsx"
-            )
-        self.path_dsd_with_values: Path = (
-            Path(self.config["output_path"])
-            if "output_path" in self.config
-            else default_path_dsd_with_values
-        )
+        # networks are read only after every config check has passed (C1.7)
+        self.network_collection = self._read_pypsa_network_collection()
+        self.network_inputs: list[dict] = self._collect_network_inputs()
 
     def __repr__(self) -> str:
         return (
@@ -329,8 +302,63 @@ class Network_Processor:
         return re.sub(r"\s+", "_", value.strip())
 
     def _is_valid_country_identifier(self, country: str) -> bool:
-        """Check if country is a valid ISO code or the special value 'all'."""
-        return country == "all" or country in EU27_COUNTRY_CODES
+        """Check if country is an ISO 3166-1 alpha-2 code, ``EU`` or ``all`` (C1.6)."""
+        return country in ("all", "EU") or country in ISO_3166_ALPHA2_CODES
+
+    def _config_error(self, key: str, expected: str, hint: str = "") -> ValueError:
+        """Build the ``ValueError`` for an invalid config value (C1.4)."""
+        return ValueError(
+            f"Invalid {key}: {self.config[key]!r} in config at {self.config_path}; "
+            f"expected {expected}.{hint}"
+        )
+
+    def _validate_config(self) -> None:
+        """Validate required keys, data types and allowed values of the config (C1.2–C1.6).
+
+        Runs before any file other than the config is read (C1.7).
+        ``industry_non_energy_shares_path`` and ``industry_non_energy_shares_year``
+        are checked when the shares file is read (C2.5).
+
+        Raises
+        ------
+        ValueError
+            If the config is not a mapping, a required key is missing, ``null``
+            or empty, or a key has a wrong data type or a value outside the
+            allowed values.
+        """
+        if not isinstance(self.config, dict):
+            raise ValueError(
+                f"Config at {self.config_path} is empty or not a YAML mapping."
+            )
+        for key in _REQUIRED_CONFIG_KEYS:
+            value = self.config.get(key)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                hint = (
+                    " Set it to a valid definitions folder path, or to False to "
+                    "evaluate all variables from the mapping file without unit "
+                    "conversion."
+                    if key == "definitions_path"
+                    else ""
+                )
+                raise ValueError(
+                    f"'{key}' not set in config at {self.config_path}.{hint}"
+                )
+        for key, (expected_type, expected) in _CONFIG_TYPES.items():
+            if key in self.config and not isinstance(self.config[key], expected_type):
+                hint = (
+                    ' YAML reads some unquoted codes as booleans; quote it, e.g. country: "NO".'
+                    if key == "country" and isinstance(self.config[key], bool)
+                    else ""
+                )
+                raise self._config_error(key, expected, hint)
+        if self.config["definitions_path"] is True:
+            raise self._config_error("definitions_path", "a folder path or false")
+        if not self._is_valid_country_identifier(self.config["country"]):
+            raise self._config_error(
+                "country", "an ISO 3166-1 alpha-2 code, 'EU' or 'all'"
+            )
+        if self.config.get("aggregation_level", "country") not in ("country", "region"):
+            raise self._config_error("aggregation_level", "'country' or 'region'")
 
     @staticmethod
     def _is_definitions_disabled(value: object) -> bool:

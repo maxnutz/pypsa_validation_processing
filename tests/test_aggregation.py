@@ -216,12 +216,8 @@ class TestOutputFilenameAllCountries:
         # so path_dsd_with_values is exactly that path (no country suffix)
         assert "all" not in processor.path_dsd_with_values.name
 
-    def test_output_path_country_code_includes_country(self, tmp_path: Path):
-        """When country='AT', output path must include 'AT'."""
-        processor = _make_processor(tmp_path, aggregation_level="country", country="AT")
-        # With output_path set explicitly the path itself is used as-is;
-        # the default path (no output_path) would contain the country.
-        # Test the default path by removing output_path from config.
+    def test_default_output_directory_country_code(self, tmp_path: Path):
+        """C1-AC6: without output_path, the output directory is 'resources' for country='AT' (SC-1)."""
         defs_path = tmp_path / "definitions2"
         defs_path.mkdir()
         nw_path = tmp_path / "networks"
@@ -244,10 +240,10 @@ aggregation_level: "country"
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 proc = Network_Processor(config_path=config_file)
-        assert "AT" in proc.path_dsd_with_values.name
+        assert proc.path_dsd_with_values == Path("resources")
 
-    def test_default_output_path_all_omits_country(self, tmp_path: Path):
-        """Default output path with country='all' must not include country suffix."""
+    def test_default_output_directory_country_all(self, tmp_path: Path):
+        """C1-AC6: without output_path, the output directory is 'resources' for country='all' (SC-1)."""
         defs_path = tmp_path / "definitions3"
         defs_path.mkdir()
         nw_path = tmp_path / "networks"
@@ -270,7 +266,7 @@ aggregation_level: "country"
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 proc = Network_Processor(config_path=config_file)
-        assert proc.path_dsd_with_values.name == "PYPSA_test_model_test_scenario.xlsx"
+        assert proc.path_dsd_with_values == Path("resources")
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +366,7 @@ aggregation_level: "country"
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
-                with pytest.raises(ValueError, match="'country' must be"):
+                with pytest.raises(ValueError, match="Invalid country"):
                     Network_Processor(config_path=config_file)
 
 
