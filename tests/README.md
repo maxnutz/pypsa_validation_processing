@@ -1,195 +1,60 @@
 # Tests
 
-Comprehensive unit and integration tests for `pypsa_validation_processing`.
+Unit tests for `pypsa_validation_processing`. They use mock PyPSA objects and temporary files only; no network files are needed. The integration run against real networks is `pixi run workflow_test`.
 
 ## Running Tests
 
-Run all tests:
-
 ```bash
-pytest tests/ -v
+pixi run test                                   # all tests with coverage, fails below 90 %
+pixi run pytest tests/test_network_processor.py -v
+pixi run pytest tests/test_network_processor.py::TestConfigValidation -v
 ```
 
-Run tests for a specific module:
+## Test Files
 
-```bash
-pytest tests/test_statistics_functions.py -v
-pytest tests/test_network_processor.py -v
-pytest tests/test_workflow.py -v
-pytest tests/test_utils.py -v
-```
+| File | Tests for | Test classes |
+|---|---|---|
+| `conftest.py` | shared mocks and fixtures | `MockStatisticsAccessor` (simulates `n.statistics.energy_balance()` etc.), `MockPyPSANetwork`, `MockNetworkCollection`; fixtures `mock_network`, `mock_network_collection`, `mock_pypsa_network_with_metadata`, `temp_config_file`, `energy_totals_df` |
+| `test_network_processor.py` | `Network_Processor` (`class_definitions.py`) | initialisation and config validation (`TestNetworkProcessorInit`, `TestConfigValidation`, `TestNetworkProcessorConfigReading`), network inputs (`TestGetNetworkConfig`, `TestNetworkInputs`, `TestIndustryNonEnergyShares`), function interface and result validation (`TestNetworkProcessorFunctionExecution`, `TestStatisticsFunctionInterface`, `TestResultValidation`), aggregation and post-processing (`TestNetworkProcessorAggregation`, `TestNetworkProcessorCountryAll`, `TestNetworkProcessorAggregationAndFiltering`, `TestNetworkProcessorDataPostprocessing`, `TestCalculateVariablesValuesAggregation`), output (`TestNetworkProcessorOutputGeneration`, `TestNetworkProcessorFileIO`, `TestOutputNames`) |
+| `test_aggregation.py` | aggregation to countries / regions (C8) | `TestPostprocesslocationWiseMode`, `TestPostprocessTimeseriesMode`, `TestAggregationAllCountries`, `TestOutputFilenameAllCountries`, `TestPyamStructuringAllCountries`, `TestBackwardCompatibilityCountryFilter`, `TestIntensiveAggregation`, `TestCopperplateAndEuropeanUnion` |
+| `test_unit_conversion.py` | unit normalisation and conversion (C9) | `TestCommonDefinitionsConfiguration`, `TestGetUnitFromCommonDefinitions`, `TestConvertUnitsToCommonDefinitions`, `TestUnitNormalisation` |
+| `test_statistics_functions.py` | `statistics_functions.py` | one class per function (e.g. `TestFinalEnergyByCarrierElectricity`, `TestNetImportsOil`, `TestFinalEnergyBySectorIndustry`) and `TestAggregatePerYearFalse` |
+| `test_eval_helpers.py` | `eval_helpers.py` (repository root, scenario comparison helpers) | functions with dummy network classes |
+| `test_format_timestamps.py` | `class_definitions.format_timestamps` | functions |
+| `test_utils.py` | constants in `utils.py` | `TestRegionsCodes` |
+| `test_workflow.py` | `workflow.py` (CLI) | `TestGetDefaultConfigPath`, `TestResolveConfigPath`, `TestBuildParser`, `TestMainWorkflow`, `TestMainGuard`, `TestCLIBehavior` |
+| `test_no_duplicate_test_classes.py` | the test suite itself | fails if two test classes share a name |
 
-Run with coverage:
+## Conventions
 
-```bash
-pytest tests/ --cov=pypsa_validation_processing --cov-report=html
-```
+- Every test has a one-line docstring; tests for a spec acceptance criterion start with its ID, e.g. `"""C1-AC1: …"""`.
+- Tests have no `-> None` return annotation.
+- Prefer the mocks in `conftest.py`; patch `pypsa.NetworkCollection` and `nomenclature.DataStructureDefinition` when constructing a `Network_Processor` from a temporary config.
 
-## Test Structure
+## Adding Tests for a New Statistics Function
 
-### `conftest.py`
-Shared pytest fixtures and mock objects:
-- **`MockStatisticsAccessor`**: Mock PyPSA statistics accessor that simulates `network.statistics.energy_balance()` calls
-- **`MockPyPSANetwork`**: Minimal mock PyPSA Network with required interface for statistics functions
-- **`MockNetworkCollection`**: Mock collection of PyPSA networks
-- **Fixtures**: Reusable fixtures for mock networks and configuration files
+Every test class for a function in `statistics_functions.py` MUST test the output format (C6, `CLAUDE.md` "Testing Rules"):
 
-### `test_statistics_functions.py`
-Tests for `pypsa_validation_processing/statistics_functions.py`:
-
-**`TestFinalEnergyByCarrierElectricity`**:
-- Validates return type (DataFrame)
-- Checks MultiIndex structure (country, unit levels)
-- Verifies non-empty results
-- Confirms numeric value types
-- Tests with multiple networks
-
-**`TestFinalEnergyBySectorTransportation`**:
-- Similar comprehensive coverage as electricity tests
-- Validates sector-specific data extraction
-- Tests multi-network processing
-
-### `test_network_processor.py`
-Tests for `pypsa_validation_processing/class_definitions.py` (`Network_Processor` class):
-
-**`TestNetworkProcessorInit`**:
-- Valid configuration initialization
-- Validation of required config parameters
-- `__repr__` method output
-
-**`TestNetworkProcessorConfigReading`**:
-- YAML configuration file parsing
-- Path validation and error handling
-
-**`TestNetworkProcessorFunctionExecution`**:
-- Function lookup and execution
-- Handling of missing functions
-
-**`TestNetworkProcessorOutputGeneration`**:
-- Output file creation
-- Error handling when no data available
-- Excel file generation
-
-### `test_workflow.py`
-Tests for `pypsa_validation_processing/workflow.py`:
-
-**`TestGetDefaultConfigPath`**:
-- Default config path resolution
-- Path existence and format validation
-
-**`TestResolveConfigPath`**:
-- Configuration path resolution from CLI arguments
-- Tilde expansion
-- Path absolutization
-
-**`TestBuildParser`**:
-- ArgumentParser creation and configuration
-- CLI argument handling
-
-**`TestMainWorkflow`**:
-- Main workflow execution
-- Network_Processor integration
-
-**`TestCLIBehavior`**:
-- Help message generation
-- Error handling for invalid arguments
-
-### `test_utils.py`
-Tests for `pypsa_validation_processing/utils.py`:
-
-**`TestEU27CountryCodes`**:
-- Dictionary structure validation
-- All 27 EU member states present
-- Sample country code mappings
-- EU27 aggregate key presence
-
-## Adding Tests for New Statistics Functions
-
-When you add a new function to `pypsa_validation_processing/statistics_functions.py`, follow these steps:
-
-### Step 1: Create the Function
-Add your function to `pypsa_validation_processing/statistics_functions.py`:
-
-```python
-def My_New_IAMC_Variable(n: pypsa.Network) -> pd.DataFrame:
-    """Extract IAMC variable from PyPSA Network.
-    
-    Parameters
-    ----------
-    n : pypsa.Network
-        PyPSA Network to extract data from
-    
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with MultiIndex including 'country' and 'unit'
-    """
-    # Implementation here
-    result = n.statistics.energy_balance(...)
-    return result.groupby(["country", "unit"]).sum()
-```
-
-### Step 2: Update the Mapping File
-Add the function mapping to `pypsa_validation_processing/configs/mapping.default.yaml`:
-
-```yaml
-My New IAMC Variable: My_New_IAMC_Variable
-```
-
-### Step 3: Add Test Class
-In `tests/test_statistics_functions.py`, add a new test class for your function:
+- `aggregate_per_year=True`: a `pd.Series` with a MultiIndex containing `location` and `unit`.
+- `aggregate_per_year=False`: a `pd.DataFrame` with snapshots as columns and a MultiIndex containing `location` and `unit`, not a `pd.Series`.
+- The MultiIndex MAY contain more levels. Values that are all zero or all NaN are valid; zero rows are not (C6.7).
 
 ```python
 class TestMyNewIamcVariable:
-    """Test suite for My_New_IAMC_Variable function."""
+    """Tests for My_New_IAMC_Variable."""
 
-    def test_returns_dataframe(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas DataFrame."""
-        result = My_New_IAMC_Variable(mock_network)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_has_country_and_unit_index(self, mock_network: MockPyPSANetwork):
-        """Test that result has country and unit in the index."""
-        result = My_New_IAMC_Variable(mock_network)
-        assert "country" in result.index.names
-        assert "unit" in result.index.names
-
-    def test_not_empty(self, mock_network: MockPyPSANetwork):
-        """Test that result is not empty."""
-        result = My_New_IAMC_Variable(mock_network)
+    def test_yearly_output_format(self, mock_network: MockPyPSANetwork):
+        """C6: aggregate_per_year=True returns a Series indexed by location and unit."""
+        result = My_New_IAMC_Variable(mock_network, aggregate_per_year=True)
+        assert isinstance(result, pd.Series)
+        assert {"location", "unit"} <= set(result.index.names)
         assert len(result) > 0
 
-    def test_numeric_values(self, mock_network: MockPyPSANetwork):
-        """Test that result values are numeric."""
-        result = My_New_IAMC_Variable(mock_network)
-        assert pd.api.types.is_numeric_dtype(result.dtype)
-
-    def test_contains_austria(self, mock_network: MockPyPSANetwork):
-        """Test that result contains Austria (AT) data."""
-        result = My_New_IAMC_Variable(mock_network)
-        assert "AT" in result.index.get_level_values("country")
+    def test_timeseries_output_format(self, mock_network: MockPyPSANetwork):
+        """C6: aggregate_per_year=False returns a DataFrame with snapshot columns."""
+        result = My_New_IAMC_Variable(mock_network, aggregate_per_year=False)
+        assert isinstance(result, pd.DataFrame)
+        assert {"location", "unit"} <= set(result.index.names)
 ```
 
-### Step 4: Run Tests
-Verify your new tests pass:
-
-```bash
-pytest tests/test_statistics_functions.py::TestMyNewIamcVariable -v
-```
-
-## Test Coverage Goals
-
-- **statistics_functions.py**: 100% - Each function must have dedicated test class
-- **Network_Processor class**: Unit tests for all public methods
-- **workflow.py**: Tests for CLI argument parsing and main execution
-- **utils.py**: Tests for constant definitions and mappings
-
-## Mock Objects
-
-The test suite uses mock PyPSA objects to avoid requiring actual network files:
-
-- **`MockStatisticsAccessor`**: Simulates `network.statistics.energy_balance()` with realistic MultiIndex structure
-- **`MockPyPSANetwork`**: Minimal network with metadata and statistics interface
-- **`MockNetworkCollection`**: Iterable collection of mock networks
-
-These mocks provide sufficient interface for testing without network file dependencies.
+Register the function in `pypsa_validation_processing/configs/mapping.default.yaml` (`My New IAMC Variable: My_New_IAMC_Variable`) and run `pixi run pytest tests/test_statistics_functions.py::TestMyNewIamcVariable -v`.

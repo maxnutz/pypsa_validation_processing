@@ -22,13 +22,13 @@ pytest = ">=7.0"
 pytest-cov = ">=4.0"
 pytest-mock = ">=3.0"
 openpyxl = ">=3.0"
-requests = ">=2.20"
 black = ">=26.5.1,<27"
 
 [pypi-dependencies]
 pandas = ">=1.0.0"
 pyam-iamc = ">=2.0.0"
 nomenclature-iamc = ">=0.29"
+pypsa = ">=1.1"
 pypsa-validation-processing = { path = ".", editable = true }
 mkdocs = ">=1.6"
 mkdocs-material = ">=9.5"

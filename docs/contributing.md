@@ -6,7 +6,7 @@ This package computes IAMC variables from PyPSA network results and is part of t
 
 ## Code Style
 
-- Python ≥ 3.12; type hints are required in all function signatures.
+- Python ≥ 3.11 (`pixi.toml` is authoritative); type hints are required in all function signatures.
 - Docstrings follow the NumPy style (no type hints in docstrings — they belong in the signature).
 - Format code with `pixi run black .` before opening a pull request.
 
