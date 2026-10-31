@@ -1,4 +1,5 @@
 from __future__ import annotations
+import ast
 import datetime
 import glob
 import importlib
@@ -1176,8 +1177,33 @@ class Network_Processor:
             return self._aggregate_to_country(result)
         return self._filter_to_regions(result)
 
-    def _map_unit_level(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Map the ``unit`` index level using ``UNITS_MAPPING``."""
+    def _map_unit_level(self, data: pd.DataFrame, variable: str) -> pd.DataFrame:
+        """Normalise the ``unit`` index level using ``UNITS_MAPPING`` (C9.1).
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame with a ``unit`` index level (or a plain ``unit`` index).
+        variable : str
+            IAMC variable the data belongs to, used in the message.
+
+        Returns
+        -------
+        pd.DataFrame
+            *data* with normalised units.
+
+        Raises
+        ------
+        ValueError
+            If a unit is not a key of ``UNITS_MAPPING``; it never becomes NaN.
+        """
+        units = data.index.get_level_values("unit")
+        unknown = sorted(set(units) - set(UNITS_MAPPING), key=str)
+        if unknown:
+            raise ValueError(
+                f"Variable '{variable}': units {unknown} are not keys of "
+                "UNITS_MAPPING (C9.1)."
+            )
         if isinstance(data.index, pd.MultiIndex):
             idx_frame = data.index.to_frame(index=False)
             idx_frame["unit"] = idx_frame["unit"].map(UNITS_MAPPING)
@@ -1258,9 +1284,21 @@ class Network_Processor:
         -------
         pd.DataFrame
             Sums grouped by :meth:`_postprocess_group_levels`.
+
+        Raises
+        ------
+        ValueError
+            If a unit is unknown, or the variable has several units after
+            normalisation, also without unit conversion (C9.5).
         """
         processed = self._select_aggregation_result(result)
-        processed = self._map_unit_level(processed)
+        processed = self._map_unit_level(processed, variable)
+        units = processed.index.get_level_values("unit").unique()
+        if len(units) > 1:
+            raise ValueError(
+                f"Variable '{variable}' has several units after normalisation: "
+                f"{sorted(units)} (C9.5)."
+            )
 
         df = pd.concat({variable: processed}, names=["variable"])
         return df.groupby(self._postprocess_group_levels()).sum()
@@ -1426,6 +1464,9 @@ class Network_Processor:
             If the variable is not found in the common definitions.
         KeyError
             If the unit is not found for the variable in the common definitions.
+        ValueError
+            If a list of several units cannot be parsed; there is no fallback
+            unit (C9.3).
         RuntimeError
             If ``self.common_dsd`` is not initialized.
 
@@ -1468,17 +1509,13 @@ class Network_Processor:
                 variable,
             )
             try:
-                import ast
-
                 target_unit = ast.literal_eval(target_unit)[0]
-                logger.info(target_unit)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to parse multiple units for variable '%s': %s. Using TJ as unit.",
-                    variable,
-                    exc,
-                )
-                target_unit = "TJ"
+            except (ValueError, SyntaxError, TypeError, IndexError) as exc:
+                raise ValueError(
+                    f"Cannot parse the unit list {target_unit!r} of variable "
+                    f"'{variable}' in the definitions (C9.3): {exc}"
+                ) from exc
+            logger.info(target_unit)
         return str(target_unit)
 
     @staticmethod

@@ -166,7 +166,7 @@ Return format rules:
 
 Post-processing behavior:
 
-- The post-processing step extracts and maps units to IAMC-valid units and sums values where needed. Do not mix energy and emissions units in one statement.
+- The post-processing step normalises units via `utils.UNITS_MAPPING` (e.g. `MWh_el` → `MWh`) and sums values where needed. A unit that is not a key of `UNITS_MAPPING`, or several units for one variable after normalisation, raise a `ValueError` (also with `convert_units: false`). Do not mix energy and emissions units in one statement.
 - Depending on config value `aggregation_level`, post-processing groups to country level (`country`) or keeps regional granularity (`region`).
 
 #### Example output

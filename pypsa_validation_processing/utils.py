@@ -173,9 +173,10 @@ UNITS_MAPPING = {
     "MWh_el": "MWh",
     "MWh_LHV": "MWh",
     "MWh_th": "MWh",
+    # carrier label, not a unit (C9.1); kept until D7 sets MWh_LHV for
+    # `land transport oil` in Final Energy|Oil and |Transportation (SC-9)
     "land transport": "MWh",
     "t_co2": "t",
-    "": "",
     "MWh": "MWh",
 }
 

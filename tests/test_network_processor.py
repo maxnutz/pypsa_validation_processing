@@ -1316,10 +1316,9 @@ output_path: {tmp_path / 'output.xlsx'}
             ),
         )
 
-        result = processor._map_unit_level(data)
+        result = processor._map_unit_level(data, "Var")
 
-        # MWh_el and MWh_th should be mapped according to UNITS_MAPPING
-        assert result.index.get_level_values("unit").tolist() != ["MWh_el", "MWh_th"]
+        assert result.index.get_level_values("unit").tolist() == ["MWh", "MWh"]
 
     def test_postprocess_group_levels_country_mode_specific_country(
         self, tmp_path: Path

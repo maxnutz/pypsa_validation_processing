@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,7 @@ import pyam
 import pytest
 
 from pypsa_validation_processing.class_definitions import Network_Processor
+from pypsa_validation_processing.utils import UNITS_MAPPING
 
 
 def _make_config(tmp_path: Path, extra: str = "") -> Path:
@@ -203,14 +205,16 @@ class TestGetUnitFromCommonDefinitions:
         )
         assert processor._get_unit_from_common_definitions("A") == "GWh"
 
-    def test_falls_back_to_tj_for_malformed_multi_unit_string(
+    def test_raises_for_malformed_multi_unit_string(
         self, processor: Network_Processor
     ):
+        """C9.3: an unparsable unit list raises ValueError, no TJ fallback (SC-10)."""
         processor.common_dsd = MagicMock()
         processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
             {"variable": ["A"], "unit": ["[TJ, GWh]"]}
         )
-        assert processor._get_unit_from_common_definitions("A") == "TJ"
+        with pytest.raises(ValueError, match="Cannot parse the unit list"):
+            processor._get_unit_from_common_definitions("A")
 
     def test_raises_keyerror_for_nan_unit(self, processor: Network_Processor):
         """The NaN check runs before the bracket-parsing check, so a NaN unit
@@ -380,3 +384,60 @@ class TestConvertUnitsToCommonDefinitions:
 
         iam_df = processor.structure_pyam_from_pandas(df)
         assert iam_df.unit == ["TWh/yr"]
+
+
+def _unit_result(rows: list[tuple[str, str, float]]) -> pd.DataFrame:
+    """Statistics result with levels location and unit and a value column."""
+    index = pd.MultiIndex.from_tuples(
+        [(loc, unit) for loc, unit, _ in rows], names=["location", "unit"]
+    )
+    return pd.DataFrame({"value": [v for _, _, v in rows]}, index=index)
+
+
+class TestUnitNormalisation:
+    """Tests for unit validation and normalisation in post-processing (C9.1, C9.5)."""
+
+    def test_units_mapping_has_no_empty_unit(self):
+        """C9-AC2c (part): UNITS_MAPPING does not contain the key ''."""
+        assert "" not in UNITS_MAPPING
+
+    @pytest.mark.parametrize("unit", ["foo", ""])
+    def test_unknown_unit_raises(self, processor: Network_Processor, unit: str):
+        """C9-AC2, C9-AC2b: a unit outside UNITS_MAPPING raises ValueError naming variable and unit."""
+        result = _unit_result([("AT1", unit, 1.0)])
+        with pytest.raises(ValueError, match=f"Variable 'Var'.*{re.escape(repr(unit))}"):
+            processor._postprocess_statistics_result("Var", result)
+
+    def test_several_units_raise_without_conversion(self, tmp_path: Path):
+        """C9-AC4: rows in MWh and t raise ValueError also with convert_units: false (SC-24)."""
+        config_path = _make_config(tmp_path, extra="convert_units: false")
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+            ),
+            patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ),
+        ):
+            processor = Network_Processor(config_path=config_path)
+        assert processor.common_dsd is None
+        result = _unit_result([("AT1", "MWh_el", 1.0), ("AT2", "t_co2", 2.0)])
+        with pytest.raises(ValueError, match="several units"):
+            processor._postprocess_statistics_result("Var", result)
+
+    def test_normalised_unit_without_conversion(self, tmp_path: Path):
+        """C9-AC6: with convert_units: false, a MWh_el result is output as MWh."""
+        config_path = _make_config(tmp_path, extra="convert_units: false")
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+            ),
+            patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ),
+        ):
+            processor = Network_Processor(config_path=config_path)
+        result = _unit_result([("AT1", "MWh_el", 1.0), ("AT2", "MWh_th", 2.0)])
+        out = processor._postprocess_statistics_result("Var", result)
+        assert out.index.get_level_values("unit").tolist() == ["MWh"]
+        assert out["value"].tolist() == [3.0]
