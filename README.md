@@ -91,7 +91,7 @@ Output goes to the directory `output_path` (default `resources`, created if miss
 - `aggregate_per_year: false` writes one folder `PYPSA_timeseries_<name>/` with one file `PYPSA_<name>_<year>.xlsx` per investment year.
 - Runs that differ only in `aggregation_level` do not overwrite each other; files with the same name are overwritten.
 - Generated output file and folder names are sanitized (whitespace collapsed to `_`).
-- Time series columns are timezone-aware timestamps in UTC (`+00:00`); the year of every snapshot is replaced by the investment year.
+- Time series columns are timezone-aware timestamps: timezone-naive snapshots are labeled UTC (`+00:00`), timezone-aware snapshots keep their timezone (no conversion). The year of every snapshot is replaced by the investment year.
 
 ## Project structure
 
