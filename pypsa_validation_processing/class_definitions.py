@@ -1140,8 +1140,11 @@ class Network_Processor:
             result = pd.DataFrame(
                 result.values, index=new_index, columns=result.columns
             )
-            return result.groupby(["country", "unit"]).sum()
-        return result.loc[self._country_mask(result)].groupby("unit").sum()
+            # dropna=False keeps null units, so _map_unit_level rejects them
+            return result.groupby(["country", "unit"], dropna=False).sum()
+        return (
+            result.loc[self._country_mask(result)].groupby("unit", dropna=False).sum()
+        )
 
     def _country_mask(self, result: pd.DataFrame) -> list[bool]:
         """Return which rows of *result* belong to the configured country (C8).
