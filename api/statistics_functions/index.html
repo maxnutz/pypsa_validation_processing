@@ -1334,7 +1334,7 @@ based on the <code>aggregation_level</code> configuration by the name of the ent
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Coal" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
@@ -1404,7 +1404,7 @@ based on the <code>aggregation_level</code> configuration by the name of the ent
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span> | None</code>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1425,7 +1425,8 @@ Network_Processor._aggregate_to_country() if configured.</p>
   <summary>Notes</summary>
   <p>This function includes only the Final Energy consumption of coal. This excludes
 coal for electricity or CHP, but only focuses on the carrier <code>coal for industry</code>
-as Final Energy of Coal. Return None, if this carrier is not present in the network.</p>
+as Final Energy of Coal. If this carrier is not present in the network, every
+location gets <code>0.0</code> with unit <code>MWh</code> (C6.13).</p>
 </details>
 
     </div>
