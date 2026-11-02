@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 import re
 import yaml
+import numpy as np
 import pandas as pd
 import pypsa
 import nomenclature
@@ -981,15 +982,15 @@ class Network_Processor:
         Raises
         ------
         ValueError
-            If the result violates C6.1, C6.2, C6.4–C6.7 or C6.10 (no
-            ``quantity`` level), naming the variable and the violation.
+            If the result violates C6.1, C6.2, C6.4–C6.7 or C6.10–C6.12
+            (``quantity`` level), naming the variable and the violation.
         """
         expected = pd.Series if self.aggregate_per_year else pd.DataFrame
         violation = None
         if not isinstance(result, expected):
             violation = (
                 f"expected pd.{expected.__name__} for aggregate_per_year="
-                f"{self.aggregate_per_year}, got {type(result).__name__}"
+                f"{self.aggregate_per_year}, got {type(result).__name__} (C6.1, C6.2)"
             )
         elif not isinstance(result.index, pd.MultiIndex) or not {
             "location",
@@ -997,17 +998,19 @@ class Network_Processor:
         }.issubset(result.index.names):
             violation = (
                 "index must be a MultiIndex with levels 'location' and 'unit', "
-                f"got {list(result.index.names)}"
+                f"got {list(result.index.names)} (C6.1, C6.2)"
             )
         elif result.empty:
-            violation = "result has zero rows"
+            violation = "result has zero rows (C6.7)"
+        # Only the values are checked; ``location`` and ``unit`` are index
+        # levels (checked above), not columns, so they never enter the dtypes.
         elif not all(
             pd.api.types.is_numeric_dtype(dtype)
             for dtype in (
                 [result.dtype] if isinstance(result, pd.Series) else result.dtypes
             )
         ):
-            violation = "values must be numeric"
+            violation = "values must be numeric (C6.4)"
         else:
             violation = self._invalid_quantity_level(
                 result, self.aggregation_classes.get(variable, "flow")
@@ -1092,7 +1095,9 @@ class Network_Processor:
             or u not in UNITS_MAPPING
         ]
         if invalid_units:
-            return f"invalid units {invalid_units} (C9.1)"
+            return f"invalid units {invalid_units} (C6.5, C9.1)"
+        if "location" not in n.buses.columns:
+            return "the network has no column 'location' in n.buses (C6.6)"
         locations = set(n.buses.location.dropna()) - {""}
         invalid_locations = [
             loc
@@ -1100,11 +1105,14 @@ class Network_Processor:
             if loc not in locations
         ]
         if invalid_locations:
-            return f"locations {invalid_locations} are not in n.buses.location"
+            return f"locations {invalid_locations} are not in n.buses.location (C6.6)"
         if isinstance(result, pd.DataFrame):
             foreign = result.columns[~result.columns.isin(n.snapshots)]
             if len(foreign):
-                return f"columns {list(foreign[:3])} are not snapshots of the network"
+                return (
+                    f"columns {list(foreign[:3])} are not snapshots of the "
+                    "network (C6.2)"
+                )
         return None
 
     def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
@@ -1121,7 +1129,8 @@ class Network_Processor:
         pd.DataFrame
             When ``self.country`` is a specific code: DataFrame with
             MultiIndex containing only the ``unit`` level (regions filtered to
-            the configured country and summed).
+            the configured country and summed). ``country: EU`` sums the
+            locations of the 27 member states (C8.8).
 
             When ``self.country == "all"``: DataFrame with MultiIndex
             ``["country", "unit"]`` where each country's regions are summed
@@ -1146,7 +1155,7 @@ class Network_Processor:
             result.loc[self._country_mask(result)].groupby("unit", dropna=False).sum()
         )
 
-    def _country_mask(self, result: pd.DataFrame) -> list[bool]:
+    def _country_mask(self, result: pd.DataFrame) -> np.ndarray:
         """Return which rows of *result* belong to the configured country (C8).
 
         ``country: EU`` selects the locations of the 27 member states
@@ -1159,13 +1168,13 @@ class Network_Processor:
 
         Returns
         -------
-        list[bool]
-            One flag per row.
+        np.ndarray
+            One boolean flag per row.
         """
         locations = result.index.get_level_values("location")
         if self.country == "EU":
-            return [loc[:2] in EU_MEMBER_STATES for loc in locations]
-        return [loc.startswith(self.country) for loc in locations]
+            return locations.str[:2].isin(EU_MEMBER_STATES)
+        return locations.str.startswith(self.country)
 
     def _filter_to_regions(self, result: pd.DataFrame) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
@@ -1184,8 +1193,10 @@ class Network_Processor:
         Notes
         -----
         When ``self.country == "all"``, all regions are returned without
-        filtering.  When a specific country code is configured, only regions
-        whose location starts with that code are returned.
+        filtering.  When ``self.country == "EU"``, only locations whose
+        two-character country code is an EU member state are returned (C8.8).
+        For any other specific country code, only locations starting with that
+        code are returned.
         """
         if self.country == "all":
             return result
@@ -1259,7 +1270,8 @@ class Network_Processor:
         ``flow`` and ``stock`` variables are summed. ``intensive`` variables
         (C4.5) are aggregated as weighted mean Σ vᵢ·wᵢ / Σ wᵢ using their
         ``weight`` rows; a group with Σ wᵢ = 0 gets ``0.0``. The ``quantity``
-        level and the ``weight`` rows are dropped (C8.2, C8.6).
+        level and the ``weight`` rows are dropped (C8.2, C8.6). NaN values
+        and weights (e.g. a carrier missing in a region) count as ``0.0``.
 
         When ``self.aggregate_per_year`` is ``True`` the input *result* is a
         :class:`pandas.Series` and a ``"value"`` column is produced.
@@ -1701,7 +1713,6 @@ class Network_Processor:
                 else list(self.functions_dict.keys())
             )
             results = []
-            dropped_copperplate = False
             for variable in variables:
                 result = self._execute_function_for_variable(
                     variable,
@@ -1724,20 +1735,13 @@ class Network_Processor:
                         result.index.get_level_values("location")
                         == COPPERPLATE_LOCATION
                     )
-                    if copperplate.any():
-                        result = result.loc[~copperplate]
-                        dropped_copperplate = True
+                    result = result.loc[~copperplate]
+                    if result.empty:
+                        continue
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
 
-            if dropped_copperplate:
-                logger.info(
-                    "Network of investment year %s: dropped the copperplate "
-                    "pseudo-location '%s' from all results (C8.7).",
-                    investment_year,
-                    COPPERPLATE_LOCATION,
-                )
             if results:
                 year_df = pd.concat(results, ignore_index=False)
                 if self.aggregate_per_year:

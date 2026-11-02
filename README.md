@@ -213,11 +213,11 @@ The short form `<variable>: <function>` is the aggregation class `flow`. The lon
 Prices|Final Energy|Electricity: {function: Prices__Final_Energy__Electricity, aggregation: intensive}
 ```
 
-| Class | Over time (inside the function) | Over regions and extra index levels (post-processing) |
-|---|---|---|
-| `flow` (default) | sum over snapshots, weighted | sum |
-| `stock` | end-of-year value | sum |
-| `intensive` | weighted mean, computed by the function | weighted mean; the result carries an index level `quantity` with paired `value` and `weight` rows |
+| Class | Over time (inside the function) | Over regions and extra index levels (post-processing) | PyPSA examples |
+|---|---|---|---|
+| `flow` (default) | sum over snapshots, weighted | sum | energy withdrawn by loads, generator output, link flows (`n.statistics.energy_balance`, `n.statistics.supply`) |
+| `stock` | end-of-year value; time series: value per snapshot, last column = yearly value | sum | installed capacity (`n.statistics.optimal_capacity`), energy level of stores (`n.stores_t.e`) |
+| `intensive` | weighted mean, computed by the function | weighted mean; the result carries an index level `quantity` with paired `value` and `weight` rows | bus prices (`n.buses_t.marginal_price`) weighted by withdrawn energy, capacity factors (`n.statistics.capacity_factor`) weighted by capacity |
 
 Any other entry (missing `function`, unknown key, unknown class, a list) raises a `ValueError` naming the variable.
 
