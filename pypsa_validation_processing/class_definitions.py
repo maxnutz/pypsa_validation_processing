@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 import re
 import yaml
+import numpy as np
 import pandas as pd
 import pypsa
 import nomenclature
@@ -1080,7 +1081,8 @@ class Network_Processor:
         pd.DataFrame
             When ``self.country`` is a specific code: DataFrame with
             MultiIndex containing only the ``unit`` level (regions filtered to
-            the configured country and summed).
+            the configured country and summed). ``country: EU`` sums the
+            locations of the 27 member states (C8.8).
 
             When ``self.country == "all"``: DataFrame with MultiIndex
             ``["country", "unit"]`` where each country's regions are summed
@@ -1102,7 +1104,7 @@ class Network_Processor:
             return result.groupby(["country", "unit"]).sum()
         return result.loc[self._country_mask(result)].groupby("unit").sum()
 
-    def _country_mask(self, result: pd.DataFrame) -> list[bool]:
+    def _country_mask(self, result: pd.DataFrame) -> np.ndarray:
         """Return which rows of *result* belong to the configured country (C8).
 
         ``country: EU`` selects the locations of the 27 member states
@@ -1115,13 +1117,13 @@ class Network_Processor:
 
         Returns
         -------
-        list[bool]
-            One flag per row.
+        np.ndarray
+            One boolean flag per row.
         """
         locations = result.index.get_level_values("location")
         if self.country == "EU":
-            return [loc[:2] in EU_MEMBER_STATES for loc in locations]
-        return [loc.startswith(self.country) for loc in locations]
+            return locations.str[:2].isin(EU_MEMBER_STATES)
+        return locations.str.startswith(self.country)
 
     def _filter_to_regions(self, result: pd.DataFrame) -> pd.DataFrame:
         """Filter a regional Series to the all regions of the given country.
@@ -1140,8 +1142,10 @@ class Network_Processor:
         Notes
         -----
         When ``self.country == "all"``, all regions are returned without
-        filtering.  When a specific country code is configured, only regions
-        whose location starts with that code are returned.
+        filtering.  When ``self.country == "EU"``, only locations whose
+        two-character country code is an EU member state are returned (C8.8).
+        For any other specific country code, only locations starting with that
+        code are returned.
         """
         if self.country == "all":
             return result
@@ -1622,7 +1626,6 @@ class Network_Processor:
                 else list(self.functions_dict.keys())
             )
             results = []
-            dropped_copperplate = False
             for variable in variables:
                 result = self._execute_function_for_variable(
                     variable,
@@ -1645,20 +1648,13 @@ class Network_Processor:
                         result.index.get_level_values("location")
                         == COPPERPLATE_LOCATION
                     )
-                    if copperplate.any():
-                        result = result.loc[~copperplate]
-                        dropped_copperplate = True
+                    result = result.loc[~copperplate]
+                    if result.empty:
+                        continue
                     results.append(
                         self._postprocess_statistics_result(variable, result)
                     )
 
-            if dropped_copperplate:
-                logger.info(
-                    "Network of investment year %s: dropped the copperplate "
-                    "pseudo-location '%s' from all results (C8.7).",
-                    investment_year,
-                    COPPERPLATE_LOCATION,
-                )
             if results:
                 year_df = pd.concat(results, ignore_index=False)
                 if self.aggregate_per_year:
