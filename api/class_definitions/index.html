@@ -1175,15 +1175,18 @@ in <em>df</em> is used directly.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Write the computed IAMC data to an Excel file (or files).</p>
+        <p>Write the computed IAMC data to an Excel file (or files) (C10).</p>
+<p><code>&lt;name&gt;</code> is <code>&lt;model&gt;_&lt;scenario&gt;_&lt;level&gt;[_&lt;country&gt;]</code>
+(:meth:<code>_output_name</code>), <code>&lt;level&gt;</code> the <code>aggregation_level</code>.</p>
 <ul>
 <li>When <code>aggregate_per_year=True</code>: writes a single file
-  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_{model}_{scenario}_{country}.xlsx</code>.</li>
+  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_&lt;name&gt;.xlsx</code>.</li>
 <li>When <code>aggregate_per_year=False</code>: creates a sub-folder
-  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_timeseries_{model}_{scenario}_{country}/</code>
+  <code>&lt;self.path_dsd_with_values&gt;/PYPSA_timeseries_&lt;name&gt;/</code>
   and writes one file per investment year named
-  <code>PYPSA_{model}_{scenario}_{country}_{year}.xlsx</code>.</li>
+  <code>PYPSA_&lt;name&gt;_&lt;year&gt;.xlsx</code>.</li>
 </ul>
+<p>The output directory is created if it does not exist.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>

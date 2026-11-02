@@ -977,7 +977,7 @@
 <p>This package computes IAMC variables from PyPSA network results and is part of the PyPSA-AT project (PyPSA-AT – a nationally tailored, fully sector-coupled energy system model for Austria). The initial set of IAMC variables is defined in <a href="https://github.com/iiasa/energy-scenarios-at-workflow">energy-scenarios-at-workflow</a>.</p>
 <h2 id="code-style">Code Style</h2>
 <ul>
-<li>Python ≥ 3.12; type hints are required in all function signatures.</li>
+<li>Python ≥ 3.11 (<code>pixi.toml</code> is authoritative); type hints are required in all function signatures.</li>
 <li>Docstrings follow the NumPy style (no type hints in docstrings — they belong in the signature).</li>
 <li>Format code with <code>pixi run black .</code> before opening a pull request.</li>
 </ul>
@@ -1041,7 +1041,7 @@
 <ul>
 <li>Tests live only in <code>tests/</code> — see the <a href="https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md">testing README</a>.</li>
 <li>Write unit tests that test small, isolated logic.</li>
-<li>Every test for a function in <code>statistics_functions.py</code> must assert the output format: a <code>pandas.Series</code> with a MultiIndex containing at least <code>country</code> and <code>unit</code> (it can include more levels).</li>
+<li>Every test for a function in <code>statistics_functions.py</code> must assert the output format: a <code>pandas.Series</code> (<code>aggregate_per_year=True</code>) or a <code>pandas.DataFrame</code> with snapshots as columns (<code>aggregate_per_year=False</code>), with a MultiIndex containing at least <code>location</code> and <code>unit</code> (it can include more levels).</li>
 </ul>
 <h2 id="contribution-workflow">Contribution Workflow</h2>
 <ol>
