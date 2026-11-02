@@ -221,21 +221,11 @@ class Network_Processor:
         self._validate_config()
 
         self.network_results_path: Path = Path(self.config["network_results_path"])
-        if not self.network_results_path.exists():
-            raise FileNotFoundError(
-                f"Network results folder does not exist: {self.network_results_path}"
-            )
-
         definitions_path = self.config["definitions_path"]
-        self.use_definitions: bool = not self._is_definitions_disabled(definitions_path)
-        if self.use_definitions:
-            self.definitions_path: Path | None = Path(definitions_path)
-            if not self.definitions_path.exists():
-                raise FileNotFoundError(
-                    f"Definition folder does not exist: {self.definitions_path}"
-                )
-        else:
-            self.definitions_path = None
+        self.use_definitions: bool = self._uses_definitions(definitions_path)
+        self.definitions_path: Path | None = (
+            Path(definitions_path) if self.use_definitions else None
+        )
 
         default_mappings_path = (
             Path(__file__).resolve().parent / "configs" / "mapping.default.yaml"
@@ -325,6 +315,8 @@ class Network_Processor:
             If the config is not a mapping, a required key is missing, ``null``
             or empty, or a key has a wrong data type or a value outside the
             allowed values.
+        FileNotFoundError
+            If the results or definitions folder does not exist (C1.5).
         """
         if not isinstance(self.config, dict):
             raise ValueError(
@@ -359,15 +351,42 @@ class Network_Processor:
             )
         if self.config.get("aggregation_level", "country") not in ("country", "region"):
             raise self._config_error("aggregation_level", "'country' or 'region'")
+        self._validate_config_paths()
+
+    def _validate_config_paths(self) -> None:
+        """Check that the configured results and definitions folders exist (C1.5).
+
+        ``mapping_path`` is checked when the mapping file is read.
+
+        Raises
+        ------
+        FileNotFoundError
+            If ``network_results_path`` or ``definitions_path`` (unless
+            disabled) does not exist.
+        """
+        network_results_path = Path(self.config["network_results_path"])
+        if not network_results_path.exists():
+            raise FileNotFoundError(
+                f"Network results folder does not exist: {network_results_path}"
+            )
+        definitions_path = self.config["definitions_path"]
+        if (
+            self._uses_definitions(definitions_path)
+            and not Path(definitions_path).exists()
+        ):
+            raise FileNotFoundError(
+                f"Definition folder does not exist: {definitions_path}"
+            )
 
     @staticmethod
-    def _is_definitions_disabled(value: object) -> bool:
-        """Check whether a definitions_path config value requests disabling definitions."""
-        if isinstance(value, bool):
-            return value is False
-        if isinstance(value, str):
-            return value.strip().lower() == "false"
-        return False
+    def _uses_definitions(definitions_path: str | bool) -> bool:
+        """Return ``False`` if ``definitions_path`` disables definitions (C3).
+
+        After :meth:`_validate_config` the value is a path string, ``False``
+        or the string ``"false"`` (any case); ``str(False)`` is ``"False"``,
+        so one string comparison covers both disabled forms.
+        """
+        return str(definitions_path).strip().lower() != "false"
 
     def _read_config(self) -> dict:
         """Read and return the YAML configuration file."""
