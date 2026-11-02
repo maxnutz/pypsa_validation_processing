@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+from math import nan
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -457,6 +457,22 @@ class TestIntensiveAggregation:
             ("Price", "AT2", "EUR/MWh"): 0.0,
         }
 
+    def test_weights_need_not_sum_to_one(self, tmp_path: Path):
+        """C8.2: Σ vᵢ·wᵢ / Σ wᵢ normalises itself; scaling all weights keeps the mean."""
+        result = self._ac6_input()
+        weight_rows = result.index.get_level_values("quantity") == "weight"
+        result.loc[weight_rows, "value"] *= 1000.0
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
+
+    def test_nan_counts_as_zero(self, tmp_path: Path):
+        """C8.2: NaN value and weight (carrier missing in a region) count as 0.0."""
+        result = _intensive(
+            [("AT1", "EUR/MWh", 10.0, 1.0), ("AT2", "EUR/MWh", nan, nan)]
+        )
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 10.0}
+
     def test_timeseries_per_column(self, tmp_path: Path):
         """C8-AC5: the weighted mean is computed per snapshot column."""
         result = self._ac6_input()
@@ -495,10 +511,10 @@ class TestCopperplateAndEuropeanUnion:
     def _run(
         self,
         tmp_path: Path,
-        caplog,
         country: str,
         aggregation_level: str = "country",
         map_names: bool = False,
+        copperplate_only_var: bool = False,
     ) -> dict:
         (tmp_path / "networks").mkdir()
         (tmp_path / "networks" / "n_2030.nc").touch()
@@ -529,37 +545,45 @@ map_country_codes_to_names: {str(map_names).lower()}
         ):
             processor = Network_Processor(config_path=config_file)
         processor.functions_dict = {"Var": "f"}
-        with (
-            patch(
-                "pypsa_validation_processing.class_definitions.importlib.import_module",
-                return_value=MagicMock(f=lambda n, aggregate_per_year=True: result),
+        copperplate_result = pd.Series(
+            [-8.0],
+            index=pd.MultiIndex.from_tuples(
+                [("EU", "MWh")], names=["location", "unit"]
             ),
-            caplog.at_level(logging.INFO),
+        )
+        if copperplate_only_var:
+            processor.functions_dict["Copperplate Var"] = "g"
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(
+                f=lambda n, aggregate_per_year=True: result,
+                g=lambda n, aggregate_per_year=True: copperplate_result,
+            ),
         ):
             processor.calculate_variables_values()
         data = processor.dsd_with_values.data
+        assert set(data["variable"]) == {"Var"}
         return dict(zip(data["region"], data["value"]))
 
-    def test_country_all_drops_copperplate(self, tmp_path: Path, caplog):
-        """C8-AC9: country/all has no EU row, and one INFO names the dropped location."""
-        assert self._run(tmp_path, caplog, "all") == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
-        infos = [
-            r.message
-            for r in caplog.records
-            if r.levelno == logging.INFO and "copperplate" in r.message
-        ]
-        assert len(infos) == 1 and "'EU'" in infos[0]
+    def test_country_all_drops_copperplate(self, tmp_path: Path):
+        """C8-AC9: country/all has no EU row."""
+        assert self._run(tmp_path, "all") == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
 
-    def test_country_eu_aggregates_member_states(self, tmp_path: Path, caplog):
+    def test_copperplate_only_variable_is_skipped(self, tmp_path: Path):
+        """C8.7: a variable with only the copperplate location produces no rows."""
+        out = self._run(tmp_path, "all", copperplate_only_var=True)
+        assert out == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
+
+    def test_country_eu_aggregates_member_states(self, tmp_path: Path):
         """C8-AC9: country/EU sums the member states AT and DE, without CH and the copperplate."""
-        assert self._run(tmp_path, caplog, "EU") == {"EU": 3.0}
+        assert self._run(tmp_path, "EU") == {"EU": 3.0}
 
-    def test_region_eu_keeps_member_state_locations(self, tmp_path: Path, caplog):
+    def test_region_eu_keeps_member_state_locations(self, tmp_path: Path):
         """C8-AC9: region/EU keeps one row per member-state location."""
-        out = self._run(tmp_path, caplog, "EU", aggregation_level="region")
+        out = self._run(tmp_path, "EU", aggregation_level="region")
         assert out == {"AT1": 1.0, "DE1": 2.0}
 
-    def test_country_eu_mapped_to_name(self, tmp_path: Path, caplog):
+    def test_country_eu_mapped_to_name(self, tmp_path: Path):
         """C8-AC10: with mapped names, the region is European Union and excludes the copperplate."""
-        out = self._run(tmp_path, caplog, "EU", map_names=True)
+        out = self._run(tmp_path, "EU", map_names=True)
         assert out == {"European Union": 3.0}
