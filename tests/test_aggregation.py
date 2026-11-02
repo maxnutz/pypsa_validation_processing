@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from math import nan
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -460,6 +461,22 @@ class TestIntensiveAggregation:
             ("Price", "AT1", "EUR/MWh"): 20.0,
             ("Price", "AT2", "EUR/MWh"): 0.0,
         }
+
+    def test_weights_need_not_sum_to_one(self, tmp_path: Path):
+        """C8.2: Σ vᵢ·wᵢ / Σ wᵢ normalises itself; scaling all weights keeps the mean."""
+        result = self._ac6_input()
+        weight_rows = result.index.get_level_values("quantity") == "weight"
+        result.loc[weight_rows, "value"] *= 1000.0
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
+
+    def test_nan_counts_as_zero(self, tmp_path: Path):
+        """C8.2: NaN value and weight (carrier missing in a region) count as 0.0."""
+        result = _intensive(
+            [("AT1", "EUR/MWh", 10.0, 1.0), ("AT2", "EUR/MWh", nan, nan)]
+        )
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 10.0}
 
     def test_timeseries_per_column(self, tmp_path: Path):
         """C8-AC5: the weighted mean is computed per snapshot column."""
