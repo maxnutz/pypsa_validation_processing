@@ -66,7 +66,7 @@ Additional optional parameters can be added when a variable needs them, e.g. `co
 
 - Tests live only in `tests/` — see the [testing README](https://github.com/maxnutz/pypsa_validation_processing/blob/main/tests/README.md).
 - Write unit tests that test small, isolated logic.
-- Every test for a function in `statistics_functions.py` must assert the output format: a `pandas.Series` with a MultiIndex containing at least `country` and `unit` (it can include more levels).
+- Every test for a function in `statistics_functions.py` must assert the output format: a `pandas.Series` (`aggregate_per_year=True`) or a `pandas.DataFrame` with snapshots as columns (`aggregate_per_year=False`), with a MultiIndex containing at least `location` and `unit` (it can include more levels).
 
 ## Contribution Workflow
 

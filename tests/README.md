@@ -27,7 +27,7 @@ pixi run pytest tests/test_network_processor.py::TestConfigValidation -v
 
 ## Conventions
 
-- Every test has a one-line docstring; tests for a spec acceptance criterion start with its ID, e.g. `"""C1-AC1: …"""`.
+- New tests get a one-line docstring; tests for a spec acceptance criterion start with its ID, e.g. `"""C1-AC1: …"""`.
 - Tests have no `-> None` return annotation.
 - Prefer the mocks in `conftest.py`; patch `pypsa.NetworkCollection` and `nomenclature.DataStructureDefinition` when constructing a `Network_Processor` from a temporary config.
 
