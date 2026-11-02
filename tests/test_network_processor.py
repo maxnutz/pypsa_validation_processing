@@ -2650,19 +2650,35 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
                 [("AT1", "MWh_el", "value"), ("AT1", "MWh_el", "weight", -1.0)],
                 "negative",
             ),
+            (
+                [
+                    ("AT1", "MWh_el", "value"),
+                    ("AT1", "MWh_el", "value"),
+                    ("AT1", "MWh_el", "weight"),
+                ],
+                "duplicate",
+            ),
         ],
     )
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_invalid_intensive_result_raises(
-        self, tmp_path: Path, rows: list[tuple], violation: str
+        self,
+        tmp_path: Path,
+        rows: list[tuple],
+        violation: str,
+        aggregate_per_year: bool,
     ):
-        """C6-AC4: an intensive result with a missing or invalid quantity level, unpaired rows or a negative weight raises."""
-        processor = self._processor(tmp_path)
+        """C6-AC4: an intensive result (Series or time series) with a missing or invalid quantity level, unpaired or duplicate rows or a negative weight raises."""
+        processor = self._processor(tmp_path, aggregate_per_year=aggregate_per_year)
         processor.aggregation_classes = {"Var X": "intensive"}
+        n = self._network()
         values = [row[3] if len(row) > 3 else 1.0 for row in rows]
         names = ["location", "unit", "quantity"][: len(rows[0][:3])]
         result = pd.Series(values, index=_index([row[:3] for row in rows], names))
+        if not aggregate_per_year:
+            result = pd.DataFrame({ts: result for ts in n.snapshots[:2]})
         with pytest.raises(ValueError, match=f"Var X.*{violation}"):
-            processor._validate_result("Var X", result, self._network())
+            processor._validate_result("Var X", result, n)
 
     def test_valid_intensive_result(self, tmp_path: Path):
         """C6.12: paired value and weight rows with a zero weight are valid."""
@@ -2718,6 +2734,26 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
         processor._validate_result(
             "Var X", pd.DataFrame(0.0, index=index, columns=n.snapshots[:2]), n
         )
+
+    def test_copperplate_eu_location_is_valid(self, tmp_path: Path):
+        """C6.13, C8.7: the copperplate location EU passes validation; it is dropped later."""
+        processor = self._processor(tmp_path)
+        n = self._network()
+        n.buses = pd.DataFrame({"location": ["AT1", "EU"]}, index=["AT1 bus", "EU oil"])
+        result = pd.Series(
+            [1.0, 2.0], index=_index([("AT1", "MWh_el"), ("EU", "MWh_el")])
+        )
+        processor._validate_result("Var X", result, n)
+
+    def test_network_without_location_column_raises(self, tmp_path: Path):
+        """C6.6: a network without n.buses.location raises ValueError, not AttributeError."""
+        processor = self._processor(tmp_path)
+        n = self._network()
+        n.buses = pd.DataFrame(index=["AT1 bus"])
+        with pytest.raises(ValueError, match="Var X.*no column 'location'"):
+            processor._validate_result(
+                "Var X", pd.Series([1.0], index=_index([("AT1", "MWh_el")])), n
+            )
 
     def test_function_returning_none_aborts_run(self, tmp_path: Path):
         """SC-25: a function returning None aborts calculate_variables_values."""
