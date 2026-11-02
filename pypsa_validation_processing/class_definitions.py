@@ -906,7 +906,7 @@ class Network_Processor:
         if not isinstance(result, expected):
             violation = (
                 f"expected pd.{expected.__name__} for aggregate_per_year="
-                f"{self.aggregate_per_year}, got {type(result).__name__}"
+                f"{self.aggregate_per_year}, got {type(result).__name__} (C6.1, C6.2)"
             )
         elif not isinstance(result.index, pd.MultiIndex) or not {
             "location",
@@ -914,19 +914,21 @@ class Network_Processor:
         }.issubset(result.index.names):
             violation = (
                 "index must be a MultiIndex with levels 'location' and 'unit', "
-                f"got {list(result.index.names)}"
+                f"got {list(result.index.names)} (C6.1, C6.2)"
             )
         elif result.empty:
-            violation = "result has zero rows"
+            violation = "result has zero rows (C6.7)"
+        # Only the values are checked; ``location`` and ``unit`` are index
+        # levels (checked above), not columns, so they never enter the dtypes.
         elif not all(
             pd.api.types.is_numeric_dtype(dtype)
             for dtype in (
                 [result.dtype] if isinstance(result, pd.Series) else result.dtypes
             )
         ):
-            violation = "values must be numeric"
+            violation = "values must be numeric (C6.4)"
         elif "quantity" in result.index.names:
-            violation = "level 'quantity' is reserved for intensive variables"
+            violation = "level 'quantity' is reserved for intensive variables (C6.10)"
         else:
             violation = self._invalid_result_labels(result, n)
         if violation is not None:
@@ -964,7 +966,9 @@ class Network_Processor:
             or u not in UNITS_MAPPING
         ]
         if invalid_units:
-            return f"invalid units {invalid_units} (C9.1)"
+            return f"invalid units {invalid_units} (C6.5, C9.1)"
+        if "location" not in n.buses.columns:
+            return "the network has no column 'location' in n.buses (C6.6)"
         locations = set(n.buses.location.dropna()) - {""}
         invalid_locations = [
             loc
@@ -972,11 +976,14 @@ class Network_Processor:
             if loc not in locations
         ]
         if invalid_locations:
-            return f"locations {invalid_locations} are not in n.buses.location"
+            return f"locations {invalid_locations} are not in n.buses.location (C6.6)"
         if isinstance(result, pd.DataFrame):
             foreign = result.columns[~result.columns.isin(n.snapshots)]
             if len(foreign):
-                return f"columns {list(foreign[:3])} are not snapshots of the network"
+                return (
+                    f"columns {list(foreign[:3])} are not snapshots of the "
+                    "network (C6.2)"
+                )
         return None
 
     def _aggregate_to_country(self, result: pd.DataFrame) -> pd.DataFrame:
