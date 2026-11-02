@@ -2484,19 +2484,35 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
                 [("AT1", "MWh_el", "value"), ("AT1", "MWh_el", "weight", -1.0)],
                 "negative",
             ),
+            (
+                [
+                    ("AT1", "MWh_el", "value"),
+                    ("AT1", "MWh_el", "value"),
+                    ("AT1", "MWh_el", "weight"),
+                ],
+                "duplicate",
+            ),
         ],
     )
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_invalid_intensive_result_raises(
-        self, tmp_path: Path, rows: list[tuple], violation: str
+        self,
+        tmp_path: Path,
+        rows: list[tuple],
+        violation: str,
+        aggregate_per_year: bool,
     ):
-        """C6-AC4: an intensive result with a missing or invalid quantity level, unpaired rows or a negative weight raises."""
-        processor = self._processor(tmp_path)
+        """C6-AC4: an intensive result (Series or time series) with a missing or invalid quantity level, unpaired or duplicate rows or a negative weight raises."""
+        processor = self._processor(tmp_path, aggregate_per_year=aggregate_per_year)
         processor.aggregation_classes = {"Var X": "intensive"}
+        n = self._network()
         values = [row[3] if len(row) > 3 else 1.0 for row in rows]
         names = ["location", "unit", "quantity"][: len(rows[0][:3])]
         result = pd.Series(values, index=_index([row[:3] for row in rows], names))
+        if not aggregate_per_year:
+            result = pd.DataFrame({ts: result for ts in n.snapshots[:2]})
         with pytest.raises(ValueError, match=f"Var X.*{violation}"):
-            processor._validate_result("Var X", result, self._network())
+            processor._validate_result("Var X", result, n)
 
     def test_valid_intensive_result(self, tmp_path: Path):
         """C6.12: paired value and weight rows with a zero weight are valid."""

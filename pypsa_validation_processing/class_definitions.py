@@ -931,8 +931,8 @@ class Network_Processor:
         Raises
         ------
         ValueError
-            If the result violates C6.1, C6.2, C6.4–C6.7 or C6.10 (no
-            ``quantity`` level), naming the variable and the violation.
+            If the result violates C6.1, C6.2, C6.4–C6.7 or C6.10–C6.12
+            (``quantity`` level), naming the variable and the violation.
         """
         expected = pd.Series if self.aggregate_per_year else pd.DataFrame
         violation = None
@@ -1181,7 +1181,8 @@ class Network_Processor:
         ``flow`` and ``stock`` variables are summed. ``intensive`` variables
         (C4.5) are aggregated as weighted mean Σ vᵢ·wᵢ / Σ wᵢ using their
         ``weight`` rows; a group with Σ wᵢ = 0 gets ``0.0``. The ``quantity``
-        level and the ``weight`` rows are dropped (C8.2, C8.6).
+        level and the ``weight`` rows are dropped (C8.2, C8.6). NaN values
+        and weights (e.g. a carrier missing in a region) count as ``0.0``.
 
         When ``self.aggregate_per_year`` is ``True`` the input *result* is a
         :class:`pandas.Series` and a ``"value"`` column is produced.
