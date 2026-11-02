@@ -2553,6 +2553,26 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
             "Var X", pd.DataFrame(0.0, index=index, columns=n.snapshots[:2]), n
         )
 
+    def test_copperplate_eu_location_is_valid(self, tmp_path: Path):
+        """C6.13, C8.7: the copperplate location EU passes validation; it is dropped later."""
+        processor = self._processor(tmp_path)
+        n = self._network()
+        n.buses = pd.DataFrame({"location": ["AT1", "EU"]}, index=["AT1 bus", "EU oil"])
+        result = pd.Series(
+            [1.0, 2.0], index=_index([("AT1", "MWh_el"), ("EU", "MWh_el")])
+        )
+        processor._validate_result("Var X", result, n)
+
+    def test_network_without_location_column_raises(self, tmp_path: Path):
+        """C6.6: a network without n.buses.location raises ValueError, not AttributeError."""
+        processor = self._processor(tmp_path)
+        n = self._network()
+        n.buses = pd.DataFrame(index=["AT1 bus"])
+        with pytest.raises(ValueError, match="Var X.*no column 'location'"):
+            processor._validate_result(
+                "Var X", pd.Series([1.0], index=_index([("AT1", "MWh_el")])), n
+            )
+
     def test_function_returning_none_aborts_run(self, tmp_path: Path):
         """SC-25: a function returning None aborts calculate_variables_values."""
         processor = self._processor(tmp_path)
