@@ -1409,6 +1409,10 @@ class TestFinalEnergyByCarrierCoal:
             self.statistics = TestFinalEnergyByCarrierCoal._CoalStatisticsAccessor(
                 raise_missing=raise_missing
             )
+            self.buses = pd.DataFrame({"location": ["AT1", "AT2", "", None]})
+            self.snapshots = pd.date_range(
+                "2019-01-01", periods=4, freq="6h", name="snapshot"
+            )
             self.carriers = pd.DataFrame(
                 index=pd.Index(["coal for industry"] if carriers is None else carriers)
             )
@@ -1467,11 +1471,18 @@ class TestFinalEnergyByCarrierCoal:
         assert calls[0]["carrier"] == "coal for industry"
         assert calls[0]["components"] == "Load"
 
-    def test_returns_none_when_carrier_is_missing(self):
-        """Missing coal carrier should short-circuit before statistics are queried."""
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_returns_zeros_when_carrier_is_missing(self, aggregate_per_year: bool):
+        """Missing coal carrier: every location gets 0.0 without querying statistics (C6.13)."""
         network = self._coal_network(carriers=[])
-        result = Final_Energy_by_Carrier__Coal(network)
-        assert result is None
+        result = Final_Energy_by_Carrier__Coal(network, aggregate_per_year)
+        expected_type = pd.Series if aggregate_per_year else pd.DataFrame
+        assert isinstance(result, expected_type)
+        assert result.index.names == ["location", "unit"]
+        assert list(result.index) == [("AT1", "MWh"), ("AT2", "MWh")]
+        assert (result == 0.0).all(axis=None)
+        if not aggregate_per_year:
+            pd.testing.assert_index_equal(result.columns, network.snapshots)
         assert network.statistics.calls == []
 
 

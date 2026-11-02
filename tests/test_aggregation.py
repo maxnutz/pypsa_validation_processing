@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from math import nan
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from pypsa_validation_processing.class_definitions import Network_Processor
-from conftest import MockPyPSANetwork
+from conftest import MockNetworkCollection, MockPyPSANetwork
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -371,3 +372,222 @@ aggregation_level: "country"
             ):
                 with pytest.raises(ValueError, match="'country' must be"):
                     Network_Processor(config_path=config_file)
+
+
+# ---------------------------------------------------------------------------
+# Tests for aggregation classes (C4.5, C8.2)
+# ---------------------------------------------------------------------------
+
+_PRICE_UNITS = {"EUR/MWh_el": "EUR/MWh", "EUR/MWh_th": "EUR/MWh", "EUR/MWh": "EUR/MWh"}
+
+
+def _intensive(rows: list[tuple], extra: str | None = None) -> pd.DataFrame:
+    """Build an intensive result from (location, unit, [extra,] value, weight)."""
+    names = ["location", "unit"] + ([extra] if extra else []) + ["quantity"]
+    tuples, data = [], []
+    for row in rows:
+        *labels, value, weight = row
+        tuples += [(*labels, "value"), (*labels, "weight")]
+        data += [value, weight]
+    index = pd.MultiIndex.from_tuples(tuples, names=names)
+    return pd.DataFrame({"value": data}, index=index)
+
+
+class TestIntensiveAggregation:
+    """C8.2: weighted mean for ``intensive`` variables, sum for ``stock``."""
+
+    def _run(self, tmp_path: Path, result: pd.DataFrame, **kwargs) -> pd.Series:
+        processor = _make_processor(tmp_path, **kwargs)
+        processor.aggregation_classes = {"Price": "intensive"}
+        with patch.dict(
+            "pypsa_validation_processing.class_definitions.UNITS_MAPPING",
+            _PRICE_UNITS,
+        ):
+            out = processor._postprocess_statistics_result("Price", result)
+        assert "quantity" not in out.index.names
+        return out["value"]
+
+    def _ac6_input(self) -> pd.DataFrame:
+        return _intensive(
+            [
+                ("AT1", "EUR/MWh", 10.0, 1.0),
+                ("AT2", "EUR/MWh", 40.0, 2.0),
+                ("DE1", "EUR/MWh", 5.0, 1.0),
+            ]
+        )
+
+    def test_country_weighted_mean(self, tmp_path: Path):
+        """C8-AC6: country/AT gives the weighted mean of AT1 and AT2."""
+        out = self._run(tmp_path, self._ac6_input())
+        assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
+
+    def test_country_all_weighted_mean(self, tmp_path: Path):
+        """C8-AC6: country/all gives one weighted mean per country."""
+        out = self._run(tmp_path, self._ac6_input(), country="all")
+        assert out.to_dict() == {
+            ("Price", "AT", "EUR/MWh"): 30.0,
+            ("Price", "DE", "EUR/MWh"): 5.0,
+        }
+
+    def test_region_keeps_locations(self, tmp_path: Path):
+        """C8-AC6: region/AT keeps the values of AT1 and AT2 and drops DE1."""
+        out = self._run(tmp_path, self._ac6_input(), aggregation_level="region")
+        assert out.to_dict() == {
+            ("Price", "AT1", "EUR/MWh"): 10.0,
+            ("Price", "AT2", "EUR/MWh"): 40.0,
+        }
+
+    def test_units_combined_after_normalisation(self, tmp_path: Path):
+        """C8-AC3b: EUR/MWh_el and EUR/MWh_th are averaged after step 2."""
+        result = _intensive(
+            [("AT1", "EUR/MWh_el", 10.0, 1.0), ("AT1", "EUR/MWh_th", 40.0, 2.0)]
+        )
+        out = self._run(tmp_path, result, aggregation_level="region")
+        assert out.to_dict() == {("Price", "AT1", "EUR/MWh"): 30.0}
+
+    def test_extra_level_and_zero_weight(self, tmp_path: Path):
+        """C8-AC7: weighted mean over 'carrier'; all weights 0 → 0.0, not NaN."""
+        result = _intensive(
+            [
+                ("AT1", "EUR/MWh", "gas", 20.0, 1.0),
+                ("AT1", "EUR/MWh", "oil", 50.0, 0.0),
+                ("AT2", "EUR/MWh", "gas", 30.0, 0.0),
+            ],
+            extra="carrier",
+        )
+        out = self._run(tmp_path, result, aggregation_level="region")
+        assert out.to_dict() == {
+            ("Price", "AT1", "EUR/MWh"): 20.0,
+            ("Price", "AT2", "EUR/MWh"): 0.0,
+        }
+
+    def test_weights_need_not_sum_to_one(self, tmp_path: Path):
+        """C8.2: Σ vᵢ·wᵢ / Σ wᵢ normalises itself; scaling all weights keeps the mean."""
+        result = self._ac6_input()
+        weight_rows = result.index.get_level_values("quantity") == "weight"
+        result.loc[weight_rows, "value"] *= 1000.0
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 30.0}
+
+    def test_nan_counts_as_zero(self, tmp_path: Path):
+        """C8.2: NaN value and weight (carrier missing in a region) count as 0.0."""
+        result = _intensive(
+            [("AT1", "EUR/MWh", 10.0, 1.0), ("AT2", "EUR/MWh", nan, nan)]
+        )
+        out = self._run(tmp_path, result)
+        assert out.to_dict() == {("Price", "EUR/MWh"): 10.0}
+
+    def test_timeseries_per_column(self, tmp_path: Path):
+        """C8-AC5: the weighted mean is computed per snapshot column."""
+        result = self._ac6_input()
+        result["t1"] = result["value"] * 2
+        processor = _make_processor(tmp_path)
+        processor.aggregation_classes = {"Price": "intensive"}
+        with patch.dict(
+            "pypsa_validation_processing.class_definitions.UNITS_MAPPING",
+            _PRICE_UNITS,
+        ):
+            out = processor._postprocess_statistics_result("Price", result)
+        assert out.loc[("Price", "EUR/MWh")].to_dict() == {"value": 30.0, "t1": 60.0}
+
+    def test_stock_is_summed(self, tmp_path: Path):
+        """C8-AC8: stock aggregates like flow."""
+        processor = _make_processor(tmp_path)
+        processor.aggregation_classes = {"Capacity": "stock"}
+        result = pd.DataFrame(
+            {"value": [100.0, 50.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("AT1", "MWh"), ("AT2", "MWh")], names=["location", "unit"]
+            ),
+        )
+        out = processor._postprocess_statistics_result("Capacity", result)
+        assert out["value"].to_dict() == {("Capacity", "MWh"): 150.0}
+
+
+# ---------------------------------------------------------------------------
+# Tests for the copperplate pseudo-location and country: EU (C8.7, C8.8)
+# ---------------------------------------------------------------------------
+
+
+class TestCopperplateAndEuropeanUnion:
+    """C8-AC9, C8-AC10."""
+
+    def _run(
+        self,
+        tmp_path: Path,
+        country: str,
+        aggregation_level: str = "country",
+        map_names: bool = False,
+        copperplate_only_var: bool = False,
+    ) -> dict:
+        (tmp_path / "networks").mkdir()
+        (tmp_path / "networks" / "n_2030.nc").touch()
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(f"""
+country: {country}
+model_name: m
+scenario_name: s
+definitions_path: false
+network_results_path: {tmp_path}
+aggregation_level: {aggregation_level}
+map_country_codes_to_names: {str(map_names).lower()}
+""")
+        locations = ["AT1", "DE1", "CH", "EU"]
+        network = MockPyPSANetwork(
+            meta={"wildcards": {"planning_horizons": 2030}},
+            buses=pd.DataFrame({"location": locations}, index=locations),
+        )
+        result = pd.Series(
+            [1.0, 2.0, 4.0, -8.0],
+            index=pd.MultiIndex.from_tuples(
+                [(loc, "MWh") for loc in locations], names=["location", "unit"]
+            ),
+        )
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection",
+            return_value=MockNetworkCollection([network]),
+        ):
+            processor = Network_Processor(config_path=config_file)
+        processor.functions_dict = {"Var": "f"}
+        copperplate_result = pd.Series(
+            [-8.0],
+            index=pd.MultiIndex.from_tuples(
+                [("EU", "MWh")], names=["location", "unit"]
+            ),
+        )
+        if copperplate_only_var:
+            processor.functions_dict["Copperplate Var"] = "g"
+        with patch(
+            "pypsa_validation_processing.class_definitions.importlib.import_module",
+            return_value=MagicMock(
+                f=lambda n, aggregate_per_year=True: result,
+                g=lambda n, aggregate_per_year=True: copperplate_result,
+            ),
+        ):
+            processor.calculate_variables_values()
+        data = processor.dsd_with_values.data
+        assert set(data["variable"]) == {"Var"}
+        return dict(zip(data["region"], data["value"]))
+
+    def test_country_all_drops_copperplate(self, tmp_path: Path):
+        """C8-AC9: country/all has no EU row."""
+        assert self._run(tmp_path, "all") == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
+
+    def test_copperplate_only_variable_is_skipped(self, tmp_path: Path):
+        """C8.7: a variable with only the copperplate location produces no rows."""
+        out = self._run(tmp_path, "all", copperplate_only_var=True)
+        assert out == {"AT": 1.0, "DE": 2.0, "CH": 4.0}
+
+    def test_country_eu_aggregates_member_states(self, tmp_path: Path):
+        """C8-AC9: country/EU sums the member states AT and DE, without CH and the copperplate."""
+        assert self._run(tmp_path, "EU") == {"EU": 3.0}
+
+    def test_region_eu_keeps_member_state_locations(self, tmp_path: Path):
+        """C8-AC9: region/EU keeps one row per member-state location."""
+        out = self._run(tmp_path, "EU", aggregation_level="region")
+        assert out == {"AT1": 1.0, "DE1": 2.0}
+
+    def test_country_eu_mapped_to_name(self, tmp_path: Path):
+        """C8-AC10: with mapped names, the region is European Union and excludes the copperplate."""
+        out = self._run(tmp_path, "EU", map_names=True)
+        assert out == {"European Union": 3.0}

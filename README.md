@@ -12,6 +12,7 @@ This package processes a PyPSA `NetworkCollection` for a given set of IAMC varia
 - investment-year aggregates (`aggregate_per_year: true`) and full time series exports (`aggregate_per_year: false`)
 - region-level and country-level aggregation (`aggregation_level`)
 - single-country runs (`country: AT`) and all-country processing (`country: all`)
+- European Union runs (`country: EU`): the 27 member states; the copperplate pseudo-location `EU` of the networks is dropped from every output
 - optional mapping of country/region codes to readable names (`map_country_codes_to_names`)
 - optional conversion to units defined in the definitions folder (`convert_units`)
 
@@ -158,6 +159,8 @@ Return format rules:
 - `aggregate_per_year=False`: return a `pandas.DataFrame` with snapshots as columns
 - In both cases, index levels must include at least `location` and `unit`
 - Do not aggregate to country level inside the function; this is done in post-processing.
+- At least one row, numeric values; `unit` values are keys of `utils.UNITS_MAPPING` (not empty, not a carrier label); `location` values are non-empty values of `n.buses.location`; with `aggregate_per_year=False`, columns are snapshots of `n`. Every location gets a row, with `0.0` where none of the function's carriers is present; never return `None`.
+- `Network_Processor` checks every result against these rules and aborts the run with a `ValueError` naming the variable and the violation. Values themselves (zero, NaN, sign) are not checked.
 
 Post-processing behavior:
 
@@ -199,6 +202,20 @@ Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
 Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
 Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 ```
+
+The short form `<variable>: <function>` is the aggregation class `flow`. The long form sets the class explicitly:
+
+```yaml
+Prices|Final Energy|Electricity: {function: Prices__Final_Energy__Electricity, aggregation: intensive}
+```
+
+| Class | Over time (inside the function) | Over regions and extra index levels (post-processing) | PyPSA examples |
+|---|---|---|---|
+| `flow` (default) | sum over snapshots, weighted | sum | energy withdrawn by loads, generator output, link flows (`n.statistics.energy_balance`, `n.statistics.supply`) |
+| `stock` | end-of-year value; time series: value per snapshot, last column = yearly value | sum | installed capacity (`n.statistics.optimal_capacity`), energy level of stores (`n.stores_t.e`) |
+| `intensive` | weighted mean, computed by the function | weighted mean; the result carries an index level `quantity` with paired `value` and `weight` rows | bus prices (`n.buses_t.marginal_price`) weighted by withdrawn energy, capacity factors (`n.statistics.capacity_factor`) weighted by capacity |
+
+Any other entry (missing `function`, unknown key, unknown class, a list) raises a `ValueError` naming the variable.
 
 At runtime, `Network_Processor` reads this mapping, looks up the function for each defined variable, and calls it for every network in the collection.  Variables without a mapping entry are silently skipped. At initialisation, before any network is read, every selected variable is checked: a function that does not exist in `statistics_functions.py`, or that does not declare `n` and `aggregate_per_year` as its first two parameters (all further parameters with defaults), raises a `ValueError`. An empty mapping file raises a `ValueError`, too. With `definitions_path: false`, every variable in the mapping file is evaluated.
 
