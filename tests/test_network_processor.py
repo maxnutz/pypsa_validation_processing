@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import pandas as pd
+import yaml
 
 from pypsa_validation_processing.class_definitions import Network_Processor
 from conftest import MockPyPSANetwork, MockNetworkCollection
@@ -240,7 +241,7 @@ network_results_path: {mock_network_results_path}
         mock_definitions_path: Path,
         mock_network_results_path: Path,
     ):
-        """Test that a null model_name in config raises ValueError."""
+        """C1-AC1: a null model_name raises ValueError naming the key."""
         config_content = f"""
 country: AT
 model_name:
@@ -257,9 +258,7 @@ network_results_path: {mock_network_results_path}
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
-                with pytest.raises(
-                    ValueError, match="model_name.*scenario_name.*must be set"
-                ):
+                with pytest.raises(ValueError, match="'model_name' not set"):
                     Network_Processor(config_path=config_file)
 
     def test_init_null_scenario_name_raises_value_error(
@@ -268,7 +267,7 @@ network_results_path: {mock_network_results_path}
         mock_definitions_path: Path,
         mock_network_results_path: Path,
     ):
-        """Test that a null scenario_name in config raises ValueError."""
+        """C1-AC1: a null scenario_name raises ValueError naming the key."""
         config_content = f"""
 country: AT
 model_name: AT_KN2040
@@ -285,10 +284,182 @@ network_results_path: {mock_network_results_path}
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
-                with pytest.raises(
-                    ValueError, match="model_name.*scenario_name.*must be set"
-                ):
+                with pytest.raises(ValueError, match="'scenario_name' not set"):
                     Network_Processor(config_path=config_file)
+
+
+# ---------------------------------------------------------------------------
+# Tests for config validation (C1)
+# ---------------------------------------------------------------------------
+
+_EU_MEMBER_STATE_CODES = (
+    "AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK"
+).split()
+
+
+class TestConfigValidation:
+    """Test required keys, types and allowed values of the package config (C1)."""
+
+    @staticmethod
+    def _write_config(tmp_path: Path, text: str) -> Path:
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(text)
+        return config_file
+
+    @pytest.fixture
+    def base_config(
+        self, mock_definitions_path: Path, mock_network_results_path: Path
+    ) -> dict:
+        """Config with only the five required keys."""
+        return {
+            "network_results_path": str(mock_network_results_path),
+            "definitions_path": str(mock_definitions_path),
+            "country": "AT",
+            "model_name": "model",
+            "scenario_name": "scenario",
+        }
+
+    def _init(self, tmp_path: Path, config: dict) -> Network_Processor:
+        config_file = self._write_config(tmp_path, yaml.safe_dump(config))
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+            ),
+            patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ),
+        ):
+            return Network_Processor(config_path=config_file)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "network_results_path",
+            "definitions_path",
+            "country",
+            "model_name",
+            "scenario_name",
+        ],
+    )
+    @pytest.mark.parametrize("value", ["missing", None, "", "  "])
+    def test_required_key_missing_null_or_empty_raises(
+        self, tmp_path: Path, base_config: dict, key: str, value: object
+    ):
+        """C1-AC1: a missing, null or empty required key raises ValueError naming it."""
+        if value == "missing":
+            del base_config[key]
+        else:
+            base_config[key] = value
+        with pytest.raises(ValueError, match=f"'{key}' not set"):
+            self._init(tmp_path, base_config)
+
+    def test_empty_config_file_raises(self, tmp_path: Path):
+        """C1-AC1: an empty config file raises ValueError."""
+        config_file = self._write_config(tmp_path, "")
+        with pytest.raises(ValueError, match="empty or not a YAML mapping"):
+            Network_Processor(config_path=config_file)
+
+    @pytest.mark.parametrize(
+        "country", _EU_MEMBER_STATE_CODES + ["CH", "NO", "GB", "IS", "UA", "EU", "all"]
+    )
+    def test_country_accepted(self, tmp_path: Path, base_config: dict, country: str):
+        """C1-AC2: EU member states, non-EU ISO codes, EU and all are accepted."""
+        base_config["country"] = country
+        assert self._init(tmp_path, base_config).country == country
+
+    @pytest.mark.parametrize("country", ["XX", "Austria", "at1", "at", "EL", "UK"])
+    def test_country_rejected(self, tmp_path: Path, base_config: dict, country: str):
+        """C1-AC2: values that are not ISO 3166-1 alpha-2 codes raise ValueError."""
+        base_config["country"] = country
+        with pytest.raises(ValueError, match="Invalid country"):
+            self._init(tmp_path, base_config)
+
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("aggregation_level", "nation"),
+            ("aggregation_level", 1),
+            ("aggregate_per_year", "yes"),
+            ("map_country_codes_to_names", "yes"),
+            ("convert_units", "yes"),
+            ("country", 1),
+            ("model_name", 1.0),
+            ("scenario_name", ["a", "b"]),
+            ("network_results_path", 5),
+            ("mapping_path", True),
+            ("output_path", 5),
+            ("output_path", None),
+            ("definitions_path", True),
+        ],
+    )
+    def test_wrong_type_or_value_raises(
+        self, tmp_path: Path, base_config: dict, key: str, value: object
+    ):
+        """C1-AC3: a wrong data type or value raises ValueError naming key and value."""
+        base_config[key] = value
+        with pytest.raises(
+            ValueError, match=f"Invalid {key}: {re.escape(repr(value))}"
+        ):
+            self._init(tmp_path, base_config)
+
+    def test_unquoted_country_no_advises_quoting(
+        self,
+        tmp_path: Path,
+        mock_definitions_path: Path,
+        mock_network_results_path: Path,
+    ):
+        """C1-AC3b: unquoted country: NO (YAML false) raises ValueError advising quotes."""
+        config_file = self._write_config(
+            tmp_path,
+            f"network_results_path: {mock_network_results_path}\n"
+            f"definitions_path: {mock_definitions_path}\n"
+            "country: NO\nmodel_name: m\nscenario_name: s\n",
+        )
+        with pytest.raises(ValueError, match="quote"):
+            Network_Processor(config_path=config_file)
+
+    def test_nonexistent_mapping_path_raises(self, tmp_path: Path, base_config: dict):
+        """C1-AC4: a non-existing mapping_path raises FileNotFoundError."""
+        base_config["mapping_path"] = str(tmp_path / "missing.yaml")
+        with pytest.raises(FileNotFoundError, match="missing.yaml"):
+            self._init(tmp_path, base_config)
+
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("aggregation_level", "nation"),
+            ("aggregate_per_year", "yes"),
+            ("map_country_codes_to_names", "yes"),
+            ("mapping_path", "missing.yaml"),
+        ],
+    )
+    def test_invalid_config_does_not_read_networks(
+        self, tmp_path: Path, base_config: dict, key: str, value: object
+    ):
+        """C1-AC5: config errors are raised before pypsa.NetworkCollection is constructed."""
+        base_config[key] = value
+        config_file = self._write_config(tmp_path, yaml.safe_dump(base_config))
+        with (
+            patch(
+                "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+            ) as collection,
+            patch(
+                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
+            ),
+        ):
+            with pytest.raises((ValueError, FileNotFoundError)):
+                Network_Processor(config_path=config_file)
+        collection.assert_not_called()
+
+    def test_only_required_keys_apply_defaults(self, tmp_path: Path, base_config: dict):
+        """C1-AC6: a config with only the required keys initialises with the documented defaults."""
+        processor = self._init(tmp_path, base_config)
+        assert processor.aggregation_level == "country"
+        assert processor.aggregate_per_year is True
+        assert processor.map_country_codes_to_names is False
+        assert processor.convert_units is True
+        assert processor.mappings_path.name == "mapping.default.yaml"
+        assert processor.path_dsd_with_values == Path("resources")
 
 
 # ---------------------------------------------------------------------------
@@ -601,7 +772,7 @@ class TestNetworkProcessorOutputGeneration:
 
                 expected_path = (
                     processor.path_dsd_with_values
-                    / "PYPSA_AT_KN2040_test_scenario_AT.xlsx"
+                    / "PYPSA_AT_KN2040_test_scenario_country_AT.xlsx"
                 )
                 assert result_path == expected_path
                 # Verify to_excel was called
@@ -631,15 +802,15 @@ class TestNetworkProcessorOutputGeneration:
 
                 expected_folder = (
                     processor.path_dsd_with_values
-                    / "PYPSA_timeseries_AT_KN2040_test_scenario_AT"
+                    / "PYPSA_timeseries_AT_KN2040_test_scenario_country_AT"
                 )
                 assert result_path == expected_folder
                 assert result_path.is_dir()
                 mock_iam_2020.to_excel.assert_called_once_with(
-                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2020.xlsx"
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_country_AT_2020.xlsx"
                 )
                 mock_iam_2030.to_excel.assert_called_once_with(
-                    expected_folder / "PYPSA_AT_KN2040_test_scenario_AT_2030.xlsx"
+                    expected_folder / "PYPSA_AT_KN2040_test_scenario_country_AT_2030.xlsx"
                 )
 
     def test_write_output_sanitizes_whitespace_in_aggregate_filename(
@@ -674,7 +845,7 @@ output_path: {tmp_path / 'output'}
 
                 result_path = processor.write_output_to_xlsx()
 
-                assert result_path.name == "PYPSA_My_Model_Name_Scenario_Name_AT.xlsx"
+                assert result_path.name == "PYPSA_My_Model_Name_Scenario_Name_country_AT.xlsx"
                 assert re.search(r"\s", str(result_path)) is None
 
     def test_write_output_sanitizes_whitespace_in_timeseries_naming(
@@ -711,9 +882,9 @@ output_path: {tmp_path / 'output'}
 
                 result_path = processor.write_output_to_xlsx()
 
-                assert result_path.name == "PYPSA_timeseries_Model_Name_Scenario_Name"
+                assert result_path.name == "PYPSA_timeseries_Model_Name_Scenario_Name_country"
                 mock_iam_2020.to_excel.assert_called_once_with(
-                    result_path / "PYPSA_Model_Name_Scenario_Name_2020.xlsx"
+                    result_path / "PYPSA_Model_Name_Scenario_Name_country_2020.xlsx"
                 )
                 assert re.search(r"\s", str(result_path)) is None
 
@@ -856,8 +1027,8 @@ output_path: {tmp_path / 'output.xlsx'}
                 with pytest.raises(ValueError, match="Invalid aggregation_level"):
                     Network_Processor(config_path=config_file)
 
-    def test_map_country_codes_to_names_defaults_to_true(self, tmp_path: Path):
-        """Test that map_country_codes_to_names defaults to False if not specified."""
+    def test_map_country_codes_to_names_defaults_to_false(self, tmp_path: Path):
+        """C1-AC6: map_country_codes_to_names defaults to False (SC-2)."""
         config_file = self._make_config_file(tmp_path)
         with patch(
             "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
@@ -866,7 +1037,7 @@ output_path: {tmp_path / 'output.xlsx'}
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=config_file)
-                assert processor.map_country_codes_to_names is True
+                assert processor.map_country_codes_to_names is False
 
     def test_map_country_codes_to_names_from_config_true(self, tmp_path: Path):
         """Test that map_country_codes_to_names=true is read from config."""
@@ -949,7 +1120,7 @@ output_path: {tmp_path / 'output.xlsx'}
             with patch(
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
-                with pytest.raises(ValueError, match="'country' must be"):
+                with pytest.raises(ValueError, match="Invalid country"):
                     Network_Processor(config_path=config_file)
 
     def test_repr_includes_aggregation_level(self, tmp_path: Path):
@@ -1145,10 +1316,9 @@ output_path: {tmp_path / 'output.xlsx'}
             ),
         )
 
-        result = processor._map_unit_level(data)
+        result = processor._map_unit_level(data, "Var")
 
-        # MWh_el and MWh_th should be mapped according to UNITS_MAPPING
-        assert result.index.get_level_values("unit").tolist() != ["MWh_el", "MWh_th"]
+        assert result.index.get_level_values("unit").tolist() == ["MWh", "MWh"]
 
     def test_postprocess_group_levels_country_mode_specific_country(
         self, tmp_path: Path
@@ -1564,11 +1734,11 @@ output_path: {tmp_path / 'output.xlsx'}
                 result_path = processor.write_output_to_xlsx()
 
                 # For country="all", filename should not include country suffix
-                assert "PYPSA_MyModel_MyScenario.xlsx" in str(result_path)
-                assert "PYPSA_MyModel_MyScenario_all.xlsx" not in str(result_path)
+                assert "PYPSA_MyModel_MyScenario_country.xlsx" in str(result_path)
+                assert "PYPSA_MyModel_MyScenario_country_all.xlsx" not in str(result_path)
 
-    def test_default_output_path_sanitizes_whitespace(self, tmp_path: Path):
-        """Default output filename should sanitize whitespace in path tokens."""
+    def test_default_output_path_is_resources_directory(self, tmp_path: Path):
+        """C1-AC6: without output_path, the output directory is the relative path 'resources' (SC-1)."""
         defs_path = tmp_path / "definitions"
         defs_path.mkdir(exist_ok=True)
         nw_path = tmp_path / "networks"
@@ -1592,11 +1762,7 @@ network_results_path: {tmp_path}
                 "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
             ):
                 processor = Network_Processor(config_path=config_file)
-                assert (
-                    processor.path_dsd_with_values.name
-                    == "PYPSA_Model_Name_Scenario_Name_AT.xlsx"
-                )
-                assert re.search(r"\s", processor.path_dsd_with_values.name) is None
+                assert processor.path_dsd_with_values == Path("resources")
 
     def test_sanitize_path_token_collapses_mixed_whitespace(self):
         """Path token sanitization should trim and collapse mixed whitespace."""
@@ -2918,3 +3084,96 @@ network_results_path: {tmp_path}
         assert not any(c[0] == 2040 for c in called if isinstance(c, tuple))
         skip_messages = [r.message for r in caplog.records if "Var Shares" in r.message]
         assert len(skip_messages) == 1 and "2040" in skip_messages[0]
+
+
+# ---------------------------------------------------------------------------
+# Tests for output names (C10)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputNames:
+    """Test output file and folder names with the aggregation level (C10.3–C10.5)."""
+
+    @staticmethod
+    def _processor(
+        tmp_path: Path, mock_network_results_path: Path, **config: object
+    ) -> Network_Processor:
+        config = {
+            "network_results_path": str(mock_network_results_path),
+            "definitions_path": False,
+            "country": "AT",
+            "model_name": "Pypsa-AT v1.0",
+            "scenario_name": "KN 2040",
+            **config,
+        }
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.safe_dump(config))
+        with patch(
+            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
+        ):
+            processor = Network_Processor(config_path=config_file)
+        iam_df = MagicMock()
+        iam_df.to_excel.side_effect = lambda path: Path(path).write_text(
+            processor.aggregation_level
+        )
+        processor.dsd_with_values = iam_df
+        return processor
+
+    def test_default_output_directory(
+        self, tmp_path: Path, mock_network_results_path: Path, monkeypatch
+    ):
+        """C10-AC1: without output_path and aggregation_level, the file is <cwd>/resources/PYPSA_<model>_<scenario>_country_<country>.xlsx."""
+        monkeypatch.chdir(tmp_path)
+        processor = self._processor(tmp_path, mock_network_results_path)
+        path = processor.write_output_to_xlsx()
+        assert path.resolve() == (
+            tmp_path / "resources" / "PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx"
+        )
+        assert path.exists()
+
+    @pytest.mark.parametrize(
+        ("level", "country", "expected"),
+        [
+            ("country", "AT", "PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx"),
+            ("country", "all", "PYPSA_Pypsa-AT_v1.0_KN_2040_country.xlsx"),
+            ("region", "AT", "PYPSA_Pypsa-AT_v1.0_KN_2040_region_AT.xlsx"),
+        ],
+    )
+    def test_file_name_contains_level(
+        self,
+        tmp_path: Path,
+        mock_network_results_path: Path,
+        level: str,
+        country: str,
+        expected: str,
+    ):
+        """C10-AC3: the file name is PYPSA_<model>_<scenario>_<level>[_<country>].xlsx."""
+        processor = self._processor(
+            tmp_path,
+            mock_network_results_path,
+            aggregation_level=level,
+            country=country,
+            output_path=str(tmp_path / "out"),
+        )
+        assert processor.write_output_to_xlsx().name == expected
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_country_and_region_runs_do_not_overwrite(
+        self, tmp_path: Path, mock_network_results_path: Path, aggregate_per_year: bool
+    ):
+        """C10-AC8: a country and a region run into one output_path leave two outputs, the first unchanged."""
+        paths = []
+        for level in ("country", "region"):
+            processor = self._processor(
+                tmp_path,
+                mock_network_results_path,
+                aggregation_level=level,
+                aggregate_per_year=aggregate_per_year,
+                output_path=str(tmp_path / "out"),
+            )
+            if not aggregate_per_year:
+                processor.dsd_with_values = [(2030, processor.dsd_with_values)]
+            paths.append(processor.write_output_to_xlsx())
+        assert paths[0] != paths[1]
+        first = paths[0] if aggregate_per_year else next(paths[0].iterdir())
+        assert first.read_text() == "country"

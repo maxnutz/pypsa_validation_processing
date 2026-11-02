@@ -35,14 +35,14 @@ pip install .
 The file `config.default.yaml` provides a guideline for the two config sections and current defaults:
 ```yaml
 # General section
-country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT) or "all"
+country: AT               # ISO 3166-1 alpha-2 country code (e.g. AT, quote "NO"), "EU" (27 member states) or "all"
 definitions_path: sister_packages/energy-scenarios-at-workflow/definitions      # path to the IAMC variable definitions folder; set to False to evaluate all mapping-file variables and skip unit conversion
 convert_units: true       # convert output units to units from definitions_path
 # mapping_path:        # optional: path to mapping YAML; defaults to configs/mapping.default.yaml
-output_path: resources            # path the outputfile should be written to
+output_path: resources            # output directory (created if missing); defaults to resources
 aggregation_level: "region"      # Options: "country" or "region"
 aggregate_per_year: true          # true: one value per investment year; false: full time series per year
-map_country_codes_to_names: true # true: map codes to names (AT -> Austria), false: keep codes
+map_country_codes_to_names: false # true: map codes to names (AT -> Austria), false (default): keep codes
 
 # Network
 network_results_path: resources/AT_KN2040/ # path to the folder containing PyPSA network results
@@ -55,6 +55,8 @@ industry_non_energy_shares_path: link_to_file.csv  # CSV written by eurostat-ene
 industry_non_energy_shares_year: latest  # "latest" (default; latest year per country and carrier) or a year, e.g. 2020
 ```
 If the path is not set or the file does not exist, variables whose function declares `industry_non_energy_shares` are skipped with a `WARNING`. An invalid file (missing columns, `EL`/`UK` country codes, a carrier without rows, shares outside `[0, 1]`) raises a `ValueError` at initialisation.
+
+Required keys: `country`, `definitions_path`, `network_results_path`, `model_name`, `scenario_name`; all other keys are optional. All config values are checked before any network is read: a missing required key, a wrong data type or a value outside the allowed values raises a `ValueError`; a missing network results folder, definitions folder or mapping file raises a `FileNotFoundError`. Full key reference: `specs/configuration.md`.
 
 Personalized config files can be specified with `--config <path-to-config-file>`.
 
@@ -84,10 +86,12 @@ This statement runs `pytest tests/ -v` with coverage reporting and fails if cove
 
 ### Output behavior
 
-- `aggregate_per_year: true` writes one xlsx file.
-- `aggregate_per_year: false` writes one folder with one xlsx file per investment year.
+Output goes to the directory `output_path` (default `resources`, created if missing). `<name>` is `<model_name>_<scenario_name>_<aggregation_level>[_<country>]`; `_<country>` is omitted for `country: all`.
+- `aggregate_per_year: true` writes one file `PYPSA_<name>.xlsx`; year columns are integers.
+- `aggregate_per_year: false` writes one folder `PYPSA_timeseries_<name>/` with one file `PYPSA_<name>_<year>.xlsx` per investment year.
+- Runs that differ only in `aggregation_level` do not overwrite each other; files with the same name are overwritten.
 - Generated output file and folder names are sanitized (whitespace collapsed to `_`).
-- Time-like columns are normalized to timezone-aware timestamps using a fixed `+01:00` offset before `pyam.IamDataFrame` creation.
+- Time series columns are timezone-aware timestamps: timezone-naive snapshots are labeled UTC (`+00:00`), timezone-aware snapshots keep their timezone (no conversion). The year of every snapshot is replaced by the investment year.
 
 ## Project structure
 
@@ -164,7 +168,7 @@ Return format rules:
 
 Post-processing behavior:
 
-- The post-processing step extracts and maps units to IAMC-valid units and sums values where needed. Do not mix energy and emissions units in one statement.
+- The post-processing step normalises units via `utils.UNITS_MAPPING` (e.g. `MWh_el` → `MWh`) and sums values where needed. A unit that is not a key of `UNITS_MAPPING`, or several units for one variable after normalisation, raise a `ValueError` (also with `convert_units: false`). Do not mix energy and emissions units in one statement.
 - Depending on config value `aggregation_level`, post-processing groups to country level (`country`) or keeps regional granularity (`region`).
 
 #### Example output
