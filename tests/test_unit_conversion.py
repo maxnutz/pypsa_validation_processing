@@ -408,6 +408,16 @@ class TestUnitNormalisation:
         with pytest.raises(ValueError, match=f"Variable 'Var'.*{re.escape(repr(unit))}"):
             processor._postprocess_statistics_result("Var", result)
 
+    @pytest.mark.parametrize("country", ["AT", "all"])
+    def test_null_unit_raises_with_country_aggregation(
+        self, processor: Network_Processor, country: str
+    ):
+        """C9-AC2: a null unit is not dropped by country aggregation but raises ValueError."""
+        processor.country = country
+        result = _unit_result([("AT1", None, 1.0), ("AT2", "MWh_el", 2.0)])
+        with pytest.raises(ValueError, match="Variable 'Var'.*nan"):
+            processor._postprocess_statistics_result("Var", result)
+
     def test_several_units_raise_without_conversion(self, tmp_path: Path):
         """C9-AC4: rows in MWh and t raise ValueError also with convert_units: false (SC-24)."""
         config_path = _make_config(tmp_path, extra="convert_units: false")
