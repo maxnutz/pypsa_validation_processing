@@ -9,3 +9,4 @@
         - create_location_index_from_copperplate
         - attribute_locations
         - fossil_oil_share
+        - fossil_gas_share

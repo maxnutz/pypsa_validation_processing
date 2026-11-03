@@ -455,6 +455,59 @@ def fossil_oil_share(n: pypsa.Network) -> float:
     return _fossil_share(supply, OIL_FOSSIL_CARRIERS, OIL_NON_FOSSIL_CARRIERS, "oil")
 
 
+# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
+GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
+GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Sabatier",
+    "biogas to gas",
+    "biogas to gas CC",
+    "BioSNG",
+    "BioSNG CC",
+    "import gas",
+)
+# D3: gas transport, excluded together with every other Link between gas buses
+GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
+
+
+def fossil_gas_share(n: pypsa.Network) -> float:
+    """Return the system-wide fossil share of gas ``f_gas`` (D3).
+
+    Yearly supply to all ``gas`` buses, summed over all locations. Stores and
+    gas transport (``GAS_TRANSPORT_CARRIERS`` and every Link whose ``bus0``
+    and ``bus1`` are both ``gas`` buses) are excluded. The same value applies
+    to every location and every snapshot.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network to evaluate.
+
+    Returns
+    -------
+    float
+        ``f_gas`` in ``[0, 1]``; ``0.0`` if no gas is supplied.
+
+    Raises
+    ------
+    ValueError
+        If a non-excluded component with a carrier outside
+        ``GAS_FOSSIL_CARRIERS`` and ``GAS_NON_FOSSIL_CARRIERS`` supplies gas.
+    """
+    supply = n.statistics.supply(
+        bus_carrier="gas", groupby=["carrier"], nice_names=False
+    )
+    supply = supply.drop("Store", level="component", errors="ignore")
+    bus_carrier = n.buses["carrier"]
+    between_gas_buses = (bus_carrier.reindex(n.links["bus0"]).to_numpy() == "gas") & (
+        bus_carrier.reindex(n.links["bus1"]).to_numpy() == "gas"
+    )
+    transport = set(GAS_TRANSPORT_CARRIERS) | set(
+        n.links.loc[between_gas_buses, "carrier"]
+    )
+    supply = supply[~supply.index.get_level_values("carrier").isin(transport)]
+    return _fossil_share(supply, GAS_FOSSIL_CARRIERS, GAS_NON_FOSSIL_CARRIERS, "gas")
+
+
 def setup_logging(level: int | str = logging.WARNING) -> None:
     """Configure root logging once for the package entrypoint.
 

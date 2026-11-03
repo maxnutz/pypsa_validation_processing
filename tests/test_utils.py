@@ -7,6 +7,7 @@ import pytest
 from pypsa_validation_processing.utils import (
     REGION_MAPPING,
     attribute_locations,
+    fossil_gas_share,
     fossil_oil_share,
 )
 
@@ -228,3 +229,67 @@ class TestFossilOilShare:
         """D2: an unknown carrier with zero yearly supply is ignored."""
         n = self._oil_network({"oil refining": 1.0, "mystery oil": 0.0})
         assert fossil_oil_share(n) == pytest.approx(1.0)
+
+
+class TestFossilGasShare:
+    @staticmethod
+    def _gas_network(
+        generators: dict[str, float], links: dict[str, float]
+    ) -> pypsa.Network:
+        """Return a network with two gas buses supplied by the given Generators and Links."""
+        n = _network(["AT11"])
+        n.add("Bus", "AT11 gas", carrier="gas", location="AT11", unit="MWh_LHV")
+        n.add("Bus", "DE1 gas", carrier="gas", location="DE1", unit="MWh_LHV")
+        n.add("Bus", "AT11 feed", carrier="feed", location="AT11")
+        for carrier, p in generators.items():
+            n.add("Generator", f"AT11 {carrier}", bus="AT11 gas", carrier=carrier)
+            n.generators_t.p[f"AT11 {carrier}"] = [p, p]
+        for carrier, p0 in links.items():
+            _add_link(
+                n,
+                f"AT11 {carrier}",
+                [p0, p0],
+                bus0="AT11 feed",
+                bus1="AT11 gas",
+                carrier=carrier,
+            )
+        return n
+
+    def test_share_of_fossil_generators(self):
+        """D3: f_gas is the fossil Generator supply over fossil and renewable supply."""
+        n = self._gas_network(
+            {"pipeline gas": 2.0, "lng gas": 1.0}, {"biogas to gas": 1.0}
+        )
+        assert fossil_gas_share(n) == pytest.approx(0.75)
+
+    def test_import_gas_is_non_fossil(self):
+        """D3: import gas counts as non-fossil supply (OQ-23)."""
+        n = self._gas_network({"production gas": 1.0}, {"import gas": 3.0})
+        assert fossil_gas_share(n) == pytest.approx(0.25)
+
+    def test_transport_and_store_are_excluded(self):
+        """D3: gas pipelines, other Links between gas buses and the gas Store are excluded."""
+        n = self._gas_network({"pipeline gas": 1.0}, {"Sabatier": 1.0})
+        for carrier in ["gas pipeline", "gas pipeline new", "gas compressor"]:
+            _add_link(
+                n,
+                f"AT11 {carrier}",
+                [5.0, 5.0],
+                bus0="AT11 gas",
+                bus1="DE1 gas",
+                carrier=carrier,
+            )
+        n.add("Store", "AT11 gas Store", bus="AT11 gas", carrier="gas")
+        n.stores_t.p["AT11 gas Store"] = [10.0, 10.0]
+        assert fossil_gas_share(n) == pytest.approx(0.5)
+
+    def test_no_supply_gives_zero(self):
+        """D3: without gas supply f_gas is 0."""
+        n = self._gas_network({"pipeline gas": 0.0}, {})
+        assert fossil_gas_share(n) == 0.0
+
+    def test_unknown_carrier_with_supply_raises(self):
+        """D3: an unknown carrier with non-zero yearly supply raises ValueError naming it."""
+        n = self._gas_network({"pipeline gas": 1.0, "shale gas": 1.0}, {})
+        with pytest.raises(ValueError, match="shale gas"):
+            fossil_gas_share(n)
