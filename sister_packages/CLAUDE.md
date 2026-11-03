@@ -7,4 +7,6 @@
 ## Blueprint for statistics-functions
 > Script `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py`
 
-The structure in func:``get_final_energy`` is useful as a semantic map of what should be counted for final-energy variables, but it is too monolithic for your package style. For your statistics functions, the best reuse is the accounting logic per variable, while keeping implementation modular, one-variable-per-function, and output-format-driven as required in file:``README.md:74``.
+Rule P6 in `specs/constitution/principles.md` is binding: for every variable this script evaluates (exact or semantic match), port its accounting logic as is (same components, carriers, bus carriers, sign conventions and special cases); use `pypsa.statistics` only for variables without a match. Deviations are allowed only as listed in the variable spec in `specs/variables/`.
+
+func:``get_final_energy`` is too monolithic for this package's style: split the ported logic into one stand-alone function per variable, with shared helpers in `utils.py` and the output format required in file:``README.md:74``.

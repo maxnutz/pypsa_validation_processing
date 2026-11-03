@@ -29,7 +29,7 @@ You are working as a senior software engineer on the PyPSA-AT project. PyPSA is 
   - `definitions_path: false` -> every variable in the mapping file; no unit conversion.
 - `Network_Processor._execute_function_for_variable` inspects each function's signature and only passes the optional kwargs it declares: `aggregate_per_year`, `config` (network config of the investment year from `<network_results_path>/configs/config*<year>.yaml`), `energy_totals` (`<network_results_path>/resources/energy_totals.csv`).
 - All functions in `pypsa_validation_processing/statistics_functions.py` are stand-alone. They can only rely on helper functions in `pypsa_validation_processing/utils.py` for general tasks that need to be executed in multiple functions.
-- **Blueprint:** [export_ariadne_variables.py](https://github.com/PyPSA/pypsa-de/blob/main/scripts/pypsa-de/export_ariadne_variables.py) serves as blueprint for evaluations, but use `pypsa.statistics` more extensively.
+- **Blueprint:** [export_ariadne_variables.py](https://github.com/PyPSA/pypsa-de/blob/main/scripts/pypsa-de/export_ariadne_variables.py) is the blueprint for this implementation. port its logic for variables it evaluates (exact or semantic match, P6 in `specs/constitution/principles.md`); use `pypsa.statistics` evaluations for variables without a match. Deviations from the ported logic are allowed only as listed in the variable spec in `specs/variables/`.
 
 ### Aggregation behavior
 - `aggregation_level: country`
