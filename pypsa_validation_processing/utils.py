@@ -177,8 +177,8 @@ UNITS_MAPPING = {
     "MWh_el": "MWh",
     "MWh_LHV": "MWh",
     "MWh_th": "MWh",
-    # carrier label, not a unit (C9.1); kept until D7 sets MWh_LHV for
-    # `land transport oil` in Final Energy|Oil and |Transportation (SC-9)
+    # bus unit label of `land transport oil` (pypsa-eur `add_ice_cars`), fuel
+    # energy (LHV); a permanent key, functions may return it raw (D7, C9.1)
     "land transport": "MWh",
     "t_co2": "t",
     "MWh": "MWh",
@@ -628,6 +628,48 @@ def non_energy_use(
         )
     factor = countries.map(carrier_shares).fillna(carrier_shares.mean())
     return demand.mul(factor, axis=0)
+
+
+# D6: MWh of coal per MWh of coke (pypsa-de `get_final_energy` l.2208-2225)
+MWH_COAL_PER_MWH_COKE = 1.366
+
+
+def apply_coke_correction(
+    coal_energy: pd.Series | pd.DataFrame, kappa: float | None = None
+) -> pd.Series | pd.DataFrame:
+    """Apply the coke correction to the energy part of industrial coal (D6).
+
+    ``FE = E · (1 − κ) + E · κ / MWH_COAL_PER_MWH_COKE`` with ``E`` the
+    ``coal for industry`` demand minus its non-energy use (D5).
+
+    Parameters
+    ----------
+    coal_energy : pd.Series | pd.DataFrame
+        Energy part ``E`` of the industrial coal demand.
+    kappa : float | None, optional
+        Coke share ``κ`` in ``[0, 1]`` from the physical method (C2.5). If
+        ``None`` (default), the Eurostat fallback ``κ = 0`` applies and one
+        ``WARNING`` is logged.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Coal final energy with the index and columns of *coal_energy*.
+
+    Raises
+    ------
+    ValueError
+        If *kappa* is outside ``[0, 1]``.
+    """
+    if kappa is None:
+        logger.warning(
+            "Coke correction is skipped (kappa = 0): Eurostat has no usable coke "
+            "share (D6)."
+        )
+        kappa = 0.0
+    if not 0.0 <= kappa <= 1.0:
+        raise ValueError(f"kappa must be in [0, 1], got: {kappa!r}")
+    return coal_energy * (1.0 - kappa) + coal_energy * kappa / MWH_COAL_PER_MWH_COKE
 
 
 def setup_logging(level: int | str = logging.WARNING) -> None:

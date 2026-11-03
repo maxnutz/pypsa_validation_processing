@@ -12,3 +12,4 @@
         - fossil_gas_share
         - apply_domestic_share
         - non_energy_use
+        - apply_coke_correction

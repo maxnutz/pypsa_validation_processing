@@ -8,6 +8,8 @@ import pytest
 
 from pypsa_validation_processing.utils import (
     REGION_MAPPING,
+    UNITS_MAPPING,
+    apply_coke_correction,
     apply_domestic_share,
     attribute_locations,
     fossil_gas_share,
@@ -462,3 +464,31 @@ class TestNonEnergyUse:
         """D5: an unsupported carrier raises ValueError."""
         with pytest.raises(ValueError, match="carrier"):
             non_energy_use(self._demand({"AT11": 1.0}), shares, "Biomass")
+
+
+class TestApplyCokeCorrection:
+    def test_fallback_is_identity_with_warning(self, caplog):
+        """D6: without kappa the Eurostat fallback kappa = 0 applies, with one WARNING."""
+        coal = pd.Series([10.0, 0.0], index=pd.Index(["AT11", "EU"], name="location"))
+        with caplog.at_level(logging.WARNING):
+            result = apply_coke_correction(coal)
+        assert result.tolist() == [10.0, 0.0]
+        assert len(caplog.records) == 1 and "D6" in caplog.records[0].getMessage()
+
+    def test_kappa_converts_coke_part(self):
+        """D6: the coke part kappa is divided by 1.366."""
+        coal = pd.Series([13.66], index=pd.Index(["AT11"], name="location"))
+        result = apply_coke_correction(coal, kappa=0.5)
+        assert result.tolist() == pytest.approx([6.83 + 5.0])
+
+    def test_kappa_out_of_range_raises(self):
+        """D6: kappa outside [0, 1] raises ValueError."""
+        coal = pd.Series([1.0], index=pd.Index(["AT11"], name="location"))
+        with pytest.raises(ValueError, match="kappa"):
+            apply_coke_correction(coal, kappa=1.5)
+
+
+class TestLandTransportUnit:
+    def test_land_transport_maps_to_mwh(self):
+        """D7: the bus unit label land transport is a permanent UNITS_MAPPING key for MWh."""
+        assert UNITS_MAPPING["land transport"] == "MWh"
