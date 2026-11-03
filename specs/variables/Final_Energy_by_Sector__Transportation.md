@@ -108,4 +108,4 @@ Per C6, MultiIndex `[location, unit]`. Raw units as returned by pypsa (`MWh_el`,
 - #15, #19 (incl. comments), #5; definitions as in section 2
 - `export_ariadne_variables.py` l.2437-2481, 2547-2551 (commit `a5baa7e9`)
 - `prepare_sector_network.py::add_ice_cars` l.2730-2765
-- Current implementation: `statistics_functions.py::Final_Energy_by_Sector__Transportation` l.790-922 (commit `16bf37f`). Differences: SC-7, SC-9, SC-32
+- Current implementation: `statistics_functions.py::Final_Energy_by_Sector__Transportation` l.790-922 (commit `16bf37f`). Differences: SC-9, SC-32 (SC-7 resolved by PR #112)
