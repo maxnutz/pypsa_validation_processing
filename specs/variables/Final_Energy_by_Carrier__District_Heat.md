@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|District Heat`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -103,7 +103,8 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_th` (or `MWh`).
 - AC9: A `DAC` Link with a positive `efficiency` at its `urban central heat` port (heat supply) raises `ValueError`; it is never counted as heat.
 
 ## 12. Open questions
-- None specific. OQ-6, OQ-21 resolved.
+- Check in the implementing PR (WP4): the current function returns non-zero values at the copperplate `EU` (`AT_KN2040`: 2020 389.1 TWh, 2030 66.0, 2040 0.97, 2050 0.18 TWh; PR #120 description), which contradicts OQ-17 ("with D1, only `Net Imports|Oil` is non-zero there"). The values are dropped from the output (C8.7), which may hide an attribution error. Measure the formula of section 7 at `EU` on `AT_KN2040` and `20261020_carbon_accounting_run`: if `urban central heat` buses or their consumers have location `EU`, report it to the owner before merging (OQ-17 or this spec to be revised). See SC-29.
+- OQ-6, OQ-21 resolved.
 
 ## 13. Sources
 - #63 (incl. comment), #73; definitions as in section 2

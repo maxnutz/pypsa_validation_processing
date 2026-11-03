@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|Oil`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -89,7 +89,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `industry_non_energy_shares` | yes | `NE_naphtha` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
-Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land transport` unit in the result (C9.1).
+Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land transport` unit in the result (D7; open: OQ-29).
 
 ## 10. Edge cases
 | Case | Expected behaviour |
@@ -110,6 +110,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 - AC9: As AC3 with `naphtha for industry` Load 10 at `A` and `S[AA, Oil] = 0.8`: `NE_naphtha = 8`, result `0.75·(40 + 10 + 4 + 10 − 8) = 42`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 
 ## 12. Open questions
+- OQ-29 (D7): whether the `land transport` label must be relabelled to `MWh_LHV`; AC5 "no unit `land transport`" holds in both options, because the function normalises to `MWh`.
 - OQ-18 resolved (D5, C2.5). OQ-1, OQ-20, OQ-23, OQ-26, OQ-27 resolved.
 
 ## 13. Sources

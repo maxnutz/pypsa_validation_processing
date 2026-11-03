@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: reviewed
+Status: draft
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
@@ -124,9 +124,11 @@ FE_coal_industry = (L[coal for industry] − NE_coal)·(1 − κ) + (L[coal for 
 - `κ = 0` overestimates coal final energy by at most the factor `1.366` on the coke part.
 
 ## D7 Unit of `land transport oil`
-`land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is a bus label, not a physical unit (C9.1, SC-9). The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.
+`land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is the bus unit label that pypsa-eur assigns (`add_ice_cars` l.2751-2757: `unit="land transport"`), not a carrier and not the name of a physical unit. It is a permanent key of `UNITS_MAPPING` (→ `MWh`; owner, PR #123 review 2026-11-02; C9.1), so it passes result validation. The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.
 
-A statistics function MUST therefore report this flow with unit `MWh_LHV` and MUST NOT divide it by a vehicle efficiency (owner decision 2026-10-22, OQ-19 resolved: the hint in #19 applies only to networks whose Load is not yet fuel energy). Check on AT 2025 (`resources/electricity_network_0p3`): 65.10 TWh = 234.4 PJ, against 267.4 PJ `Final Energy [by Sector]|Transportation|Oil` in the Eurostat energy balance 2024.
+A statistics function MUST report this flow with unit `MWh_LHV` (open since the owner decision of 2026-11-02, see below) and MUST NOT divide it by a vehicle efficiency (owner decision 2026-10-22, OQ-19 resolved: the hint in #19 applies only to networks whose Load is not yet fuel energy). Check on AT 2025 (`resources/electricity_network_0p3`): 65.10 TWh = 234.4 PJ, against 267.4 PJ `Final Energy [by Sector]|Transportation|Oil` in the Eurostat energy balance 2024.
+
+> **Open question (OQ-29):** with `land transport` a permanent key of `UNITS_MAPPING`, is the relabelling to `MWh_LHV` still required, or MAY the function keep the raw label `land transport`? The no-division rule is not affected. Both users (`Final Energy [by Carrier]|Oil`, `Final Energy [by Sector]|Transportation`) normalise to `MWh` before summing (C6.5), so their output does not depend on the answer.
 
 ## D8 Split of decentral heat input between sectors `D8_sec(l)`
 Owner decision 2026-10-22 (OQ-22 resolved): for decentral heat, the `Final Energy [by Sector]` variables measure the **energy input** to decentral heat supply, not the delivered heat. The input is split between sectors per location, in proportion to their heat demands. District heat (`urban central heat`) is not affected; there the delivered heat is counted (`Final Energy [by Carrier]|District Heat`).

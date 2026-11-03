@@ -1,6 +1,6 @@
 # `Final Energy [by Sector]|Transportation`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -82,7 +82,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `energy_totals` | yes | D4 | variable skipped with `WARNING` (C2.4, SC-7) |
 
 ## 9. Return format
-Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transport` unit (C9.1, SC-9).
+Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transport` unit (D7; open: OQ-29).
 
 ## 10. Edge cases
 | Case | Expected behaviour |
@@ -101,7 +101,8 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- None specific. OQ-1, OQ-19 (D7), OQ-24, OQ-27 resolved.
+- OQ-29 (D7): whether the `land transport` label must be relabelled to `MWh_LHV`; AC5 "unit is `MWh`; no `land transport` unit" holds in both options, because the function normalises to `MWh`.
+- OQ-1, OQ-19 (D7), OQ-24, OQ-27 resolved.
 
 ## 13. Sources
 - #15, #19 (incl. comments), #5; definitions as in section 2
