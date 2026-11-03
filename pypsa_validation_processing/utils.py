@@ -370,6 +370,91 @@ def attribute_locations(
     return create_location_index_from_copperplate(flows, list(locations))
 
 
+# D2: carriers that supply oil buses; only ``oil refining`` is fossil (OQ-23)
+OIL_FOSSIL_CARRIERS: tuple[str, ...] = ("oil refining",)
+OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Fischer-Tropsch",
+    "biomass to liquid",
+    "biomass to liquid CC",
+    "electrobiofuels",
+    "unsustainable bioliquids",
+    "import oil",
+)
+
+
+def _fossil_share(
+    supply: pd.Series,
+    fossil: tuple[str, ...],
+    non_fossil: tuple[str, ...],
+    bus_carrier: str,
+) -> float:
+    """Return the fossil share of the yearly *supply* per carrier (D2, D3).
+
+    Parameters
+    ----------
+    supply : pd.Series
+        Yearly supply to buses of *bus_carrier*, indexed by ``carrier``.
+    fossil : tuple[str, ...]
+        Fossil supplying carriers.
+    non_fossil : tuple[str, ...]
+        Non-fossil supplying carriers.
+    bus_carrier : str
+        Bus carrier, used in the error message.
+
+    Returns
+    -------
+    float
+        ``fossil supply / (fossil + non-fossil supply)``, ``0.0`` if the
+        denominator is 0.
+
+    Raises
+    ------
+    ValueError
+        If a carrier outside *fossil* and *non_fossil* has non-zero supply.
+    """
+    supply = supply.groupby("carrier").sum()
+    unknown = supply[~supply.index.isin(fossil + non_fossil) & supply.ne(0)]
+    if not unknown.empty:
+        raise ValueError(
+            f"Unknown carriers {sorted(unknown.index)} supply '{bus_carrier}' "
+            "buses; the spec does not classify them as fossil or non-fossil "
+            "(D2, D3)."
+        )
+    total = supply[supply.index.isin(fossil + non_fossil)].sum()
+    if total == 0:
+        return 0.0
+    return float(supply[supply.index.isin(fossil)].sum() / total)
+
+
+def fossil_oil_share(n: pypsa.Network) -> float:
+    """Return the system-wide fossil share of oil ``f_oil`` (D2).
+
+    Yearly supply to all ``oil`` buses, summed over all locations; Stores are
+    excluded. The same value applies to every location and every snapshot.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network to evaluate.
+
+    Returns
+    -------
+    float
+        ``f_oil`` in ``[0, 1]``; ``0.0`` if no oil is supplied.
+
+    Raises
+    ------
+    ValueError
+        If a component other than a Store with a carrier outside
+        ``OIL_FOSSIL_CARRIERS`` and ``OIL_NON_FOSSIL_CARRIERS`` supplies oil.
+    """
+    supply = n.statistics.supply(
+        bus_carrier="oil", groupby=["carrier"], nice_names=False
+    )
+    supply = supply.drop("Store", level="component", errors="ignore")
+    return _fossil_share(supply, OIL_FOSSIL_CARRIERS, OIL_NON_FOSSIL_CARRIERS, "oil")
+
+
 def setup_logging(level: int | str = logging.WARNING) -> None:
     """Configure root logging once for the package entrypoint.
 

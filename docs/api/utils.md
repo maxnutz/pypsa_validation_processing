@@ -8,3 +8,4 @@
         - get_energy_totals_domestic_share
         - create_location_index_from_copperplate
         - attribute_locations
+        - fossil_oil_share

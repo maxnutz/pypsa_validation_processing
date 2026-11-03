@@ -4,7 +4,11 @@ import pandas as pd
 import pypsa
 import pytest
 
-from pypsa_validation_processing.utils import REGION_MAPPING, attribute_locations
+from pypsa_validation_processing.utils import (
+    REGION_MAPPING,
+    attribute_locations,
+    fossil_oil_share,
+)
 
 GROUPBY = ["name", "carrier", "location", "unit"]
 
@@ -172,3 +176,55 @@ class TestAttributeLocations:
         )
         with pytest.raises(ValueError, match="name"):
             attribute_locations(network, flows)
+
+
+class TestFossilOilShare:
+    @staticmethod
+    def _oil_network(supply: dict[str, float]) -> pypsa.Network:
+        """Return a network whose EU oil bus is supplied by Links of the given carriers."""
+        n = _network(["AT11"])
+        n.add("Bus", "EU oil", carrier="oil", location="EU", unit="MWh_LHV")
+        n.add("Bus", "AT11 feed", carrier="feed", location="AT11")
+        for carrier, p0 in supply.items():
+            _add_link(
+                n,
+                f"AT11 {carrier}",
+                [p0, p0],
+                bus0="AT11 feed",
+                bus1="EU oil",
+                carrier=carrier,
+            )
+        return n
+
+    def test_share_of_oil_refining(self):
+        """D2: f_oil is the yearly oil refining supply over all C_oil supply."""
+        n = self._oil_network({"oil refining": 3.0, "Fischer-Tropsch": 1.0})
+        assert fossil_oil_share(n) == pytest.approx(0.75)
+
+    def test_import_oil_is_non_fossil(self):
+        """D2: import oil counts as non-fossil supply (OQ-23)."""
+        n = self._oil_network({"oil refining": 1.0, "import oil": 1.0})
+        assert fossil_oil_share(n) == pytest.approx(0.5)
+
+    def test_store_is_excluded(self):
+        """D2: supply of the oil Store does not enter f_oil."""
+        n = self._oil_network({"oil refining": 1.0, "electrobiofuels": 1.0})
+        n.add("Store", "EU oil Store", bus="EU oil", carrier="oil")
+        n.stores_t.p["EU oil Store"] = [10.0, 10.0]
+        assert fossil_oil_share(n) == pytest.approx(0.5)
+
+    def test_no_supply_gives_zero(self):
+        """D2: without oil supply f_oil is 0."""
+        n = self._oil_network({"oil refining": 0.0})
+        assert fossil_oil_share(n) == 0.0
+
+    def test_unknown_carrier_with_supply_raises(self):
+        """D2: an unknown carrier with non-zero yearly supply raises ValueError naming it."""
+        n = self._oil_network({"oil refining": 1.0, "mystery oil": 1.0})
+        with pytest.raises(ValueError, match="mystery oil"):
+            fossil_oil_share(n)
+
+    def test_unknown_carrier_without_supply_is_ignored(self):
+        """D2: an unknown carrier with zero yearly supply is ignored."""
+        n = self._oil_network({"oil refining": 1.0, "mystery oil": 0.0})
+        assert fossil_oil_share(n) == pytest.approx(1.0)
