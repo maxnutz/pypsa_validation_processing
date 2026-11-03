@@ -6,7 +6,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 
 "Packaged config" below means the value in `configs/config.default.yaml`; "Default" means the value used when an optional key is absent or `null` (C1.4). Both can differ.
 
-`configs/config.default.yaml` is the only versioned config. The example configs `configs/config.{country,region}-{year,timeseries}.yaml` used by `pixi run workflow_test` are local files only: `.gitignore` l.76 ignores `pypsa_validation_processing/configs/*` (owner, PR #127 review 2026-11-03). Statements about them below describe the maintainer's local copies, not repository content.
+`configs/config.default.yaml` is the only versioned config. The example configs `configs/config.{country,region}-{year,timeseries}.yaml` used by `pixi run workflow_test` are local files only: `.gitignore` l.76 ignores `pypsa_validation_processing/configs/*` (owner, PR #127 review 2026-11-03). Statements about them below describe the maintainer's local copies, not repository content. A versioned set of test configs (folder `config/test`, all important configuration setups, network `resources/electricity_network_0p3`) is planned in #129 (owner, PR #127 review 2026-11-03).
 
 ## Keys
 
