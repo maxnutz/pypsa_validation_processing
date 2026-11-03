@@ -38,7 +38,7 @@ One PR per definition, each with unit tests; listed with the variables that need
 - [ ] D5 non-energy use incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Coal, Industry
 - [ ] D6 coke correction `κ` — Coal, Industry
 - [ ] D7 `land transport oil` — Oil, Transportation: no division by an engine efficiency. No unit relabelling to `MWh_LHV` (OQ-29 resolved 2026-11-03); `land transport` stays a key of `UNITS_MAPPING` (owner, PR #123 review 2026-11-02); the functions MAY return the raw unit `land transport`, `Network_Processor` normalises it after the function (C8 step 2).
-- [ ] Versioned test configs in `config/test` with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03).
+- [ ] Non-versioned test configs in `config/test` with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03).
 - [ ] D8 decentral heat split — Agriculture, Industry, Residential and Commercial
 
 ## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
