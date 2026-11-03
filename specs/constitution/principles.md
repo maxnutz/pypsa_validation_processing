@@ -36,7 +36,7 @@ For every statistics function the implementation source is chosen in this order:
 
 The ported logic is changed only as far as needed to fit the function contract: stand-alone function, shared helpers only in `utils.py` (P4), return format of C6, no country aggregation inside the function. Every such change MUST be listed in the variable spec.
 
-This rule takes precedence over the general hint in `CLAUDE.md` ("Blueprint": "use `pypsa.statistics` more extensively"). The conflict is recorded as SC-14 in [open_questions.md](../open_questions.md) so `CLAUDE.md` can be aligned.
+`CLAUDE.md` ("Blueprint") and `sister_packages/CLAUDE.md` follow this rule since PR #128 (SC-14 resolved, [open_questions.md](../open_questions.md)). If an instruction file disagrees with P6, P6 takes precedence.
 
 ## P7 Requirement language
 Specs use MUST / SHOULD / MAY (RFC 2119 meaning). Acceptance criteria MUST be concrete enough to become unit tests in `tests/`.
