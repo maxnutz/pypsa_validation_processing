@@ -27,7 +27,7 @@ You are working as a senior software engineer on the PyPSA-AT project. PyPSA is 
 - Which variables are executed:
   - `definitions_path: <folder>` -> every variable in the definitions that has a mapping entry; unmapped variables are skipped. Units are converted to the definitions' units if `convert_units: true`.
   - `definitions_path: false` -> every variable in the mapping file; no unit conversion.
-- `Network_Processor._execute_function_for_variable` inspects each function's signature and only passes the optional kwargs it declares: `aggregate_per_year`, `config` (network config of the investment year from `<network_results_path>/configs/config*<year>.yaml`), `energy_totals` (`<network_results_path>/resources/energy_totals.csv`).
+- `Network_Processor._execute_function_for_variable` inspects each function's signature and only passes the optional kwargs it declares: `aggregate_per_year`, `config`, `energy_totals`, `industry_non_energy_shares` (sources and fallbacks: C2 in `specs/contracts.md`).
 - All functions in `pypsa_validation_processing/statistics_functions.py` are stand-alone. They can only rely on helper functions in `pypsa_validation_processing/utils.py` for general tasks that need to be executed in multiple functions.
 - **Blueprint:** [export_ariadne_variables.py](https://github.com/PyPSA/pypsa-de/blob/main/scripts/pypsa-de/export_ariadne_variables.py) is the blueprint for this implementation. port its logic for variables it evaluates (exact or semantic match, P6 in `specs/constitution/principles.md`); use `pypsa.statistics` evaluations for variables without a match. Deviations from the ported logic are allowed only as listed in the variable spec in `specs/variables/`.
 
@@ -52,8 +52,8 @@ Before writing any code:
 ### Local debugging
 - locally, use the `pixi run workflow_test` for debugging. This statement includes all possible evaluation setups.
 - Test if `pypsa.statistics`-function calls return values.
-  - empty pd.DataFrame or pd.DataFrame with all NaN values are not valid.
-  - empty pd.Series or pd.Series with all NaN values are not valid.
+  - If none of the requested carriers exist in the network, `pypsa.statistics` returns an empty `pd.Series` (zero rows), also with `groupby_time=False`; a non-existent `bus_carrier` raises `ValueError`. The statistics function must turn an empty pypsa result into `0.0` for every location (C6.13, `specs/contracts.md`). An empty *function* result (zero rows) is a structural error and aborts the run (C6.7).
+  - All-zero or all-NaN values are valid results (C6), but they can also point to an error in the evaluation setup (e.g. a wrong carrier or component name). Be very careful: check them against the network before accepting them.
 
 ### Function Architecture (Critical)
 - Statistics functions in `statistics_functions.py`: each is independent, can only call helpers from `utils.py`
@@ -62,7 +62,7 @@ Before writing any code:
 - **Practical example:** If you create `calculate_foo()` and `calculate_bar()`, they must never import or call each other. Shared logic goes into `utils.py`.
 
 ## Code Style
-- Python ≥ 3.12; type hints in all function signatures
+- Python ≥ 3.11 (`pixi.toml` is authoritative); type hints in all function signatures
 - Docstrings in NumPy style (no type hints in docstrings — they're in the signature)
 - Black formatter for formatting (`pixi run black .`)
 
