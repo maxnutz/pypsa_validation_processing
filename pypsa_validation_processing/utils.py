@@ -1,7 +1,9 @@
 """Static information and general utility functions for pypsa_validation_processing."""
 
 import logging
+
 import pandas as pd
+import pypsa
 
 EU27_COUNTRY_CODES: dict[str, str] = {
     "AL": "Albania",
@@ -312,6 +314,60 @@ def create_location_index_from_copperplate(
     output = raw_input.copy()
     output.index = new_index
     return output
+
+
+def attribute_locations(
+    n: pypsa.Network, flows: pd.Series | pd.DataFrame
+) -> pd.Series | pd.DataFrame:
+    """Attribute flows on copperplate buses to a location (D1).
+
+    ``pypsa.statistics`` already attributes a flow to the location of the bus
+    at the evaluated port (D1.1, D1.2). This helper applies the copperplate
+    exception: a Link flow at location ``EU`` is moved to the location of the
+    Link's ``bus1`` (D1.3). If ``bus1`` is a copperplate bus as well, the flow
+    stays at ``EU`` (D1.4). Flows of other components are not changed.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network the flows were evaluated on.
+    flows : pd.Series | pd.DataFrame
+        Result of a ``pypsa.statistics`` call whose index contains the levels
+        ``component``, ``name`` and ``location``. ``pypsa.statistics`` drops
+        the ``component`` level if ``components`` is a single string, so pass
+        a list (e.g. ``components=["Link"]``).
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Copy of *flows* with the ``location`` level replaced. Rows are not
+        regrouped, so two rows may now share all index values.
+
+    Raises
+    ------
+    ValueError
+        If the index of *flows* lacks one of the required levels.
+    """
+    missing = [
+        level
+        for level in ("component", "name", "location")
+        if level not in flows.index.names
+    ]
+    if missing:
+        raise ValueError(
+            f"flows lack the index levels {missing} (D1). Group by 'name' and "
+            "'location', and pass 'components' as a list: pypsa drops the "
+            "'component' level for a single component given as a string."
+        )
+    index = flows.index.to_frame(index=False)
+    on_copperplate = (index["component"] == "Link") & (
+        index["location"] == COPPERPLATE_LOCATION
+    )
+    bus1 = n.links["bus1"].reindex(index.loc[on_copperplate, "name"])
+    receiving = n.buses["location"].reindex(bus1).to_numpy()
+    locations = index["location"].to_numpy(dtype=object, copy=True)
+    locations[on_copperplate.to_numpy()] = receiving
+    return create_location_index_from_copperplate(flows, list(locations))
 
 
 def setup_logging(level: int | str = logging.WARNING) -> None:
