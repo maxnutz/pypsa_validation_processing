@@ -52,7 +52,7 @@ Before writing any code:
 ### Local debugging
 - locally, use the `pixi run workflow_test` for debugging. This statement includes all possible evaluation setups.
 - Test if `pypsa.statistics`-function calls return values.
-  - An empty result (zero rows) is a structural error and aborts the run (C6, `specs/contracts.md`).
+  - If none of the requested carriers exist in the network, `pypsa.statistics` returns an empty `pd.Series` (zero rows), also with `groupby_time=False`; a non-existent `bus_carrier` raises `ValueError`. The statistics function must turn an empty pypsa result into `0.0` for every location (C6.13, `specs/contracts.md`). An empty *function* result (zero rows) is a structural error and aborts the run (C6.7).
   - All-zero or all-NaN values are valid results (C6), but they can also point to an error in the evaluation setup (e.g. a wrong carrier or component name). Be very careful: check them against the network before accepting them.
 
 ### Function Architecture (Critical)
