@@ -4,7 +4,9 @@ Status: draft
 
 The package config is a YAML file passed via `--config <path>`; without `--config`, `pypsa_validation_processing/configs/config.default.yaml` is used and a `WARNING` is logged (`workflow.py::resolve_config_path`). Validation rules and errors: [contracts.md](contracts.md) C1.
 
-"Packaged config" below means the value in `configs/config.default.yaml`; "Default" means the value used when the key is absent. Both can differ.
+"Packaged config" below means the value in `configs/config.default.yaml`; "Default" means the value used when an optional key is absent or `null` (C1.4). Both can differ.
+
+`configs/config.default.yaml` is the only versioned config. The example configs `configs/config.{country,region}-{year,timeseries}.yaml` used by `pixi run workflow_test` are local files only: `.gitignore` l.76 ignores `pypsa_validation_processing/configs/*` (owner, PR #127 review 2026-11-03). Statements about them below describe the maintainer's local copies, not repository content.
 
 ## Keys
 
@@ -24,9 +26,9 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 | `industry_non_energy_shares_path` | path (string) | no | – (not set) | CSV file written by `eurostat-energy-balance_processing` | Eurostat fallback for industrial non-energy use (C2.5, D5). An empty value (`null`) or an empty or whitespace-only string means "not set". Not set, not existing or not readable → variables needing it are skipped with `WARNING`. | wrong type: `ValueError`; unreadable file: `WARNING`, skip (C2.5); invalid content: `ValueError` (C2.5) |
 | `industry_non_energy_shares_year` | `latest` or int | no | `latest` | `latest`, a year present in the shares file | Year of the Eurostat shares (C2.5): `latest` = latest year per country and carrier; a year = rows of that year only. Empty value (`null`) = `latest`. Checked and used only if the shares file is read; ignored otherwise, also with a wrong type (C2.5). | only if the file is read: wrong type: `ValueError`; year not in the file: `ValueError` (C2.5) |
 
-Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). The code (PR #122) treats `null` for an optional key other than the two `industry_non_energy_shares_*` keys as a wrong type; not yet confirmed by the owner (OQ-30). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
+Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). `null` (empty value) is not a wrong type for an optional key: it means "not set" and the default applies, for every optional key (owner, PR #127 review 2026-11-03, OQ-30). The code (PR #122) still raises `ValueError` for `null` in optional keys other than the two `industry_non_energy_shares_*` keys (SC-44). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
 
-Sources: `class_definitions.py::Network_Processor.__init__`, `_validate_config` (PR #122); `configs/config.default.yaml`; `configs/config.{country,region}-{year,timeseries}.yaml`; `README.md` "Set the config parameters"; owner decisions in the kick-off (`output_path`, `map_country_codes_to_names`, `country`) and kick-off review (`output_path` = repository-root `resources/`).
+Sources: `class_definitions.py::Network_Processor.__init__`, `_validate_config` (PR #122); `configs/config.default.yaml`; local example configs `configs/config.{country,region}-{year,timeseries}.yaml` (not versioned); `README.md` "Set the config parameters"; owner decisions in the kick-off (`output_path`, `map_country_codes_to_names`, `country`) and kick-off review (`output_path` = repository-root `resources/`).
 
 ## Notes per key
 
@@ -41,10 +43,10 @@ Default choice and packaged config: `sister_packages/energy-scenarios-at-workflo
 
 YAML 1.1 (`yaml.safe_load`) parses some unquoted codes as non-strings: `country: NO` becomes boolean `false` (checked 2026-10-07). Such codes MUST be quoted (`country: "NO"`); an unquoted one is rejected as a wrong type (C1.4).
 
-Since PR #122 the code accepts the 249 assigned ISO 3166-1 alpha-2 codes (`utils.ISO_3166_ALPHA2_CODES`), `EU` and `all`, case-sensitively; `XK`, `GB0`, `GB1`, `EL`, `UK` and lower-case codes are rejected (OQ-4, OQ-31).
+Codes are case-sensitive; lower-case codes are rejected (owner, PR #127 review 2026-11-03, OQ-31). Since PR #122 the code accepts the 249 assigned ISO 3166-1 alpha-2 codes (`utils.ISO_3166_ALPHA2_CODES`), `EU` and `all`, and rejects `XK`, `GB0`, `GB1`, `EL`, `UK`; pypsa-eur vs. Eurostat notation is open (OQ-4).
 
 ### `convert_units`
-Only `config.default.yaml`, `config.country-timeseries.yaml` and `config.region-timeseries.yaml` set it (`true`); the other example configs rely on the default.
+`config.default.yaml` sets it (`true`). In the local example configs (not versioned), `config.country-timeseries.yaml` and `config.region-timeseries.yaml` set it, the others rely on the default.
 
 ### `mapping_path`
 Packaged config: commented out (default applies). The repository contains only `configs/mapping.default.yaml`; further mapping files in `configs/` (e.g. a local `mapping.prices_ie.yaml`) are not versioned (`.gitignore` l.76 ignores `pypsa_validation_processing/configs/*`).

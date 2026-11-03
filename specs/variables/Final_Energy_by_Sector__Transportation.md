@@ -31,7 +31,7 @@ Implementing PR: –
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
-| PyPSA unit(s) | `MWh_el` (BEV charger), `MWh_LHV` (H2, liquids; `land transport` relabelled, D7) | bus units |
+| PyPSA unit(s) | `MWh_el` (BEV charger), `MWh_LHV` (H2, liquids), `land transport` (bus unit of `land transport oil`, D7) | bus units |
 | Normalised unit | `MWh` (the function MUST normalise, because carriers with different units are summed; C6.5) | `UNITS_MAPPING` |
 | Target unit | `TJ` | definitions file |
 | Conversion | MWh → TJ, 0.0036 | C9 |
@@ -82,7 +82,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `energy_totals` | yes | D4 | variable skipped with `WARNING` (C2.4, SC-7) |
 
 ## 9. Return format
-Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transport` unit (D7; open: OQ-29).
+Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transport` unit, because the function normalises all units to `MWh` (C6.5, D7).
 
 ## 10. Edge cases
 | Case | Expected behaviour |
@@ -101,7 +101,7 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- OQ-29 (D7): whether the `land transport` label must be relabelled to `MWh_LHV`; AC5 "unit is `MWh`; no `land transport` unit" holds in both options, because the function normalises to `MWh`.
+- OQ-29 resolved (2026-11-03): no relabelling to `MWh_LHV` (D7).
 - OQ-1, OQ-19 (D7), OQ-24, OQ-27 resolved.
 
 ## 13. Sources
