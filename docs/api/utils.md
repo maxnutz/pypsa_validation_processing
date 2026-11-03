@@ -11,3 +11,4 @@
         - fossil_oil_share
         - fossil_gas_share
         - apply_domestic_share
+        - non_energy_use

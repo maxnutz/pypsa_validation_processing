@@ -1,5 +1,7 @@
 """Tests for pypsa_validation_processing.utils."""
 
+import logging
+
 import pandas as pd
 import pypsa
 import pytest
@@ -10,6 +12,7 @@ from pypsa_validation_processing.utils import (
     attribute_locations,
     fossil_gas_share,
     fossil_oil_share,
+    non_energy_use,
 )
 
 GROUPBY = ["name", "carrier", "location", "unit"]
@@ -368,3 +371,94 @@ class TestApplyDomesticShare:
         """D4: a kind other than aviation or navigation raises ValueError."""
         with pytest.raises(ValueError, match="kind"):
             apply_domestic_share(self._flows({"AT11": 1.0}), totals, "rail")
+
+
+class TestNonEnergyUse:
+    @staticmethod
+    def _demand(values: dict[str, float]) -> pd.Series:
+        """Return yearly industry demand indexed by location and unit."""
+        return pd.Series(
+            values.values(),
+            index=pd.MultiIndex.from_tuples(
+                [(loc, "MWh_LHV") for loc in values], names=["location", "unit"]
+            ),
+        )
+
+    @pytest.fixture
+    def shares(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {"non_energy_share": [0.1, 0.8, 0.2, 0.3, 0.6, 0.0]},
+            index=pd.MultiIndex.from_tuples(
+                [
+                    ("AT", "Natural Gas"),
+                    ("AT", "Oil"),
+                    ("AT", "Coal"),
+                    ("DE", "Natural Gas"),
+                    ("DE", "Oil"),
+                    ("DE", "Coal"),
+                ],
+                names=["country", "carrier"],
+            ),
+        )
+
+    def test_share_of_country(self, shares):
+        """D5: NE_x(l) is the share of the country of l times the demand at l."""
+        demand = self._demand({"AT11": 100.0, "DE1": 100.0})
+        result = non_energy_use(demand, shares, "Natural Gas")
+        assert result.tolist() == pytest.approx([10.0, 30.0])
+
+    def test_oil_and_coal_use_their_rows(self, shares):
+        """D5: Oil and Coal use the shares of their own carrier."""
+        demand = self._demand({"AT11": 10.0})
+        assert non_energy_use(demand, shares, "Oil").tolist() == pytest.approx([8.0])
+        assert non_energy_use(demand, shares, "Coal").tolist() == pytest.approx([2.0])
+
+    def test_missing_country_uses_mean_with_warning(self, shares, caplog):
+        """D5: a country without a row gets the mean of the carrier, with one WARNING."""
+        demand = self._demand({"CH": 100.0, "CH1": 10.0})
+        with caplog.at_level(logging.WARNING):
+            result = non_energy_use(demand, shares, "Oil")
+        assert result.tolist() == pytest.approx([70.0, 7.0])
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "CH" in warnings[0].getMessage() and "Oil" in warnings[0].getMessage()
+
+    def test_copperplate_uses_mean_without_warning(self, shares, caplog):
+        """D5: the copperplate EU gets the mean without a WARNING."""
+        demand = self._demand({"AT11": 0.0, "EU": 10.0})
+        with caplog.at_level(logging.WARNING):
+            result = non_energy_use(demand, shares, "Natural Gas")
+        assert result.tolist() == pytest.approx([0.0, 2.0])
+        assert not caplog.records
+
+    def test_h2_is_zero_with_warning(self, shares, caplog):
+        """D5: NE_H2 is 0, with one WARNING per call."""
+        demand = self._demand({"AT11": 10.0})
+        with caplog.at_level(logging.WARNING):
+            result = non_energy_use(demand, None, "H2")
+        assert result.tolist() == [0.0]
+        assert len(caplog.records) == 1 and "H2" in caplog.records[0].getMessage()
+
+    def test_time_series_bounded_by_demand(self, shares):
+        """D5: per snapshot 0 <= NE_x(l) <= demand(l)."""
+        demand = pd.DataFrame(
+            [[10.0, 0.0], [5.0, 20.0]],
+            index=self._demand({"AT11": 0.0, "DE1": 0.0}).index,
+            columns=pd.date_range("2025-01-01", periods=2, freq="3h"),
+        )
+        result = non_energy_use(demand, shares, "Oil")
+        assert isinstance(result, pd.DataFrame)
+        assert result.to_numpy().ravel().tolist() == pytest.approx(
+            [8.0, 0.0, 3.0, 12.0]
+        )
+        assert ((result >= 0) & (result <= demand)).all().all()
+
+    def test_missing_shares_raises(self):
+        """D5: shares None for Natural Gas, Oil or Coal raises ValueError."""
+        with pytest.raises(ValueError, match="industry_non_energy_shares"):
+            non_energy_use(self._demand({"AT11": 1.0}), None, "Coal")
+
+    def test_unknown_carrier_raises(self, shares):
+        """D5: an unsupported carrier raises ValueError."""
+        with pytest.raises(ValueError, match="carrier"):
+            non_energy_use(self._demand({"AT11": 1.0}), shares, "Biomass")

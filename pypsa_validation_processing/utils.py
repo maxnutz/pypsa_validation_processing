@@ -5,6 +5,8 @@ import logging
 import pandas as pd
 import pypsa
 
+logger = logging.getLogger(__name__)
+
 EU27_COUNTRY_CODES: dict[str, str] = {
     "AL": "Albania",
     "AT": "Austria",
@@ -562,6 +564,70 @@ def apply_domestic_share(
     share = domestic.div(total).where(total.ne(0), 0.0)
     factor = pd.Series(countries, index=flows.index).map(share).fillna(0.0)
     return flows.mul(factor, axis=0)
+
+
+def non_energy_use(
+    demand: pd.Series | pd.DataFrame,
+    shares: pd.DataFrame | None,
+    carrier: str,
+) -> pd.Series | pd.DataFrame:
+    """Return the industrial non-energy use ``NE_x(l)`` (D5, Eurostat fallback).
+
+    ``NE_x(l) = S[c, x] · demand(l)`` with ``c`` = the first two characters of
+    the location and ``S`` the Eurostat shares (C2.5). A country without a row
+    for *carrier* gets the unweighted mean of all rows of *carrier*, with one
+    ``WARNING`` per call naming the countries (none for the copperplate
+    ``EU``). ``NE_H2`` is 0, with one ``WARNING`` per call. Since
+    ``0 ≤ S ≤ 1`` (checked at initialisation), ``0 ≤ NE_x(l) ≤ demand(l)``.
+
+    Parameters
+    ----------
+    demand : pd.Series | pd.DataFrame
+        Industry demand of *carrier* (e.g. the ``gas for industry`` Load) with
+        a ``location`` index level; a DataFrame has snapshots as columns.
+    shares : pd.DataFrame | None
+        Index (``country``, ``carrier``), column ``non_energy_share`` (C2.5).
+    carrier : str
+        ``"Natural Gas"``, ``"Oil"``, ``"Coal"`` or ``"H2"``.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Non-energy use with the index and columns of *demand*.
+
+    Raises
+    ------
+    ValueError
+        If *carrier* is not supported, or *shares* is ``None`` for a carrier
+        other than ``"H2"``.
+    """
+    if carrier == "H2":
+        logger.warning(
+            "H2 non-energy use is skipped: Eurostat has no hydrogen share (D5)."
+        )
+        return demand * 0.0
+    if carrier not in ("Natural Gas", "Oil", "Coal"):
+        raise ValueError(
+            "carrier must be 'Natural Gas', 'Oil', 'Coal' or 'H2', " f"got: {carrier!r}"
+        )
+    if shares is None:
+        raise ValueError("industry_non_energy_shares is required (D5, C2.5).")
+    carrier_shares = shares.xs(carrier, level="carrier")["non_energy_share"]
+    countries = pd.Series(
+        demand.index.get_level_values("location").str[:2], index=demand.index
+    )
+    missing = sorted(
+        set(countries) - set(carrier_shares.index) - {COPPERPLATE_LOCATION}
+    )
+    if missing:
+        logger.warning(
+            "No industry non-energy share of '%s' for %s; using the mean of all "
+            "countries in the shares table (D5).",
+            carrier,
+            missing,
+        )
+    factor = countries.map(carrier_shares).fillna(carrier_shares.mean())
+    return demand.mul(factor, axis=0)
 
 
 def setup_logging(level: int | str = logging.WARNING) -> None:
