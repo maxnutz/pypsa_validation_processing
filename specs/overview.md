@@ -40,9 +40,10 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
    3. For each variable, call its statistics function with `n` and the optional kwargs it declares (C5). Result: `pd.Series` or `pd.DataFrame` per C6.
    4. Post-process the result, in this order (C8 "Post-processing order"):
       1. Validate the result structure (C6.9) and the raw unit labels (C9.1).
-      2. **Aggregation:** aggregate or filter by `aggregation_level` and `country` and over extra index levels, grouped by the raw PyPSA unit labels (e.g. `MWh_el` and `MWh_th` stay separate), with the class-specific operation (C8).
-      3. **Unit label normalisation** via `UNITS_MAPPING` (C9.1), e.g. `MWh_el`, `MWh_th` → `MWh`.
-      4. **Re-groupby** by region and normalised unit with the class-specific operation (sum for `flow` and `stock`, weighted mean for `intensive`; C8); then drop `weight` rows and add the `variable` level.
+      2. Drop the copperplate pseudo-location `EU` (C8.7); a result with no rows left is skipped for this network.
+      3. **Aggregation:** aggregate or filter by `aggregation_level` and `country` and over extra index levels, grouped by the raw PyPSA unit labels (e.g. `MWh_el` and `MWh_th` stay separate), with the class-specific operation (C8).
+      4. **Unit label normalisation** via `UNITS_MAPPING` (C9.1), e.g. `MWh_el`, `MWh_th` → `MWh`.
+      5. **Re-groupby** by region and normalised unit with the class-specific operation (sum for `flow` and `stock`, weighted mean for `intensive`; C8); then drop `weight` rows and add the `variable` level.
 4. **Assembly.**
    - `aggregate_per_year: true`: merge all years into one table with one column per investment year.
    - `aggregate_per_year: false`: keep one table per investment year; replace the snapshot year by the investment year (C10).
@@ -54,7 +55,7 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
 |---|---|---|
 | CLI / workflow | `pypsa_validation_processing/workflow.py` | Argument parsing, logging setup, orchestration. Root `workflow.py` is a compatibility wrapper only. |
 | `Network_Processor` | `pypsa_validation_processing/class_definitions.py` | Config validation, input reading, function dispatch, aggregation, unit handling, pyam structuring, export. |
-| `format_timestamps` | `pypsa_validation_processing/class_definitions.py` | Normalises column labels to integer years or UTC timestamps. |
+| `format_timestamps` | `pypsa_validation_processing/class_definitions.py` | Normalises column labels to integer years or timezone-aware timestamps (naive → UTC, aware kept; C10.5). |
 | Statistics functions | `pypsa_validation_processing/statistics_functions.py` | One stand-alone function per IAMC variable (C5–C7). |
 | Helpers and static data | `pypsa_validation_processing/utils.py` | Shared helpers for statistics functions; `UNITS_MAPPING`, `REGION_MAPPING`, `EU27_COUNTRY_CODES`, `statistics_kwargs*`. |
 | Configs and mappings | `pypsa_validation_processing/configs/` | Packaged default config, example setups, mapping files. |

@@ -19,4 +19,4 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Final Energy [by Sector]\|Agriculture` | [Final_Energy_by_Sector__Agriculture.md](Final_Energy_by_Sector__Agriculture.md) | exact | reviewed |
 | `Final Energy [by Sector]\|Residential and Commercial` | [Final_Energy_by_Sector__Residential_and_Commercial.md](Final_Energy_by_Sector__Residential_and_Commercial.md) | exact | reviewed |
 
-Not yet specified: `Prices|Final Energy|Electricity` (#99; mapped only in `mapping.prices_ie.yaml`, no working implementation).
+Not yet specified: `Prices|Final Energy|Electricity` (#99; no implementation, no entry in `mapping.default.yaml`; it will be the first `intensive` variable, C4.5).

@@ -11,20 +11,20 @@ Version constraints are taken from `pixi.toml` and `pyproject.toml`; locked vers
 |---|---|---|---|
 | Python | `>=3.11` | 3.14.3 | `pixi.toml` `[dependencies]`, `pyproject.toml` `requires-python`, `pixi.lock` |
 
-The package MUST support Python `>=3.11` (`pixi.toml`). `CLAUDE.md` and `docs/contributing.md` state ≥ 3.12; they are to be aligned (SC-12 in [open_questions.md](../open_questions.md)).
+The package MUST support Python `>=3.11` (`pixi.toml`). `docs/contributing.md` was aligned in PR #125; `CLAUDE.md` still states ≥ 3.12 and is to be aligned on owner request (SC-12 in [open_questions.md](../open_questions.md)).
 
 ## Environment
 - Pixi workspace `pypsa-validation-processing`, channel `conda-forge`, platforms `linux-64`, `osx-arm64`, `osx-64`, `win-64` (`pixi.toml` `[workspace]`).
 - Tasks (`pixi.toml` `[tasks]`):
   - `workflow`: `python workflow.py` (packaged default config).
-  - `workflow_test`: runs the four `config.{country,region}-{year,timeseries}.yaml` setups, then `pytest tests/ -v`.
+  - `workflow_test`: runs the four `config.{country,region}-{year,timeseries}.yaml` setups, then `pytest tests/ -v`. These configs are local files, not in the repository (`.gitignore` l.76; configuration.md).
   - `test`: `pytest tests/ -v --cov=pypsa_validation_processing --cov-report=term-missing --cov-fail-under=90`.
 - Package build: setuptools (`pyproject.toml` `[build-system]`); CLI entry point `pypsa-validation-processing = pypsa_validation_processing.workflow:main`.
 
 ## Runtime libraries
 | Library | Constraint | Locked | Role in this package |
 |---|---|---|---|
-| `pypsa` | none (only `pyproject.toml` `dependencies`) | 1.1.2 | Reads networks as `pypsa.NetworkCollection`; `n.statistics` accessor is the main computation API of statistics functions; `n.meta` carries the investment year. |
+| `pypsa` | `>=1.1` (`pixi.toml` `[pypi-dependencies]`, since PR #125) | 1.1.2 | Reads networks as `pypsa.NetworkCollection`; `n.statistics` accessor is the main computation API of statistics functions; `n.meta` carries the investment year. |
 | `pandas` | `>=1.0.0` | 2.3.3 | Internal data model: `pd.Series` / `pd.DataFrame` with MultiIndex (`location`, `unit`, …). |
 | `pyam-iamc` | `>=2.0.0` | 3.2.0 | `pyam.IamDataFrame` as output structure; `convert_unit`; `to_excel`. |
 | `nomenclature-iamc` | `>=0.29` | 0.29.4 | `nomenclature.DataStructureDefinition` reads variable/region definitions and their units. |
@@ -34,7 +34,7 @@ The package MUST support Python `>=3.11` (`pixi.toml`). `CLAUDE.md` and `docs/co
 | `openpyxl` | `>=3.0` | 3.1.5 | Excel engine for `IamDataFrame.to_excel`. |
 | `numpy` | `>=1.18.0` | 2.4.3 | Numerical helper in statistics functions. |
 
-> **Open question:** `pypsa` is not declared in `pixi.toml`; it enters only through the editable install of this package (`pyproject.toml`). See SC-13.
+`requests` is not a direct dependency (removed from `pixi.toml` in PR #125, OQ-16 resolved); it is installed only transitively.
 
 Which behaviour of each library the package relies on is specified in [contracts.md](../contracts.md) C11.
 
