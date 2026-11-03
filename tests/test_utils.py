@@ -12,6 +12,7 @@ from pypsa_validation_processing.utils import (
     apply_coke_correction,
     apply_domestic_share,
     attribute_locations,
+    decentral_heat_split,
     fossil_gas_share,
     fossil_oil_share,
     non_energy_use,
@@ -492,3 +493,205 @@ class TestLandTransportUnit:
     def test_land_transport_maps_to_mwh(self):
         """D7: the bus unit label land transport is a permanent UNITS_MAPPING key for MWh."""
         assert UNITS_MAPPING["land transport"] == "MWh"
+
+
+class TestDecentralHeatSplit:
+    @staticmethod
+    def _link(n: pypsa.Network, name: str, p: dict[int, float], **attrs) -> None:
+        """Add a Link with constant dispatch p[i] (MW, positive = withdrawal) at port i."""
+        n.add("Link", name, **attrs)
+        for port, value in p.items():
+            n.links_t[f"p{port}"][name] = [value, value]
+
+    @staticmethod
+    def _load(n: pypsa.Network, name: str, bus: str, p: float) -> None:
+        """Add a Load with constant withdrawal p (MW)."""
+        n.add("Load", name, bus=bus, carrier=name.split(" ", 1)[1])
+        n.loads_t.p[name] = [p, p]
+
+    @pytest.fixture
+    def network(self) -> pypsa.Network:
+        n = _network(["AT11", "DE1"])
+        n.buses["unit"] = "MWh_th"
+        n.add(
+            "Bus",
+            "AT11 urban decentral heat",
+            carrier="urban decentral heat",
+            location="AT11",
+            unit="MWh_th",
+        )
+        n.add("Bus", "AT11 water tanks", carrier="rural water tanks", location="AT11")
+        for bus, carrier, location, unit in [
+            ("AT11 gas", "gas", "AT11", "MWh_LHV"),
+            ("DE1 gas", "gas", "DE1", "MWh_LHV"),
+            ("EU oil", "oil", "EU", "MWh_LHV"),
+            ("AT11 low voltage", "low voltage", "AT11", "MWh_el"),
+            ("AT11", "AC", "AT11", "MWh_el"),
+            ("AT11 biogas", "biogas", "AT11", "MWh_LHV"),
+            ("co2 atmosphere", "co2", "EU", "t_co2"),
+        ]:
+            n.add("Bus", bus, carrier=carrier, location=location, unit=unit)
+        heat = "AT11 rural heat"
+        self._link(
+            n,
+            "AT11 rural gas boiler",
+            {0: 3.0, 1: -2.7, 2: -0.6},
+            bus0="AT11 gas",
+            bus1=heat,
+            bus2="co2 atmosphere",
+            carrier="rural gas boiler",
+        )
+        self._link(
+            n,
+            "AT11 rural oil boiler",
+            {0: 1.5, 1: -1.4},
+            bus0="EU oil",
+            bus1=heat,
+            carrier="rural oil boiler",
+        )
+        self._link(
+            n,
+            "AT11 rural air heat pump",
+            {0: -3.0, 1: 1.0},
+            bus0=heat,
+            bus1="AT11 low voltage",
+            carrier="rural air heat pump",
+        )
+        self._link(
+            n,
+            "AT11 biogas CHP",
+            {0: 2.0, 1: -0.8, 2: -0.9},
+            bus0="AT11 biogas",
+            bus1="AT11",
+            bus2=heat,
+            carrier="biogas CHP",
+        )
+        self._link(
+            n,
+            "AT11 rural water tanks charger",
+            {0: 0.5, 1: -0.5},
+            bus0=heat,
+            bus1="AT11 water tanks",
+            carrier="rural water tanks charger",
+        )
+        self._link(
+            n,
+            "AT11 rural water tanks discharger",
+            {0: 0.5, 1: -0.5},
+            bus0="AT11 water tanks",
+            bus1=heat,
+            carrier="rural water tanks discharger",
+        )
+        self._link(
+            n,
+            "DE1 rural gas boiler",
+            {0: 1.0, 1: -0.9},
+            bus0="DE1 gas",
+            bus1="DE1 rural heat",
+            carrier="rural gas boiler",
+        )
+        self._link(
+            n,
+            "AT11 urban decentral resistive heater",
+            {0: 4.0, 1: -4.0},
+            bus0="AT11 low voltage",
+            bus1="AT11 urban decentral heat",
+            carrier="urban decentral resistive heater",
+        )
+        self._link(
+            n,
+            "AT11 DAC",
+            {0: 1.0, 1: 0.0},
+            bus0="AT11 urban decentral heat",
+            bus1="co2 atmosphere",
+            carrier="DAC",
+        )
+        for name, p in [
+            ("AT11 rural solar thermal", 0.6),
+            ("AT11 rural heat vent", -0.3),
+        ]:
+            n.add("Generator", name, bus=heat, carrier=name.split(" ", 1)[1])
+            n.generators_t.p[name] = [p, p]
+        self._load(n, "AT11 rural heat", heat, 2.0)
+        self._load(n, "AT11 agriculture heat", heat, 1.0)
+        self._load(n, "AT11 urban decentral heat", "AT11 urban decentral heat", 2.0)
+        self._load(
+            n,
+            "AT11 low-temperature heat for industry",
+            "AT11 urban decentral heat",
+            1.0,
+        )
+        return n
+
+    def test_rural_input_split_by_demand(self, network):
+        """D8: rural heat input (incl. D1, solar, CHP heat) is split 2:1 between rc and agr."""
+        result = decentral_heat_split(network)
+        rural = result.xs("AT11", level="location").drop(
+            "urban decentral heat", level="carrier", errors="ignore"
+        )
+        rc = rural.xs("rc", level="sector").droplevel("unit")
+        assert rc.drop("low voltage").to_dict() == pytest.approx(
+            {"gas": 12.0, "oil": 6.0, "rural heat": 6.0}
+        )
+        assert rural.xs("agr", level="sector").sum() == pytest.approx(42.0 / 3)
+
+    def test_excluded_flows(self, network):
+        """D8: CO2 output, CHP fuel and electricity, storage and heat vent are not input."""
+        result = decentral_heat_split(network)
+        carriers = set(result.index.get_level_values("carrier"))
+        assert carriers == {"gas", "oil", "low voltage", "rural heat"}
+
+    def test_urban_decentral_other_demand(self, network):
+        """D8: DAC is other demand; the input is split rc 1/2, ind 1/4, other 1/4."""
+        result = decentral_heat_split(network).xs("AT11", level="location")
+        lv = result.xs("low voltage", level="carrier").droplevel("unit")
+        # urban: 24 MWh resistive heater; rural: 6 MWh heat pump split 2:1
+        assert lv.to_dict() == pytest.approx(
+            {"rc": 12.0 + 4.0, "agr": 2.0, "ind": 6.0, "other": 6.0}
+        )
+
+    def test_consistency_per_location(self, network):
+        """D8: the sector values sum to the total input at a location with demand."""
+        result = decentral_heat_split(network).xs("AT11", level="location")
+        assert result.sum() == pytest.approx(18.0 + 9.0 + 6.0 + 9.0 + 24.0)
+
+    def test_location_without_demand_gets_zero(self, network):
+        """D8: a location without heat demand has shares 0."""
+        result = decentral_heat_split(network).xs("DE1", level="location")
+        assert result.abs().sum() == 0.0
+
+    def test_units_are_normalised(self, network):
+        """D8: all units are normalised to MWh (C6.5)."""
+        result = decentral_heat_split(network)
+        assert set(result.index.get_level_values("unit")) == {"MWh"}
+
+    def test_time_series_matches_year(self, network):
+        """D8: snapshot values weighted over the year equal the yearly values."""
+        yearly = decentral_heat_split(network)
+        series = decentral_heat_split(network, aggregate_per_year=False)
+        assert isinstance(series, pd.DataFrame)
+        assert list(series.columns) == list(network.snapshots)
+        weighted = series.mul(network.snapshot_weightings.generators, axis=1)
+        pd.testing.assert_series_equal(weighted.sum(axis=1), yearly, check_names=False)
+
+    def test_generator_only_supply(self):
+        """D8: a heat bus supplied only by solar thermal gives the solar heat as input."""
+        n = _network(["AT11"])
+        n.buses["unit"] = "MWh_th"
+        n.add(
+            "Generator",
+            "AT11 rural solar thermal",
+            bus="AT11 rural heat",
+            carrier="rural solar thermal",
+        )
+        n.generators_t.p["AT11 rural solar thermal"] = [1.0, 1.0]
+        self._load(n, "AT11 rural heat", "AT11 rural heat", 1.0)
+        result = decentral_heat_split(n)
+        assert result.xs("rc", level="sector").sum() == pytest.approx(6.0)
+
+    def test_network_without_decentral_heat(self):
+        """D8: a network without decentral heat buses gives an empty result."""
+        n = pypsa.Network()
+        n.set_snapshots(pd.date_range("2025-01-01", periods=2, freq="3h"))
+        assert decentral_heat_split(n).empty
+        assert decentral_heat_split(n, aggregate_per_year=False).empty

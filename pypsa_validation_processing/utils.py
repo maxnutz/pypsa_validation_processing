@@ -672,6 +672,178 @@ def apply_coke_correction(
     return coal_energy * (1.0 - kappa) + coal_energy * kappa / MWH_COAL_PER_MWH_COKE
 
 
+# D8: decentral heat bus carriers and the Load carriers of each sector
+DECENTRAL_HEAT_BUS_CARRIERS: tuple[str, ...] = ("rural heat", "urban decentral heat")
+DECENTRAL_HEAT_SECTORS: dict[str, str] = {
+    "rural heat": "rc",
+    "urban decentral heat": "rc",
+    "agriculture heat": "agr",
+    "low-temperature heat for industry": "ind",
+}
+DECENTRAL_HEAT_OTHER_SECTOR = "other"
+# D8: heat storage and dumped heat are neither input nor demand
+_HEAT_EXCLUDED_PATTERN = r"water tanks|water pits|heat vent"
+_D8_KWARGS = {"groupby": ["name", "carrier", "location", "unit"], "nice_names": False}
+
+
+def _decentral_heat_input(
+    n: pypsa.Network, bus_carrier: str, aggregate_per_year: bool
+) -> list[pd.Series | pd.DataFrame]:
+    """Return the parts of the input ``I_b`` to buses of *bus_carrier* (D8.1).
+
+    Each part has the levels ``location``, ``carrier`` (input carrier) and
+    ``unit``. ``pypsa.statistics`` is called once per bus carrier, because
+    without ``bus_carrier`` it keeps only one of several supplying ports of a
+    Link (pypsa 1.1.2).
+    """
+    heat = n.statistics.supply(
+        bus_carrier=bus_carrier, components=["Link", "Generator"], **_D8_KWARGS
+    )
+    heat = heat[
+        heat.gt(0)
+        & ~heat.index.get_level_values("carrier").str.contains(_HEAT_EXCLUDED_PATTERN)
+    ]
+    is_link = heat.index.get_level_values("component") == "Link"
+    links = heat.index[is_link].get_level_values("name")
+    ports = n.links.loc[links, n.links.columns[n.links.columns.str.match(r"bus\d+$")]]
+    port_carriers = ports.stack().map(n.buses["carrier"]).dropna()
+    other = sorted(set(port_carriers) - {bus_carrier})
+    other = [bc for bc in other if "co2" not in bc]
+    carriers = sorted(set(n.links.loc[links, "carrier"]))
+    chp = set()
+    for bc in other:
+        supply = n.statistics.supply(
+            bus_carrier=bc,
+            components=["Link"],
+            carrier=carriers,
+            groupby=["name"],
+            nice_names=False,
+        )
+        chp |= set(supply[supply.gt(0)].index.get_level_values("name"))
+    is_received = ~heat.index.get_level_values("name").isin(links.difference(chp))
+    received = heat.index[is_received].get_level_values("name")
+    parts = [
+        _label_input(
+            n.statistics.supply(
+                bus_carrier=bus_carrier,
+                components=["Link", "Generator"],
+                groupby_time=aggregate_per_year,
+                **_D8_KWARGS,
+            ),
+            received,
+            bus_carrier,
+        )
+    ]
+    for bc in other:
+        withdrawal = n.statistics.withdrawal(
+            bus_carrier=bc,
+            components=["Link"],
+            carrier=carriers,
+            groupby_time=aggregate_per_year,
+            **_D8_KWARGS,
+        )
+        parts.append(
+            _label_input(attribute_locations(n, withdrawal), links.difference(chp), bc)
+        )
+    return parts
+
+
+def _label_input(
+    flows: pd.Series | pd.DataFrame, names: pd.Index, input_carrier: str
+) -> pd.Series | pd.DataFrame:
+    """Keep the rows of *names*, label them with *input_carrier* (D8.1)."""
+    flows = flows[flows.index.get_level_values("name").isin(names)]
+    index = flows.index.to_frame(index=False)
+    index["carrier"] = input_carrier
+    flows = flows.copy()
+    flows.index = pd.MultiIndex.from_frame(index)
+    return flows.groupby(["location", "carrier", "unit"]).sum()
+
+
+def _decentral_heat_shares(n: pypsa.Network, bus_carrier: str) -> pd.DataFrame:
+    """Return the yearly sector shares ``σ_b,x(l)`` (D8.2, D8.3).
+
+    Rows are locations, columns the sectors of ``DECENTRAL_HEAT_SECTORS`` and
+    ``DECENTRAL_HEAT_OTHER_SECTOR``; a location without demand has 0 shares.
+    """
+    demand = n.statistics.withdrawal(
+        bus_carrier=bus_carrier, groupby=["carrier", "location"], nice_names=False
+    )
+    demand = demand.drop("Store", level="component", errors="ignore")
+    carriers = demand.index.get_level_values("carrier")
+    demand = demand[~carriers.str.contains(_HEAT_EXCLUDED_PATTERN)]
+    index = demand.index.to_frame(index=False)
+    is_load = index["component"].eq("Load")
+    index["sector"] = index["carrier"].map(DECENTRAL_HEAT_SECTORS).where(is_load)
+    index["sector"] = index["sector"].fillna(DECENTRAL_HEAT_OTHER_SECTOR)
+    sectors = list(dict.fromkeys(DECENTRAL_HEAT_SECTORS.values())) + [
+        DECENTRAL_HEAT_OTHER_SECTOR
+    ]
+    by_sector = (
+        pd.Series(
+            demand.to_numpy(),
+            index=pd.MultiIndex.from_frame(index[["location", "sector"]]),
+        )
+        .groupby(["location", "sector"])
+        .sum()
+        .unstack("sector")
+        .reindex(columns=sectors)
+        .fillna(0.0)
+    )
+    total = by_sector.sum(axis=1)
+    return by_sector.div(total.where(total.ne(0)), axis=0).fillna(0.0)
+
+
+def decentral_heat_split(
+    n: pypsa.Network, aggregate_per_year: bool = True
+) -> pd.Series | pd.DataFrame:
+    """Split the input to decentral heat supply between sectors (D8).
+
+    For each bus carrier ``b`` of ``DECENTRAL_HEAT_BUS_CARRIERS`` and location
+    ``l``: ``D8_x(l) = Σ_b σ_b,x(l) · I_b(l)``. ``I_b`` is the withdrawal of
+    the Links that supply heat to ``b`` at their non-heat input ports
+    (location per D1), plus the heat supplied by Generators (solar thermal)
+    and by CHPs (Links with a further non-heat output) to ``b``. Heat storage
+    and heat vents are excluded. ``σ_b,x`` are yearly demand shares, applied
+    to every snapshot.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network to evaluate.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), return yearly values as a Series; otherwise a
+        DataFrame with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Index levels ``sector`` (``rc``, ``agr``, ``ind``, ``other``),
+        ``location``, ``carrier`` (input carrier) and ``unit`` (normalised
+        to ``MWh``, C6.5). Empty if the network has no decentral heat buses.
+    """
+    sector_parts = []
+    for bus_carrier in DECENTRAL_HEAT_BUS_CARRIERS:
+        if bus_carrier not in set(n.buses["carrier"]):
+            continue
+        inputs = pd.concat(_decentral_heat_input(n, bus_carrier, aggregate_per_year))
+        inputs = remap_unit_index(inputs).groupby(["location", "carrier", "unit"]).sum()
+        shares = _decentral_heat_shares(n, bus_carrier)
+        locations = inputs.index.get_level_values("location")
+        for sector in shares.columns:
+            factor = shares[sector].reindex(locations).fillna(0.0).to_numpy()
+            sector_parts.append(
+                pd.concat({sector: inputs.mul(factor, axis=0)}, names=["sector"])
+            )
+    levels = ["sector", "location", "carrier", "unit"]
+    if not sector_parts:
+        empty_index = pd.MultiIndex.from_tuples([], names=levels)
+        if aggregate_per_year:
+            return pd.Series(dtype=float, index=empty_index)
+        return pd.DataFrame(index=empty_index, columns=n.snapshots, dtype=float)
+    return pd.concat(sector_parts).groupby(levels).sum()
+
+
 def setup_logging(level: int | str = logging.WARNING) -> None:
     """Configure root logging once for the package entrypoint.
 
