@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: draft
+Status: reviewed
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 

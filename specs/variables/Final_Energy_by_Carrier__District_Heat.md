@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|District Heat`
 
-Status: draft
+Status: reviewed
 Implementing PR: –
 
 ## 1. Variable and function name

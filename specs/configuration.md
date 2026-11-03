@@ -1,6 +1,6 @@
 # Configuration
 
-Status: draft
+Status: reviewed
 
 The package config is a YAML file passed via `--config <path>`; without `--config`, `pypsa_validation_processing/configs/config.default.yaml` is used and a `WARNING` is logged (`workflow.py::resolve_config_path`). Validation rules and errors: [contracts.md](contracts.md) C1.
 

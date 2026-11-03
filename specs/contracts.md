@@ -1,6 +1,6 @@
 # Contracts
 
-Status: draft
+Status: reviewed
 
 Contracts between the components of `pypsa_validation_processing`. Each contract lists the requirements, the sources it is based on, and acceptance criteria (AC) that can become unit tests in `tests/`. Spec-vs-code differences are referenced as `SC-n`, open questions as `OQ-n`, assumptions as `A-n` (all in [open_questions.md](open_questions.md)).
 
