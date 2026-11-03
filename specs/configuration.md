@@ -14,7 +14,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 |---|---|---|---|---|---|---|
 | `network_results_path` | path (string) | yes | – | existing directory | Results folder (C2). | missing or wrong type: `ValueError`; not existing: `FileNotFoundError` |
 | `definitions_path` | path (string) or `false` | yes | – | existing directory in IAMC-valid definitions format, or `false` / `"false"` (case-insensitive) | Folder → variables from definitions + unit conversion; `false` → all mapping variables, no conversion (C3). | missing/empty or wrong type: `ValueError`; not existing: `FileNotFoundError` |
-| `country` | string | yes | – | ISO 3166-1 alpha-2 code, incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), `EU` (European Union = the 27 member states, C8.8), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
+| `country` | string | yes | – | ISO 3166-1 alpha-2 code or `XK` (pypsa-eur notation, OQ-4), incl. all 27 EU member states (e.g. `AT`, `DE`, `GR`) and non-EU codes (e.g. `CH`, `"NO"`, `GB`), `EU` (European Union = the 27 member states, C8.8), or `all` | Selects locations and output granularity (C8); part of output names (C10). | `ValueError` (SC-3, SC-19, OQ-4, OQ-11) |
 | `model_name` | string | yes | – | non-empty string | IAMC `model`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `scenario_name` | string | yes | – | non-empty string | IAMC `scenario`; part of output names. | `ValueError` (SC-4, SC-19) |
 | `convert_units` | bool | no | `true` | `true`, `false` | Convert to definition units (C9). Without effect if `definitions_path: false`. | `ValueError` (SC-5) |
@@ -43,7 +43,7 @@ Default choice and packaged config: `sister_packages/energy-scenarios-at-workflo
 
 YAML 1.1 (`yaml.safe_load`) parses some unquoted codes as non-strings: `country: NO` becomes boolean `false` (checked 2026-10-07). Such codes MUST be quoted (`country: "NO"`); an unquoted one is rejected as a wrong type (C1.4).
 
-Codes are case-sensitive; lower-case codes are rejected (owner, PR #127 review 2026-11-03, OQ-31). Since PR #122 the code accepts the 249 assigned ISO 3166-1 alpha-2 codes (`utils.ISO_3166_ALPHA2_CODES`), `EU` and `all`, and rejects `XK`, `GB0`, `GB1`, `EL`, `UK`; pypsa-eur vs. Eurostat notation is open (OQ-4).
+Codes are case-sensitive; lower-case codes are rejected (owner, PR #127 review 2026-11-03, OQ-31). `country` uses the pypsa-eur notation (owner, 2026-11-03, OQ-4): ISO 3166-1 alpha-2 codes plus `XK` (Kosovo), `EU` and `all`. `GR` and `GB` are the codes for Greece and the United Kingdom (OQ-11); `EL`, `UK`, `GB0`, `GB1` are rejected. `country: XK` with `aggregation_level: country` gives one row `XK`. The code (PR #122, `utils.ISO_3166_ALPHA2_CODES`) still rejects `XK` (SC-45).
 
 ### `convert_units`
 `config.default.yaml` sets it (`true`). In the local example configs (not versioned), `config.country-timeseries.yaml` and `config.region-timeseries.yaml` set it, the others rely on the default.

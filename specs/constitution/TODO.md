@@ -56,13 +56,13 @@ One PR per function. Order: few dependencies first, so the framework is exercise
 - [ ] All functions return every location (C6.13; SC-26) — checked in each PR above.
 
 ## WP5 Config, units and output (C1, C9, C10) — independent, parallel to WP3/WP4
-- [x] PR #122: config validation and defaults (SC-1–5, SC-18, SC-19). Decisions taken in the PR without asking: OQ-31 (case-sensitive codes, confirmed 2026-11-03); OQ-30 (`null` for optional keys, rejected 2026-11-03 → SC-44); OQ-4 (`XK`, open).
+- [x] PR #122: config validation and defaults (SC-1–5, SC-18, SC-19). Decisions taken in the PR without asking: OQ-31 (case-sensitive codes, confirmed 2026-11-03); OQ-30 (`null` for optional keys, rejected 2026-11-03 → SC-44); OQ-4 (`XK` rejected; owner 2026-11-03: accept `XK` → SC-45).
 - [x] PR #123: unit handling (SC-10, SC-24; SC-9 partly: `land transport` stays in `UNITS_MAPPING`, owner decision 2026-11-02). Follow-ups: OQ-29 and OQ-32 resolved 2026-11-03 (no relabelling, no cross-year check); SC-43 open.
 - [x] PR #124: output names and timestamps (SC-15, SC-22). Owner (PR #124 review 2026-11-02): timezone-aware snapshots keep their timezone (C10.5).
 - [x] PR #125: environment and docs (SC-13, SC-16; OQ-16: `requests` removed, `pypsa` declared in `pixi.toml`; SC-12 for `docs/contributing.md`). SC-17 was already done in PR #112.
 - [ ] SC-12 (`CLAUDE.md` "Code Style": Python ≥ 3.12) and SC-20 (`CLAUDE.md` "Local debugging": all-NaN results "not valid"): need a `CLAUDE.md` change on explicit owner request ("Forbidden Actions"); not a spec PR.
-- [ ] PR: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43).
-- [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44.
+- [ ] PR: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43); `country: XK` accepted, pypsa-eur notation (C1.6, C1-AC2; SC-45).
+- [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44; OQ-4 decided 2026-11-03 (SC-45).
 
 ## Later (need specs first)
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).
