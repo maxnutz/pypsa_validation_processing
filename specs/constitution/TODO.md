@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -25,11 +25,8 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 - [x] PR #120: drop the copperplate `EU`, `country: EU` = 27 member states (C8.7–8; SC-37). Owner (PR #120 review 2026-11-02): no log message for the drop.
 
 ## WP3 Shared definitions in `utils.py` — depends on WP1 and on SC-14
-- [ ] SC-14 resolved before the first helper or statistics function is implemented (WP3, WP4). P6 (`specs/constitution/principles.md`) is binding: exact or semantic pypsa-de match → port the logic of `export_ariadne_variables.py` as is; `pypsa.statistics` only if no match exists; every change to the ported logic is listed in the variable spec. Two instruction files say otherwise and are read by the `developer` role:
-  - `CLAUDE.md` l.32 ("Blueprint"): "serves as blueprint for evaluations, but use `pypsa.statistics` more extensively" → contradicts P6. Proposed text: "`export_ariadne_variables.py` is the implementation source: port its logic for every variable it evaluates (exact or semantic match, P6 in `specs/constitution/principles.md`); use `pypsa.statistics` only for variables without a match."
-  - `sister_packages/CLAUDE.md` l.7-10: calls `get_final_energy` a "semantic map" and recommends reusing "the accounting logic per variable". Compatible with P6 in substance, but MUST name P6 as the rule, so that "semantic map" is not read as "inspiration only".
-  - Who: the owner. `CLAUDE.md` changes only on explicit request ("Forbidden Actions"), `sister_packages/` is read-only for both roles, and spec PRs change only `specs/`. So this is a separate, non-spec PR on explicit request; then mark SC-14 resolved in `open_questions.md` (spec PR).
-  - Not affected: WP1, WP2 and WP5 (no statistics logic).
+- [x] SC-14 resolved before the first helper or statistics function is implemented (WP3, WP4): resolved by PR #128 (2026-11-03); `CLAUDE.md` "Blueprint" and `sister_packages/CLAUDE.md` name P6 (`specs/constitution/principles.md`) as binding.
+- [ ] Non-versioned test configs in `config/test` with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03).
 One PR per definition, each with unit tests; listed with the variables that need it.
 - [ ] D1 location attribution — Electricity, Natural Gas, Oil, Net Imports|Oil, Transportation, Residential and Commercial
 - [ ] D2 `f_oil` — Oil, Net Imports|Oil
@@ -38,7 +35,6 @@ One PR per definition, each with unit tests; listed with the variables that need
 - [ ] D5 non-energy use incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Coal, Industry
 - [ ] D6 coke correction `κ` — Coal, Industry
 - [ ] D7 `land transport oil` — Oil, Transportation: no division by an engine efficiency. No unit relabelling to `MWh_LHV` (OQ-29 resolved 2026-11-03); `land transport` stays a key of `UNITS_MAPPING` (owner, PR #123 review 2026-11-02); the functions MAY return the raw unit `land transport`, `Network_Processor` normalises it after the function (C8 step 2).
-- [ ] Non-versioned test configs in `config/test` with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03).
 - [ ] D8 decentral heat split — Agriculture, Industry, Residential and Commercial
 
 ## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
