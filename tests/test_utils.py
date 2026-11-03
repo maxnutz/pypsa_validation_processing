@@ -6,6 +6,7 @@ import pytest
 
 from pypsa_validation_processing.utils import (
     REGION_MAPPING,
+    apply_domestic_share,
     attribute_locations,
     fossil_gas_share,
     fossil_oil_share,
@@ -293,3 +294,77 @@ class TestFossilGasShare:
         n = self._gas_network({"pipeline gas": 1.0, "shale gas": 1.0}, {})
         with pytest.raises(ValueError, match="shale gas"):
             fossil_gas_share(n)
+
+
+class TestApplyDomesticShare:
+    @staticmethod
+    def _flows(values: dict[str, float]) -> pd.Series:
+        """Return yearly flows indexed by location and unit."""
+        return pd.Series(
+            values.values(),
+            index=pd.MultiIndex.from_tuples(
+                [(loc, "MWh_LHV") for loc in values], names=["location", "unit"]
+            ),
+        )
+
+    @pytest.fixture
+    def totals(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "total domestic aviation": [30.0, 10.0, 0.0],
+                "total international aviation": [70.0, 30.0, 0.0],
+                "total domestic navigation": [20.0, 50.0, 0.0],
+                "total international navigation": [80.0, 50.0, 0.0],
+            },
+            index=pd.Index(["AT", "DE", "LU"], name="country"),
+        )
+
+    def test_share_per_country(self, totals):
+        """D4: each location is weighted with the share of its own country."""
+        flows = self._flows({"AT11": 100.0, "AT12": 10.0, "DE1": 100.0})
+        result = apply_domestic_share(flows, totals, "aviation")
+        assert result.tolist() == pytest.approx([30.0, 3.0, 25.0])
+
+    def test_navigation_columns(self, totals):
+        """D4: kind navigation uses the navigation columns."""
+        flows = self._flows({"DE1": 10.0})
+        result = apply_domestic_share(flows, totals, "navigation")
+        assert result.tolist() == pytest.approx([5.0])
+
+    def test_zero_denominator_gives_zero(self, totals):
+        """D4: a country with zero domestic and international demand gets d_k = 0."""
+        flows = self._flows({"LU": 10.0})
+        assert apply_domestic_share(flows, totals, "aviation").tolist() == [0.0]
+
+    def test_missing_country_with_demand_raises(self, totals):
+        """D4: a non-zero location whose country has no row raises ValueError naming it."""
+        flows = self._flows({"AT11": 1.0, "CH": 1.0})
+        with pytest.raises(ValueError, match="CH"):
+            apply_domestic_share(flows, totals, "aviation")
+
+    def test_zero_rows_need_no_lookup(self, totals):
+        """D4: rows that are 0 (e.g. EU) stay 0 without a country row."""
+        flows = self._flows({"AT11": 10.0, "EU": 0.0})
+        result = apply_domestic_share(flows, totals, "aviation")
+        assert result.tolist() == pytest.approx([3.0, 0.0])
+
+    def test_time_series(self, totals):
+        """D4: a time series is weighted per row in every snapshot column."""
+        flows = pd.DataFrame(
+            [[10.0, 20.0], [0.0, 0.0]],
+            index=self._flows({"AT11": 0.0, "EU": 0.0}).index,
+            columns=pd.date_range("2025-01-01", periods=2, freq="3h"),
+        )
+        result = apply_domestic_share(flows, totals, "aviation")
+        assert isinstance(result, pd.DataFrame)
+        assert result.to_numpy().ravel().tolist() == pytest.approx([3.0, 6.0, 0.0, 0.0])
+
+    def test_missing_energy_totals_raises(self):
+        """D4: energy_totals None raises ValueError."""
+        with pytest.raises(ValueError, match="energy_totals"):
+            apply_domestic_share(self._flows({"AT11": 1.0}), None, "aviation")
+
+    def test_unknown_kind_raises(self, totals):
+        """D4: a kind other than aviation or navigation raises ValueError."""
+        with pytest.raises(ValueError, match="kind"):
+            apply_domestic_share(self._flows({"AT11": 1.0}), totals, "rail")

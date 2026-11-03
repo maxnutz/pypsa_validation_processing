@@ -508,6 +508,62 @@ def fossil_gas_share(n: pypsa.Network) -> float:
     return _fossil_share(supply, GAS_FOSSIL_CARRIERS, GAS_NON_FOSSIL_CARRIERS, "gas")
 
 
+def apply_domestic_share(
+    flows: pd.Series | pd.DataFrame,
+    energy_totals: pd.DataFrame | None,
+    kind: str,
+) -> pd.Series | pd.DataFrame:
+    """Multiply flows by the domestic share ``d_k(c)`` of their country (D4).
+
+    ``d_k(c) = total domestic k / (total domestic k + total international k)``
+    with ``c`` = the first two characters of the location. The share is looked
+    up only for rows with a non-zero value (in any snapshot); rows that are 0
+    everywhere stay 0 without a lookup, e.g. the pseudo-location ``EU``.
+
+    Parameters
+    ----------
+    flows : pd.Series | pd.DataFrame
+        Flows with a ``location`` index level; a DataFrame has snapshots as
+        columns.
+    energy_totals : pd.DataFrame | None
+        Energy totals of one year, indexed by ``country`` (C2.4).
+    kind : str
+        ``"aviation"`` or ``"navigation"``.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        *flows* multiplied row-wise by ``d_k``; a denominator of 0 gives 0.
+
+    Raises
+    ------
+    ValueError
+        If *energy_totals* is ``None``, *kind* is not supported, or a row
+        with non-zero flow belongs to a country without a row in
+        *energy_totals*.
+    """
+    if energy_totals is None:
+        raise ValueError("energy_totals is required to compute domestic shares (D4).")
+    if kind not in ("aviation", "navigation"):
+        raise ValueError(f"kind must be 'aviation' or 'navigation', got: {kind!r}")
+    nonzero = flows.ne(0)
+    if isinstance(flows, pd.DataFrame):
+        nonzero = nonzero.any(axis=1)
+    countries = flows.index.get_level_values("location").str[:2]
+    needed = pd.Index(countries[nonzero.to_numpy()]).unique()
+    missing = needed.difference(energy_totals.index)
+    if not missing.empty:
+        raise ValueError(
+            f"No energy totals row for the countries {sorted(missing)} with "
+            f"{kind} demand (D4)."
+        )
+    domestic = energy_totals.loc[needed, f"total domestic {kind}"]
+    total = domestic + energy_totals.loc[needed, f"total international {kind}"]
+    share = domestic.div(total).where(total.ne(0), 0.0)
+    factor = pd.Series(countries, index=flows.index).map(share).fillna(0.0)
+    return flows.mul(factor, axis=0)
+
+
 def setup_logging(level: int | str = logging.WARNING) -> None:
     """Configure root logging once for the package entrypoint.
 

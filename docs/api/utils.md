@@ -10,3 +10,4 @@
         - attribute_locations
         - fossil_oil_share
         - fossil_gas_share
+        - apply_domestic_share
