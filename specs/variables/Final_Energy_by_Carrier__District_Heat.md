@@ -101,9 +101,11 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_th` (or `MWh`).
 - AC7: The result does not depend on the efficiencies of the heat-supplying links (changing a CHP efficiency in the mock leaves the result unchanged).
 - AC8: An unknown withdrawing carrier on `urban central heat` raises `ValueError`.
 - AC9: A `DAC` Link with a positive `efficiency` at its `urban central heat` port (heat supply) raises `ValueError`; it is never counted as heat.
+- AC10: Mock with a copperplate bus `EU coal` (location `EU`) and an `urban central coal CHP` Link `EU coal` → `A` electricity / `A urban central heat`: the result has `(EU, …) = 0.0` (C6.13) and the heat is counted at `A` only via the consumers of section 7.
 
 ## 12. Open questions
-- None specific. OQ-6, OQ-21 resolved.
+- Copperplate `EU` (checked 2026-11-03, PR #127 review): the current function returns non-zero values at `EU` (`AT_KN2040`: 2020 389.1 TWh, 2030 66.0, 2040 0.97, 2050 0.18 TWh; PR #120). Cause: it counts the fuel withdrawal (`bus0`) of the heat-supplying Links, and `urban central coal CHP`, `urban central lignite CHP`, `urban central oil CHP` withdraw from the copperplate buses `EU coal`, `EU lignite`, `EU oil` (`AT_KN2040` 2020: 60 Links, 381.6 TWh; `20261020_carbon_accounting_run` 2030: 16 Links, 26.4 TWh; `electricity_network_0p3` 2025: 61 Links, 330.8 TWh). Their `bus1` (electricity) and `bus2` (`urban central heat`) are regional (e.g. `PL`, `DE3`, `CZ`), so the flows are attributable; the current code ignores D1.3. District heat on the copperplate has no meaning. The formula of section 7 uses only consumers on `urban central heat` buses, which are all regional, so it gives `0.0` at `EU` (AC10). OQ-17 stands. See SC-29.
+- OQ-6, OQ-21 resolved.
 
 ## 13. Sources
 - #63 (incl. comment), #73; definitions as in section 2

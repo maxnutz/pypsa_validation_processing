@@ -14,22 +14,24 @@ General rule for all contracts: [constitution/principles.md](constitution/princi
 1. `Network_Processor(config_path)` MUST read the package config with `yaml.safe_load`. The keys, types, defaults and allowed values are specified in [configuration.md](configuration.md); that table is part of this contract.
 2. Required keys: `network_results_path`, `definitions_path`, `country`, `model_name`, `scenario_name`. A missing, `null` or empty required key MUST raise `ValueError` naming the key and the config path. (SC-4)
 3. All other keys (`convert_units`, `mapping_path`, `output_path`, `aggregation_level`, `aggregate_per_year`, `map_country_codes_to_names`) are optional: a config containing only the five required keys MUST initialise without error, and the defaults of [configuration.md](configuration.md) apply.
-   > Checked against the code on 2026-10-07: `Network_Processor` initialises with only the five required keys, both with `definitions_path: false` and with a definitions folder. Two of the applied defaults differ from the spec (`map_country_codes_to_names`, `output_path`; SC-1, SC-2).
+   > Checked against the code on 2026-10-07: `Network_Processor` initialises with only the five required keys, both with `definitions_path: false` and with a definitions folder. The two defaults that differed from the spec (`map_country_codes_to_names`, `output_path`; SC-1, SC-2) were fixed in PR #122 (2026-11-02).
 4. Every key, required or optional, whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` naming the key, the expected type and the given value. The same applies to values outside the allowed values. Expected types: [configuration.md](configuration.md). (SC-5, SC-19) Exception: `industry_non_energy_shares_year` is checked only if the shares file is read (C2.5).
+   - `null` (empty value) for an optional key is not a wrong type: it means "not set", and the default of [configuration.md](configuration.md) applies, for every optional key (e.g. `output_path:` → `resources`, `convert_units:` → `true`) (owner, PR #127 review 2026-11-03, OQ-30; the shares keys already follow this rule, C2.5). For required keys, `null` stays an error (item 2). (SC-44)
    - YAML 1.1 parses some unquoted values as non-strings, e.g. `country: NO` (Norway) as boolean `false`. Such a value MUST be rejected as a wrong type, and the message SHOULD advise quoting (`country: "NO"`).
 5. A configured path that does not exist MUST raise `FileNotFoundError` naming the path: `network_results_path`, `definitions_path` (unless `false`), `mapping_path`.
-6. `country` MUST accept every ISO 3166-1 alpha-2 code and the value `all`; anything else MUST raise `ValueError`. This explicitly includes the codes of all 27 EU member states: `AT`, `BE`, `BG`, `CY`, `CZ`, `DE`, `DK`, `EE`, `ES`, `FI`, `FR`, `GR`, `HR`, `HU`, `IE`, `IT`, `LT`, `LU`, `LV`, `MT`, `NL`, `PL`, `PT`, `RO`, `SE`, `SI`, `SK`, and non-EU codes such as `CH`, `NO`, `GB`. (SC-3, OQ-4, OQ-11)
+6. `country` uses the pypsa-eur notation (owner, 2026-11-03, OQ-4): it MUST accept every ISO 3166-1 alpha-2 code, `XK` (Kosovo, used by pypsa-eur) and the value `all`; anything else MUST raise `ValueError`, in particular the Eurostat codes `EL`, `UK` (Greece = `GR`, United Kingdom = `GB`, OQ-11) and the location codes `GB0`, `GB1`. This explicitly includes the codes of all 27 EU member states: `AT`, `BE`, `BG`, `CY`, `CZ`, `DE`, `DK`, `EE`, `ES`, `FI`, `FR`, `GR`, `HR`, `HU`, `IE`, `IT`, `LT`, `LU`, `LV`, `MT`, `NL`, `PL`, `PT`, `RO`, `SE`, `SI`, `SK`, and non-EU codes such as `CH`, `NO`, `GB`. (SC-3, OQ-4, OQ-11) Codes are case-sensitive: `at` MUST be rejected (owner, PR #127 review 2026-11-03, OQ-31). `country: XK` selects the locations starting with `XK`; with `aggregation_level: country` they give one row with region label `XK` (C8). The code (PR #122) still rejects `XK` (SC-45).
    - `country: EU` MUST also be accepted. It denotes the **European Union**, i.e. the 27 member states listed above, aggregated per C8.8 (owner decision 2026-10-23, OQ-17). It never refers to the copperplate pseudo-location `EU` of the networks (C8.7).
 7. All config validation MUST be completed before any network file is read (P5 "early"). (SC-18)
 8. Relative paths are resolved against the current working directory (A-1).
 
-**Sources:** `class_definitions.py::Network_Processor.__init__` (l.165-279), `_is_valid_country_identifier`, `_is_definitions_disabled`; `configs/config.default.yaml`; `README.md` "Set the config parameters"; owner decisions in the kick-off.
+**Sources:** `class_definitions.py::Network_Processor.__init__`, `_validate_config`, `_validate_config_paths`, `_is_valid_country_identifier`, `_uses_definitions` (PR #122); `utils.ISO_3166_ALPHA2_CODES`; `configs/config.default.yaml`; `README.md` "Set the config parameters"; owner decisions in the kick-off.
 
 **Acceptance criteria**
 - C1-AC1: For each required key, a config without it raises `ValueError` whose message contains the key name.
-- C1-AC2: Each of the 27 EU member-state codes listed in requirement 6 is accepted (parametrised test), as are `CH`, `"NO"` (quoted), `GB` and `all`; `XX`, `Austria`, `at1` raise `ValueError`.
+- C1-AC2: Each of the 27 EU member-state codes listed in requirement 6 is accepted (parametrised test), as are `CH`, `"NO"` (quoted), `GB`, `GR`, `XK` and `all`; `XX`, `Austria`, `at1`, `EL`, `UK`, `GB0`, `GB1` raise `ValueError`. With `country: XK`, `aggregation_level: country` and input `{(XK1, MWh): 1, (XK2, MWh): 2, (AT1, MWh): 4}`, the output is one row `XK, MWh = 3`.
 - C1-AC3: Each of the following raises `ValueError` naming the key: `aggregation_level: nation`, `aggregation_level: 1`, `aggregate_per_year: "yes"`, `map_country_codes_to_names: "yes"`, `convert_units: "yes"`, `country: 1`, `model_name: 1.0`, `scenario_name: [a, b]`, `network_results_path: 5`, `mapping_path: true`, `output_path: 5`.
 - C1-AC3b: Unquoted `country: NO` raises `ValueError` whose message mentions quoting.
+- C1-AC3c: A config with the five required keys and `convert_units:`, `mapping_path:`, `output_path:`, `aggregation_level:`, `aggregate_per_year:`, `map_country_codes_to_names:` all `null` initialises without error, and the defaults of C1-AC6 apply. `country: at` raises `ValueError`.
 - C1-AC4: A non-existing `network_results_path`, `definitions_path` or `mapping_path` raises `FileNotFoundError`.
 - C1-AC5: With an invalid `aggregation_level`, `pypsa.NetworkCollection` is not constructed (mock asserts not called).
 - C1-AC6: A config with only the five required keys initialises without error, and the defaults of [configuration.md](configuration.md) apply (`aggregation_level == "country"`, `aggregate_per_year is True`, `map_country_codes_to_names is False`, `convert_units` true, default mapping file, output directory `<cwd>/resources`).
@@ -122,7 +124,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 2. `definitions_path: false` (YAML bool `false` or string `"false"`, case-insensitive) → every variable in the mapping file is evaluated, in file order. No unit conversion takes place, independent of `convert_units`.
 3. Each selected variable is evaluated once per investment year.
 
-**Sources:** `Network_Processor.calculate_variables_values` (l.839-843), `_is_definitions_disabled`, class docstring; `README.md` "Mapping File"; `CLAUDE.md` "Key Implementation Notes".
+**Sources:** `Network_Processor.calculate_variables_values`, `_uses_definitions`, class docstring; `README.md` "Mapping File"; `CLAUDE.md` "Key Implementation Notes".
 
 **Acceptance criteria**
 - C3-AC1: With definitions `{A, B, C}` and mapping `{A, B}`, exactly `A` and `B` are evaluated.
@@ -155,7 +157,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 
    The class is a property of the variable, not of the function: the same function MAY in principle serve variables of different classes, but the declared class MUST match what the function returns (C6.10–C6.12).
 
-**Sources:** `configs/mapping.default.yaml`, `configs/mapping.prices_ie.yaml`; `Network_Processor._read_mappings`, `_execute_function_for_variable` (l.368-382); `README.md` "Mapping File", "Naming Convention".
+**Sources:** `configs/mapping.default.yaml`; `Network_Processor._read_mappings` (short and long form since PR #119), `_validate_mapped_functions`; `README.md` "Mapping File", "Naming Convention".
 
 **Acceptance criteria**
 - C4-AC1: A non-existing `mapping_path` raises `FileNotFoundError`; an empty mapping file raises `ValueError`.
@@ -202,7 +204,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 2. `aggregate_per_year=False` → MUST return a `pd.DataFrame` (not a `pd.Series`) whose columns are snapshot timestamps of `n` and whose index is a `pd.MultiIndex` containing at least `location` and `unit`.
 3. Additional index levels MAY be present; they are aggregated in post-processing according to the aggregation class (C8). The level name `quantity` is reserved for `intensive` variables (item 12).
 4. Values MUST be of a numeric dtype. NaN and zero are valid values; a result whose values are all zero or all NaN is valid (owner decision, second review round).
-5. `unit` values MUST be valid PyPSA units per C9.1 (e.g. `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`): non-empty, not a carrier label, key of `utils.UNITS_MAPPING`. A statistics function MAY normalise units itself via `UNITS_MAPPING` (e.g. to combine series of different carriers); normalised units such as `MWh` are keys of `UNITS_MAPPING` and therefore valid (owner decision, 2026-10-07; resolves OQ-15).
+5. `unit` values MUST be valid PyPSA units per C9.1: non-empty strings that are keys of `utils.UNITS_MAPPING`. Examples are `MWh_el`, `MWh_LHV`, `MWh_th`, `t_co2`, `land transport`; the list is not exhaustive, further units of pypsa-eur / PyPSA-AT networks are added to `UNITS_MAPPING`. A unit MAY have the same name as a carrier of the evaluated network (`n.carriers.index`); this is not an error (owner, PR #127 review 2026-11-03). A statistics function MAY return raw units as pypsa returns them (e.g. `land transport`, D7); normalisation is post-processing in `Network_Processor` (C8 step 2, C9.1). A function MAY also normalise units itself via `UNITS_MAPPING`; it MUST do so before it sums flows of different units within one row. Normalised units such as `MWh` are keys of `UNITS_MAPPING` and therefore valid (owner decision, 2026-10-07; resolves OQ-15).
 6. `location` values MUST be non-empty values of `n.buses.location` of the evaluated network (e.g. `AT1`). The function MUST NOT aggregate to country level (C8 does this).
 7. The result MUST contain at least one row (A-4). Item 13 states how a function meets this when none of its carriers is present.
 8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2, 4–7 and the structural parts of items 10–12 (presence and values of the `quantity` level). Values themselves (zero, NaN, sign, magnitude) are not checked here, with the exception of negative weights (item 12).
@@ -225,13 +227,13 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
     - the case "none of the carriers is present in `n` at all" is the special case in which every location gets `0.0`; it therefore never yields an empty result (item 7);
     - example: in `base_s_adm__none_2040.nc`, the coal withdrawal of `AT13` is `0.0` over the year; the result for `Final Energy [by Carrier]|Coal` still has an `AT13` row with `0.0` for both values of `aggregate_per_year`; a 2020 network without any `H2` carrier gives, for a `flow` variable on hydrogen, `(AT1, MWh): 0.0`, `(AT2, MWh): 0.0`, … for every location.
 
-**Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor.calculate_variables_values` (l.849-856).
+**Sources:** `CLAUDE.md` "Function Architecture (Critical)", "Local debugging", "Testing Rules"; `README.md` "Return format rules"; `Network_Processor._validate_result`, `_invalid_result_labels`, `_invalid_quantity_level` (PR #118, PR #119).
 
 **Acceptance criteria**
 - C6-AC1 (per statistics function, in `tests/test_statistics_functions.py`): with `aggregate_per_year=True` the result
   - is a `pd.Series` with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
   - has at least one row and a numeric dtype (`pd.api.types.is_numeric_dtype`);
-  - has only `unit` values that are non-empty keys of `UNITS_MAPPING` and not carrier labels (C9.1);
+  - has only `unit` values that are non-empty keys of `UNITS_MAPPING` (C9.1);
   - has only `location` values contained in `n.buses.location` of the mock network and none empty.
 - C6-AC2 (per statistics function): with `aggregate_per_year=False` the result
   - is a `pd.DataFrame` (not a `pd.Series`) with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
@@ -245,7 +247,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - a Series with zero rows;
   - a Series without `location` level, or without `unit` level, or with a flat index;
   - a Series of dtype `object` with string values;
-  - a Series with unit `""`, `"land transport"` or `"foo"`;
+  - a Series with unit `""` or `"foo"`;
   - a Series with location `""` or `"XX9"` (not in `n.buses.location`);
   - a `pd.DataFrame`;
   - for a `flow` or `stock` variable: a Series with a `quantity` level;
@@ -296,15 +298,17 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 1. Aggregation MUST follow the table and the post-processing order above.
 2. Index levels other than `location`, `unit` and `quantity` MUST be aggregated according to the aggregation class (C4.5), in the same step as locations:
    - `flow`, `stock`: sum.
-   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0 (e.g. a region without any of the carriers, C6.13), the value is `0.0`, not NaN, and the weight is `0.0` (A-5).
+   - `intensive`: weighted mean, value = Σ vᵢ·wᵢ / Σ wᵢ over all rows i of a group, using the `weight` row paired with each `value` row (C6.12). The `weight` of the aggregated row is Σ wᵢ, so that step 3 of the post-processing order can repeat the weighted mean. For time series this is done per snapshot column. If Σ wᵢ = 0 (e.g. a region without any of the carriers, C6.13), the value is `0.0`, not NaN, and the weight is `0.0` (A-5). A NaN value or NaN weight counts as `0.0` in Σ vᵢ·wᵢ and Σ wᵢ (owner, PR #119 review 2026-11-02, e.g. a carrier missing in one region); a group whose values and weights are all NaN therefore gives `0.0`. Consequence, intended (owner, PR #127 review 2026-11-03): a NaN value with a positive weight lowers the weighted mean (it counts as a value of `0.0`).
 3. In `Network_Processor`, normalisation (step 2) MUST NOT happen before aggregation (step 1); units already normalised by the statistics function (C6.5) pass step 2 unchanged. Rows that share region label and normalised unit after step 2 MUST be combined in step 3 with the operation of item 2.
 4. If `map_country_codes_to_names: true`, region labels MUST be mapped via `utils.REGION_MAPPING`; labels without entry stay unchanged.
 5. A configured country without matching locations: behaviour open (OQ-9).
 6. For `intensive` variables, `weight` rows MUST be dropped after step 3 (re-groupby); only `value` rows reach unit conversion and output. With `aggregation_level: region`, no aggregation over locations takes place, but extra index levels are still aggregated as in item 2.
-7. **Copperplate pseudo-location `EU`.** In pypsa-eur and PyPSA-AT networks, the location `EU` holds the copperplate buses (`EU oil`, `EU coal`, `EU methanol`, `EU oil primary`, `co2 atmosphere`, …) and the Links and Generators attached to them (e.g. `oil refining`, `import oil`). It is **not** the European Union. `Network_Processor` MUST drop all rows with location `EU` from every valid result before step 1, for every `aggregation_level` and `country`, and log one `INFO` per network naming the dropped location. Values at `EU` therefore never reach the output (owner decision 2026-10-23, OQ-17). Measured on `20261020_carbon_accounting_run`: `EU` is the only pseudo-location; with D1, only `Net Imports|Oil` is non-zero there (−fossil oil supply, 2025: oil refining 5877.6 TWh).
+7. **Copperplate pseudo-location `EU`.** The label `EU` has two meanings: as a location of `n.buses.location` it is the copperplate (this item); as a value of `country` it is the European Union, an aggregate of regions (item 8, C1.6). In pypsa-eur and PyPSA-AT networks, the location `EU` holds the copperplate buses (`EU oil`, `EU coal`, `EU methanol`, `EU oil primary`, `co2 atmosphere`, …) and the Links and Generators attached to them (e.g. `oil refining`, `import oil`). It is **not** the European Union. `Network_Processor` MUST drop all rows with location `EU` from every valid result (after the validation of C6.9, before step 1), for every `aggregation_level` and `country`. Values of the copperplate location `EU` therefore never reach the output (owner decision 2026-10-23, OQ-17). The region label `EU` can reach the output, but only as the aggregate of the member-state locations with `country: EU` (item 8); it never contains copperplate values (owner, PR #127 review 2026-11-03). The drop is not logged: it is deterministic and happens for nearly every network (owner, PR #120 review 2026-11-02; replaces the earlier "one `INFO` per network").
+   - A result that has no rows left after the drop (it held only location `EU`) MUST be skipped for that network, without a log message: it gets no output row and is not post-processed (PR #120, `6182623`; confirmed by the owner, PR #127 review 2026-11-03). It counts as "no values" for C2.6: if this holds for every variable of every network, the `RuntimeError` of C2.6 is raised. A result conforming to C6.13 always has rows besides `EU` if the network has other locations.
+   - Measured on `20261020_carbon_accounting_run`: `EU` is the only pseudo-location; with D1, only `Net Imports|Oil` is non-zero there (−fossil oil supply, 2025: oil refining 5877.6 TWh). The current (pre-spec) `Final_Energy_by_Carrier__District_Heat` returns non-zero values at `EU` (`AT_KN2040` 2020: 389.1 TWh, 2030: 66.0 TWh; PR #120 description). Cause (measured 2026-11-03): fuel withdrawals of `urban central {coal,lignite,oil} CHP` Links at the copperplate buses `EU coal`, `EU lignite`, `EU oil`; their `bus1` (electricity) and `bus2` (`urban central heat`) are regional. This violates D1.3 and disappears with the spec formula (SC-29, District Heat spec section 12).
 8. **European Union (`country: EU`).** With `aggregation_level: country`, all locations whose country (first two characters) is one of the 27 member-state codes of C1.6 MUST be aggregated into one row per `(variable, unit)` with region label `EU` (mapped to `European Union` with `map_country_codes_to_names: true`). With `aggregation_level: region`, these locations MUST be kept, one row per location. Locations of non-member countries (e.g. `CH`, `NO`, `GB0`, `RS`) are not included; the pseudo-location `EU` never contributes (item 7). The country of a location is NOT matched by prefix `EU`.
 
-**Sources:** `Network_Processor._aggregate_to_country`, `_filter_to_regions`, `_select_aggregation_result`, `_postprocess_statistics_result`, `structure_pyam_from_pandas`; `CLAUDE.md` "Aggregation behavior".
+**Sources:** `Network_Processor._aggregate_to_country`, `_filter_to_regions`, `_country_mask`, `_select_aggregation_result`, `_postprocess_statistics_result`, `_sum_over_groups`, `calculate_variables_values`, `structure_pyam_from_pandas`; `utils.COPPERPLATE_LOCATION`, `utils.EU_MEMBER_STATES` (PR #119, PR #120); `CLAUDE.md` "Aggregation behavior".
 
 **Acceptance criteria**
 - C8-AC1: Input `{(AT1, MWh): 1, (AT2, MWh): 2, (DE1, MWh): 4}`:
@@ -324,7 +328,8 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
   - in every case the output contains no `weight` rows and no `quantity` level.
 - C8-AC7 (`intensive`): an extra level `carrier` with `(AT1, gas): value 20, weight 1` and `(AT1, oil): value 50, weight 0` gives `AT1 = 20` with `region`/`AT`; a group whose weights are all 0 gives `0.0` (value and weight), not NaN.
 - C8-AC8 (`stock`): `{(AT1, MW): 100, (AT2, MW): 50}` with `country`/`AT` → `AT, MW = 150`, identical to `flow`.
-- C8-AC9: Input `{(AT1, MWh): 1, (DE1, MWh): 2, (CH, MWh): 4, (EU, MWh): -8}`: with `country`/`all` → `{AT: 1, DE: 2, CH: 4}`, no `EU` row; with `country`/`EU` → `{EU: 3}`; with `region`/`EU` → `{AT1: 1, DE1: 2}`. An `INFO` naming the dropped location `EU` is logged.
+- C8-AC9: Input `{(AT1, MWh): 1, (DE1, MWh): 2, (CH, MWh): 4, (EU, MWh): -8}`: with `country`/`all` → `{AT: 1, DE: 2, CH: 4}`, no `EU` row; with `country`/`EU` → `{EU: 3}`; with `region`/`EU` → `{AT1: 1, DE1: 2}`. No log message about the drop is required.
+- C8-AC9b: A variable whose result holds only the location `EU` is absent from the output and does not raise; another variable of the same network appears normally. If it is the only mapped variable, `calculate_variables_values` raises the `RuntimeError` of C2.6.
 - C8-AC10: With `country`/`EU` and `map_country_codes_to_names: true`, the region label is `European Union`, and its value excludes the pseudo-location `EU`.
 
 ---
@@ -333,29 +338,30 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 
 **Requirements**
 1. **Unit validation and normalisation.** Normalisation is step 2 of the post-processing order (C8): after aggregation, before re-groupby and conversion.
-   - Before aggregation (as part of result validation, C6.5), every raw `unit` value MUST be checked. An empty (or whitespace-only) string and a carrier label MUST be rejected with `ValueError` naming variable and value, **even if the value is a key of `UNITS_MAPPING`**. Example: `land transport` is a carrier label, not a unit.
-   - `utils.UNITS_MAPPING` MUST contain only physical units as keys and values; the current keys `""` and `"land transport"` are not allowed. (SC-9)
+   - Before aggregation (as part of result validation, C6.5), every raw `unit` value MUST be checked. A non-string, an empty (or whitespace-only) string, and a value that is not a key of `UNITS_MAPPING` MUST be rejected with `ValueError` naming variable and value. A key of `UNITS_MAPPING` is valid even if a carrier of the evaluated network (`n.carriers.index`) has the same name: carriers and units may share a name (owner, PR #127 review 2026-11-03; SC-46).
+   - `utils.UNITS_MAPPING` maps physical PyPSA units and the bus unit labels used by pypsa-eur / PyPSA-AT to physical units. The key `""` is not allowed. `land transport` → `MWh` is a permanent key (owner, PR #123 review 2026-11-02: "important unit in pypsa-eur"): it is the `unit` attribute of the `land transport oil` buses (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars` l.2751-2757, `unit="land transport"`); the flow it labels is fuel energy (LHV, D7). Statistics functions MAY return it as raw unit; a relabelling to `MWh_LHV` is not required (owner, PR #127 review 2026-11-03, OQ-29). `Network_Processor` normalises it to `MWh` in step 2 (C8), after the function. (SC-9)
    - Every valid PyPSA unit is then normalised via `UNITS_MAPPING` (e.g. `MWh_el`, `MWh_th`, `MWh_LHV` → `MWh`; `t_co2` → `t`).
    - A unit that is not a key of `UNITS_MAPPING` MUST raise `ValueError` naming variable and unit; it MUST NOT become NaN. (SC-9)
 2. **Conversion.** Conversion is step 4 of the post-processing order (C8), the last transformation of values. If `convert_units: true` and definitions are used (C3), each variable MUST be converted with `pyam.IamDataFrame.convert_unit(current, to)` from the normalised unit to the unit in the definitions (pint with the `iam-units` registry). If both are equal, no conversion takes place.
-3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10)
+3. If a definition lists several units (e.g. `unit: [ TJ, TWh ]` in `definitions/variable/trade.yaml`), the first one is used. A unit list that cannot be parsed MUST raise `ValueError`; there is no fallback unit. (SC-10) A bracketed unit string without comma is a list as well: `"[TJ]"` is a single-element list and MUST give `TJ`; the empty list `"[]"` MUST raise `ValueError` naming the variable. Neither is used literally as target unit (owner, PR #127 review 2026-11-03; SC-43).
 4. If a variable has several definition entries, the first one is used and a `WARNING` is logged.
 5. Errors (each MUST raise an exception naming the variable):
-   - always: variable without unit → `ValueError`; several units for one variable after normalisation → `ValueError`;
+   - always: variable without unit → `ValueError`; several units for one variable after normalisation → `ValueError`. The check is per result, i.e. per variable and investment year (PR #123). Different units of one variable in different investment years are allowed if no conversion applies (`convert_units: false` or `definitions_path: false`); with conversion, every year is converted to the definition unit (owner, PR #127 review 2026-11-03, OQ-32: no cross-year check);
    - only when conversion applies (C9.2: `convert_units: true` and definitions used): definition without unit → exception; unit not convertible → `ValueError`.
 
    A variable missing from the definitions never reaches this step (C3.1); with `definitions_path: false`, no definition-related check takes place (C3.2, C9.6).
 6. If `convert_units: false` or `definitions_path: false`, output units are the normalised PyPSA units.
 
-**Sources:** `Network_Processor._map_unit_level`, `_convert_units_to_common_definitions`, `_get_unit_from_common_definitions`; `utils.UNITS_MAPPING`; `definitions/variable/*.yaml`; https://pyam-iamc.readthedocs.io/en/stable/ (`convert_unit`).
+**Sources:** `Network_Processor._invalid_result_labels`, `_map_unit_level`, `_sum_over_groups`, `_convert_units_to_common_definitions`, `_get_unit_from_common_definitions` (PR #123); `utils.UNITS_MAPPING`; `sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars` (bus unit `land transport`); `definitions/variable/*.yaml`; https://pyam-iamc.readthedocs.io/en/stable/ (`convert_unit`).
 
 **Acceptance criteria**
 - C9-AC1: A result with unit `MWh_el` for a variable defined in `TJ` is output as `TJ` with value × 0.0036 (1 MWh = 3.6 GJ).
 - C9-AC2: A result with unit `foo` (not in `UNITS_MAPPING`) raises `ValueError` containing `foo`.
-- C9-AC2b: A result with unit `""` or `"land transport"` raises `ValueError` naming the variable, and no row with unit `MWh` is produced from it.
-- C9-AC2c: `UNITS_MAPPING` contains neither the key `""` nor the key `"land transport"`.
+- C9-AC2b: A result with unit `""` raises `ValueError` naming the variable, and no row with unit `MWh` is produced from it. A result with unit `land transport` on a mock network that also has a carrier `land transport` does not raise and is normalised to `MWh` (SC-46).
+- C9-AC2c: `UNITS_MAPPING` contains no key `""`; it contains `"land transport": "MWh"`. A result with unit `land transport` is valid and normalised to `MWh` by `Network_Processor`, whether or not the network has a carrier of that name.
 - C9-AC3: For a definition `unit: [ TJ, TWh ]`, the output unit is `TJ`.
-- C9-AC4: A variable with rows in `MWh` and `t` raises `ValueError`.
+- C9-AC3b: For a definition unit string `"[TJ]"` the target unit is `TJ`; for `"[]"` a `ValueError` naming the variable is raised (SC-43).
+- C9-AC4: A variable with rows in `MWh` and `t` in one result raises `ValueError`. With `convert_units: false`, a variable in `MWh` for 2030 and in `t` for 2040 does not raise; the output holds both units.
 - C9-AC5: A unit pair without conversion (e.g. `t` → `TJ`) raises `ValueError`.
 - C9-AC6: With `convert_units: false`, a `MWh_el` result is output as `MWh`.
 
@@ -369,12 +375,12 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 3. **Path tokens.** In file and folder names, whitespace runs in `model_name`, `scenario_name` and `country` are replaced by `_`; leading/trailing whitespace is removed. `_<country>` is omitted for `country: all`. `<level>` is the value of `aggregation_level` (`country` or `region`) and is always part of the name, so that runs that differ only in `aggregation_level` do not overwrite each other (owner decision, review; SC-22).
 4. **Yearly output** (`aggregate_per_year: true`): one file `<output_path>/PYPSA_<model>_<scenario>_<level>[_<country>].xlsx`; year columns are integers (investment years).
 5. **Time series output** (`aggregate_per_year: false`): folder `<output_path>/PYPSA_timeseries_<model>_<scenario>_<level>[_<country>]/` with one file per investment year `PYPSA_<model>_<scenario>_<level>[_<country>]_<year>.xlsx`.
-   - Columns are timezone-aware timestamps in UTC (`+00:00`).
+   - Columns are timezone-aware timestamps. Timezone-naive snapshots are labelled UTC (`+00:00`, `tz_localize`, no shift of the clock time); timezone-aware snapshots keep their timezone, without conversion (owner, PR #124 review 2026-11-02).
    - The year of every snapshot timestamp is replaced by the investment year (e.g. `2019-01-01 00:00` → `2050-01-01 00:00`). Leap-day handling is open (OQ-5).
 6. **Excel layout.** Files are written with `pyam.IamDataFrame.to_excel` defaults (pyam 3.2): sheet `data` with all IAMC dimensions and sheet `meta`.
 7. Existing files with the same name are overwritten. With the naming of items 3–5, this happens only for runs with identical `output_path`, `model_name`, `scenario_name`, `aggregation_level`, `country` and `aggregate_per_year`.
 
-**Sources:** `Network_Processor.structure_pyam_from_pandas`, `write_output_to_xlsx`, `_sanitize_path_token`, `calculate_variables_values` (l.869-875); `format_timestamps`; `README.md` "Output behavior"; owner decisions in the kick-off.
+**Sources:** `Network_Processor.structure_pyam_from_pandas`, `write_output_to_xlsx`, `_output_name`, `_sanitize_path_token`, `calculate_variables_values` (PR #124); `format_timestamps` (tz-aware columns kept unchanged, tz-naive localised to `+00:00`); `README.md` "Output behavior"; owner decisions in the kick-off.
 
 **Acceptance criteria**
 - C10-AC1: Without `output_path` and without `aggregation_level`, the yearly file is written to `<cwd>/resources/PYPSA_<model>_<scenario>_country_<country>.xlsx`.
@@ -382,7 +388,7 @@ The country of a location is its first two characters (`AT1` → `AT`). "Aggrega
 - C10-AC3: `model_name: "Pypsa-AT v1.0"`, `scenario_name: "KN 2040"`, `aggregation_level: country`, `country: AT` → file name `PYPSA_Pypsa-AT_v1.0_KN_2040_country_AT.xlsx`; with `country: all` → `PYPSA_Pypsa-AT_v1.0_KN_2040_country.xlsx`; with `aggregation_level: region`, `country: AT` → `PYPSA_Pypsa-AT_v1.0_KN_2040_region_AT.xlsx`.
 - C10-AC4: Time series for investment years 2030 and 2040 → folder `PYPSA_timeseries_<model>_<scenario>_<level>_<country>/` with files `PYPSA_<model>_<scenario>_<level>_<country>_2030.xlsx` and `…_2040.xlsx`.
 - C10-AC5: Reading a yearly file with `pyam.IamDataFrame(path)` gives integer years and the configured model and scenario.
-- C10-AC6: A time series column for snapshot `2019-03-01 12:00` in investment year 2050 is `2050-03-01 12:00+00:00`.
+- C10-AC6: A time series column for the timezone-naive snapshot `2019-03-01 12:00` in investment year 2050 is `2050-03-01 12:00+00:00`; for the timezone-aware snapshot `2019-03-01 12:00+01:00` it is `2050-03-01 12:00+01:00`.
 - C10-AC7: The written workbook contains the sheets `data` and `meta`.
 - C10-AC8: Two runs into the same `output_path` with identical config except `aggregation_level` (`country`, then `region`) leave two yearly files (resp. two time series folders), and the first file is unchanged after the second run.
 

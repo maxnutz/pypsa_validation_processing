@@ -32,8 +32,8 @@ Implementing PR: –
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
-| PyPSA unit(s) | `MWh_th` (boiler withdrawal at the `EU oil` bus), `MWh_LHV` (demand Loads); `land transport` relabelled to `MWh_LHV` (D7) | bus units (measured) |
-| Normalised unit | `MWh` (the function MUST normalise, because flows with different units are summed; C6.5) | `UNITS_MAPPING` |
+| PyPSA unit(s) | `MWh_th` (boiler withdrawal at the `EU oil` bus), `MWh_LHV` (demand Loads); `land transport` (bus unit of `land transport oil`, D7) | bus units (measured) |
+| Normalised unit | `MWh` (after post-processing, C8 step 2; the function MAY return raw units such as `land transport`, D7, C6.5) | `UNITS_MAPPING` |
 | Target unit | `TJ` | definitions file |
 | Conversion | MWh → TJ, 0.0036 | C9 |
 
@@ -89,7 +89,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `industry_non_energy_shares` | yes | `NE_naphtha` (D5, Eurostat fallback, C2.5) | variable skipped with `WARNING` (C2.5) |
 
 ## 9. Return format
-Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land transport` unit in the result (C9.1).
+Per C6, MultiIndex `[location, unit]`. Raw units as returned by pypsa (`MWh_LHV`, `MWh_th`, `land transport`) are allowed, one row per location and unit; normalising inside the function is optional (C6.5, D7). The post-processed output has the unit `MWh` (C8 step 2) or the definition unit (C9.2).
 
 ## 10. Edge cases
 | Case | Expected behaviour |
@@ -100,16 +100,17 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`). No `land trans
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock: `oil refining` supplies 75, `Fischer-Tropsch` supplies 25 (`f_oil = 0.75`). At `A` (country `AA`): `land transport oil` Load 40 (bus unit `land transport`), `kerosene for aviation` Load 20, `d_aviation(AA) = 0.5`, `agriculture machinery oil` Load 4, `NE_naphtha = 0`, 1 snapshot. Result `(A, MWh_LHV or MWh): 0.75·(40 + 10 + 4) = 40.5`.
+- AC3: Mock: `oil refining` supplies 75, `Fischer-Tropsch` supplies 25 (`f_oil = 0.75`). At `A` (country `AA`): `land transport oil` Load 40 (bus unit `land transport`), `kerosene for aviation` Load 20, `d_aviation(AA) = 0.5`, `agriculture machinery oil` Load 4, `NE_naphtha = 0`, 1 snapshot. Result, summed over the unit rows of `A` (after normalisation, C8 step 2): `0.75·(40 + 10 + 4) = 40.5` `MWh`.
 - AC3b: As AC3, but the kerosene bus at `A` is supplied by `kerosene for aviation` 15 and `methanol-to-kerosene` 5 (`s_ker = 0.75`). Result `0.75·(40 + 0.5·0.75·20 + 4) = 38.625`.
 - AC4: C6-AC3 (`flow`).
-- AC5: Values ≥ 0; no unit `land transport` in the result.
+- AC5: Values ≥ 0; every unit of the result is a key of `UNITS_MAPPING` (`land transport` allowed); after post-processing the variable has the single unit `MWh`.
 - AC6: C6-AC6.
 - AC7: The domestic share is taken per country: two locations of different countries with different `energy_totals` rows get different shares.
 - AC8: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 - AC9: As AC3 with `naphtha for industry` Load 10 at `A` and `S[AA, Oil] = 0.8`: `NE_naphtha = 8`, result `0.75·(40 + 10 + 4 + 10 − 8) = 42`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 
 ## 12. Open questions
+- OQ-29 resolved (2026-11-03): no relabelling to `MWh_LHV`; the function MAY return the raw unit `land transport`, normalised by `Network_Processor` (D7).
 - OQ-18 resolved (D5, C2.5). OQ-1, OQ-20, OQ-23, OQ-26, OQ-27 resolved.
 
 ## 13. Sources

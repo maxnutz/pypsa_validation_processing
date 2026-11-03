@@ -31,8 +31,8 @@ Implementing PR: –
 ## 3. Unit
 | Item | Value | Source |
 |---|---|---|
-| PyPSA unit(s) | `MWh_el` (BEV charger), `MWh_LHV` (H2, liquids; `land transport` relabelled, D7) | bus units |
-| Normalised unit | `MWh` (the function MUST normalise, because carriers with different units are summed; C6.5) | `UNITS_MAPPING` |
+| PyPSA unit(s) | `MWh_el` (BEV charger), `MWh_LHV` (H2, liquids), `land transport` (bus unit of `land transport oil`, D7) | bus units |
+| Normalised unit | `MWh` (after post-processing, C8 step 2; the function MAY return raw units such as `land transport`, D7, C6.5) | `UNITS_MAPPING` |
 | Target unit | `TJ` | definitions file |
 | Conversion | MWh → TJ, 0.0036 | C9 |
 
@@ -82,7 +82,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `energy_totals` | yes | D4 | variable skipped with `WARNING` (C2.4, SC-7) |
 
 ## 9. Return format
-Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transport` unit (C9.1, SC-9).
+Per C6, MultiIndex `[location, unit]`. Raw units as returned by pypsa (`MWh_el`, `MWh_LHV`, `land transport`) are allowed, one row per location and unit; normalising inside the function is optional (C6.5, D7). The post-processed output has the unit `MWh` (C8 step 2) or the definition unit (C9.2).
 
 ## 10. Edge cases
 | Case | Expected behaviour |
@@ -93,15 +93,16 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh` (normalised). No `land transpo
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
-- AC3: Mock at `A` (country `AA`, `d_aviation = 0.5`, `d_navigation = 0.2`): `BEV charger` withdrawal 10 (efficiency 0.9), `land transport fuel cell` 5, `land transport oil` 40 (bus unit `land transport`), kerosene 20, shipping oil 10, shipping methanol 5; 1 snapshot. Result `(A, MWh): 10 + 5 + 40 + 10 + 3 = 68`. Adding `electricity for rail` 2 and `electricity for road` 4 gives `70` (road not counted). Adding a `V2G` feed-in of 3 to `low voltage` at `A` gives `67`.
+- AC3: Mock at `A` (country `AA`, `d_aviation = 0.5`, `d_navigation = 0.2`): `BEV charger` withdrawal 10 (efficiency 0.9), `land transport fuel cell` 5, `land transport oil` 40 (bus unit `land transport`), kerosene 20, shipping oil 10, shipping methanol 5; 1 snapshot. Result, summed over the unit rows of `A` (after normalisation, C8 step 2): `10 + 5 + 40 + 10 + 3 = 68` `MWh`. Adding `electricity for rail` 2 and `electricity for road` 4 gives `70` (road not counted). Adding a `V2G` feed-in of 3 to `low voltage` at `A` gives `67`.
 - AC4: C6-AC3 (`flow`).
-- AC5: Yearly values ≥ 0; unit is `MWh`; no `land transport` unit.
+- AC5: Yearly values ≥ 0; every unit of the result is a key of `UNITS_MAPPING` (`land transport` allowed); after post-processing the variable has the single unit `MWh` and the value of AC3.
 - AC8: Time series, 2 snapshots, weighting 1, only `BEV charger` withdrawal 4 / 0 and `V2G` feed-in 0 / 3 at `A`: snapshot values `4 / −3` (not clipped), yearly value `1`.
 - AC6: C6-AC6.
 - AC7: Without `energy_totals`, the variable is skipped with a `WARNING` (C2-AC6).
 
 ## 12. Open questions
-- None specific. OQ-1, OQ-19 (D7), OQ-24, OQ-27 resolved.
+- OQ-29 resolved (2026-11-03): no relabelling to `MWh_LHV`; the function MAY return the raw unit `land transport`, normalised by `Network_Processor` (D7).
+- OQ-1, OQ-19 (D7), OQ-24, OQ-27 resolved.
 
 ## 13. Sources
 - #15, #19 (incl. comments), #5; definitions as in section 2
