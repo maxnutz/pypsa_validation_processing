@@ -456,6 +456,22 @@ class TestNonEnergyUse:
         )
         assert ((result >= 0) & (result <= demand)).all().all()
 
+    def test_share_outside_unit_interval_clipped_with_warning(self, caplog):
+        """D5: a share outside [0, 1] is clipped, with one WARNING."""
+        shares = pd.DataFrame(
+            {"non_energy_share": [1.5, -0.2]},
+            index=pd.MultiIndex.from_tuples(
+                [("AT", "Oil"), ("DE", "Oil")], names=["country", "carrier"]
+            ),
+        )
+        demand = self._demand({"AT11": 10.0, "DE1": 10.0})
+        with caplog.at_level(logging.WARNING):
+            result = non_energy_use(demand, shares, "Oil")
+        assert result.tolist() == pytest.approx([10.0, 0.0])
+        assert len(caplog.records) == 1
+        message = caplog.records[0].getMessage()
+        assert "AT" in message and "DE" in message
+
     def test_missing_shares_raises(self):
         """D5: shares None for Natural Gas, Oil or Coal raises ValueError."""
         with pytest.raises(ValueError, match="industry_non_energy_shares"):
