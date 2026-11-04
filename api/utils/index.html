@@ -663,6 +663,83 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.attribute_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        attribute_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.fossil_oil_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fossil_oil_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.fossil_gas_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fossil_gas_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.apply_domestic_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_domestic_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.non_energy_use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        non_energy_use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.apply_coke_correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_coke_correction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.decentral_heat_split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decentral_heat_split
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -814,6 +891,83 @@
     <span class="md-ellipsis">
       
         create_location_index_from_copperplate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.attribute_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        attribute_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.fossil_oil_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fossil_oil_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.fossil_gas_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fossil_gas_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.apply_domestic_share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_domestic_share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.non_energy_use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        non_energy_use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.apply_coke_correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_coke_correction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.decentral_heat_split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decentral_heat_split
       
     </span>
   </a>
@@ -1232,6 +1386,814 @@ if the index cannot be reconstructed with the existing index names.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>column_name</code> is not found in the index levels of <code>raw_input</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.attribute_locations" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">attribute_locations</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">flows</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Attribute flows on copperplate buses to a location (D1).</p>
+<p><code>pypsa.statistics</code> already attributes a flow to the location of the bus
+at the evaluated port (D1.1, D1.2). This helper applies the copperplate
+exception: a Link flow at location <code>EU</code> is moved to the location of the
+Link's <code>bus1</code> (D1.3). If <code>bus1</code> is a copperplate bus as well, the flow
+stays at <code>EU</code> (D1.4). Flows of other components are not changed.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network the flows were evaluated on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>flows</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Result of a <code>pypsa.statistics</code> call whose index contains the levels
+<code>component</code>, <code>name</code> and <code>location</code>. <code>pypsa.statistics</code> drops
+the <code>component</code> level if <code>components</code> is a single string, so pass
+a list (e.g. <code>components=["Link"]</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Copy of <em>flows</em> with the <code>location</code> level replaced. Rows are not
+regrouped, so two rows may now share all index values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the index of <em>flows</em> lacks one of the required levels.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.fossil_oil_share" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fossil_oil_share</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the system-wide fossil share of oil <code>f_oil</code> (D2).</p>
+<p>Yearly supply to all <code>oil</code> buses, summed over all locations; Stores are
+excluded. The same value applies to every location and every snapshot.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>f_oil</code> in <code>[0, 1]</code>; <code>0.0</code> if no oil is supplied.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a component other than a Store with a carrier outside
+<code>OIL_FOSSIL_CARRIERS</code> and <code>OIL_NON_FOSSIL_CARRIERS</code> supplies oil.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.fossil_gas_share" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fossil_gas_share</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the system-wide fossil share of gas <code>f_gas</code> (D3).</p>
+<p>Yearly supply to all <code>gas</code> buses, summed over all locations. Stores and
+gas transport (<code>GAS_TRANSPORT_CARRIERS</code> and every Link whose <code>bus0</code>
+and <code>bus1</code> are both <code>gas</code> buses) are excluded. The same value applies
+to every location and every snapshot.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>f_gas</code> in <code>[0, 1]</code>; <code>0.0</code> if no gas is supplied.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a non-excluded component with a carrier outside
+<code>GAS_FOSSIL_CARRIERS</code> and <code>GAS_NON_FOSSIL_CARRIERS</code> supplies gas.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.apply_domestic_share" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply_domestic_share</span><span class="p">(</span><span class="n">energy_stats</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Multiply flows by the domestic share <code>d_k(c)</code> of their country (D4).</p>
+<p><code>d_k(c) = total domestic k / (total domestic k + total international k)</code>
+with <code>c</code> = the first two characters of the location. The share is looked
+up only for rows with a non-zero value (in any snapshot); rows that are 0
+everywhere stay 0 without a lookup, e.g. the pseudo-location <code>EU</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>energy_stats</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Energy statistics with a <code>location</code> index level; a DataFrame has snapshots as
+columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>energy_totals</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Energy totals of one year, indexed by <code>country</code> (C2.4).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>kind</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"aviation"</code> or <code>"navigation"</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><em>energy_stats</em> multiplied row-wise by <code>d_k</code>; a denominator of 0 gives 0.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>energy_totals</em> is <code>None</code>, <em>kind</em> is not supported, or a row
+with non-zero Energy statistics belongs to a country without a row in
+<em>energy_totals</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.non_energy_use" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">non_energy_use</span><span class="p">(</span><span class="n">demand</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">shares</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">carrier</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the industrial non-energy use <code>NE_x(l)</code> (D5, Eurostat fallback).</p>
+<p><code>NE_x(l) = S[c, x] · demand(l)</code> with <code>c</code> = the first two characters of
+the location and <code>S</code> the Eurostat shares (C2.5). A country without a row
+for <em>carrier</em> gets the unweighted mean of all rows of <em>carrier</em>, with one
+<code>WARNING</code> per call naming the countries (none for the copperplate
+<code>EU</code>). <code>NE_H2</code> is 0, with one <code>WARNING</code> per call. <code>0 ≤ S ≤ 1</code> is
+checked when the file is read; a share outside <code>[0, 1]</code> here (e.g. after
+an adaptation of the shares) is clipped to <code>[0, 1]</code> with one <code>WARNING</code>
+per call, so <code>0 ≤ NE_x(l) ≤ demand(l)</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>demand</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Industry demand of <em>carrier</em> (e.g. the <code>gas for industry</code> Load) with
+a <code>location</code> index level; a DataFrame has snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>shares</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Index (<code>country</code>, <code>carrier</code>), column <code>non_energy_share</code> (C2.5).
+Read from the CSV written by the sister package
+<code>eurostat-energy-balance_processing</code>
+(<code>utils.calculate_industry_non_energy_shares</code>, written by
+<code>IAMC_Creator.write_industry_non_energy_shares</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>carrier</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"Natural Gas"</code>, <code>"Oil"</code>, <code>"Coal"</code> or <code>"H2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Non-energy use with the index and columns of <em>demand</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>carrier</em> is not supported, or <em>shares</em> is <code>None</code> for a carrier
+other than <code>"H2"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.apply_coke_correction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply_coke_correction</span><span class="p">(</span><span class="n">coal_energy</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">kappa</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Apply the coke correction to the energy part of industrial coal (D6).
+   PyPSA reports with <code>coal for industry</code> the coal, that goes <em>into</em> coke
+   ovens, Eurostats final energy counts the coke, that <em>comes out</em> of them.</p>
+<p><code>FE = E · (1 − κ) + E · κ / MWH_COAL_PER_MWH_COKE</code> with <code>E</code> the
+<code>coal for industry</code> demand minus its non-energy use (D5).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>coal_energy</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Energy part <code>E</code> of the industrial coal demand.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>kappa</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Coke share <code>κ</code> in <code>[0, 1]</code> from the physical method (C2.5). If
+<code>None</code> (default), the Eurostat fallback <code>κ = 0</code> applies and one
+<code>WARNING</code> is logged.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Coal final energy with the index and columns of <em>coal_energy</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>kappa</em> is outside <code>[0, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.decentral_heat_split" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">decentral_heat_split</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Split the input to decentral heat supply between sectors (D8).</p>
+<p>For each bus carrier <code>b</code> of <code>DECENTRAL_HEAT_BUS_CARRIERS</code> and location
+<code>l</code>: <code>D8_x(l) = Σ_b σ_b,x(l) · I_b(l)</code>. <code>I_b</code> is the withdrawal of
+the Links that supply heat to <code>b</code> at their non-heat input ports
+(location per D1), plus the heat supplied by Generators (solar thermal)
+and by CHPs (Links with a further non-heat output) to <code>b</code>. Heat storage
+and heat vents are excluded. <code>σ_b,x</code> are yearly demand shares, applied
+to every snapshot.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), return yearly values as a Series; otherwise a
+DataFrame with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Index levels <code>sector</code> (<code>rc</code>, <code>agr</code>, <code>ind</code>, <code>other</code>),
+<code>location</code>, <code>carrier</code> (input carrier) and <code>unit</code> (normalised
+to <code>MWh</code>, C6.5). Empty if no decentral heat bus is supplied.</p>
               </div>
             </td>
           </tr>
