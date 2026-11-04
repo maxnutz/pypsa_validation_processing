@@ -233,6 +233,9 @@ GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
 # D3: gas transport, excluded together with every other Link between gas buses
 GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
 
+# D6: MWh of coal per MWh of coke
+MWH_COAL_PER_MWH_COKE = 1.366
+
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
@@ -649,14 +652,12 @@ def non_energy_use(
     return demand.mul(factor, axis=0)
 
 
-# D6: MWh of coal per MWh of coke (pypsa-de `get_final_energy` l.2208-2225)
-MWH_COAL_PER_MWH_COKE = 1.366
-
-
 def apply_coke_correction(
     coal_energy: pd.Series | pd.DataFrame, kappa: float | None = None
 ) -> pd.Series | pd.DataFrame:
     """Apply the coke correction to the energy part of industrial coal (D6).
+       PyPSA reports with `coal for industry` the coal, that goes _into_ coke
+       ovens, Eurostats final energy counts the coke, that _comes out_ of them.
 
     ``FE = E · (1 − κ) + E · κ / MWH_COAL_PER_MWH_COKE`` with ``E`` the
     ``coal for industry`` demand minus its non-energy use (D5).
