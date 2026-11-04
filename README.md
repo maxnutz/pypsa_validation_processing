@@ -76,7 +76,7 @@ pixi run python workflow.py --config /absolute/path/to/config.yaml --log-level I
 
 After `pip install .`, the same CLI is available as `pypsa-validation-processing`.
 
-`pixi run workflow_test` runs the workflow for all four example setups in `configs/` (`country`/`region` × `year`/`timeseries`) and then the test suite. Use it for local end-to-end checks.
+`pixi run workflow_test` runs the workflow for the six test setups in `configs/test/` on the network `resources/electricity_network_0p3` and then the test suite. Use it for local end-to-end checks. The test configs are local files, not versioned; create them from `specs/configuration.md` (section "Test configs"), which also lists the local data they need.
 ### Run tests
 Run tests with
 ```bash
@@ -106,7 +106,7 @@ pypsa_validation_processing/
 |   |-- utils.py                        # static information and general utility functions
 |   `-- configs/                        # package configuration files
 |       |-- config.default.yaml         # default configuration file
-|       |-- config.{country,region}-{year,timeseries}.yaml  # example setups used by `workflow_test`
+|       |-- test/<setup>.yaml           # local test setups used by `workflow_test` (not versioned)
 |       `-- mapping.default.yaml        # mapping IAMC-variable - statistics-function
 |-- docs/                               # mkdocs documentation sources
 |-- notebooks/                          # marimo notebooks for background info on functions
