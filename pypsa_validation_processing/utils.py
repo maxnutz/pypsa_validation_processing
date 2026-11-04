@@ -218,6 +218,19 @@ OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
     "import oil",
 )
 
+# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
+GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
+GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Sabatier",
+    "biogas to gas",
+    "biogas to gas CC",
+    "BioSNG",
+    "BioSNG CC",
+    "import gas",
+)
+# D3: gas transport, excluded together with every other Link between gas buses
+GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
+
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
@@ -458,20 +471,6 @@ def fossil_oil_share(n: pypsa.Network) -> float:
     )
     supply = supply.drop("Store", level="component", errors="ignore")
     return _fossil_share(supply, OIL_FOSSIL_CARRIERS, OIL_NON_FOSSIL_CARRIERS, "oil")
-
-
-# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
-GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
-GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
-    "Sabatier",
-    "biogas to gas",
-    "biogas to gas CC",
-    "BioSNG",
-    "BioSNG CC",
-    "import gas",
-)
-# D3: gas transport, excluded together with every other Link between gas buses
-GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
 
 
 def fossil_gas_share(n: pypsa.Network) -> float:
