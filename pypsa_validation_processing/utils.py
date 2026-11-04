@@ -581,8 +581,10 @@ def non_energy_use(
     the location and ``S`` the Eurostat shares (C2.5). A country without a row
     for *carrier* gets the unweighted mean of all rows of *carrier*, with one
     ``WARNING`` per call naming the countries (none for the copperplate
-    ``EU``). ``NE_H2`` is 0, with one ``WARNING`` per call. Since
-    ``0 ≤ S ≤ 1`` (checked at initialisation), ``0 ≤ NE_x(l) ≤ demand(l)``.
+    ``EU``). ``NE_H2`` is 0, with one ``WARNING`` per call. ``0 ≤ S ≤ 1`` is
+    checked when the file is read; a share outside ``[0, 1]`` here (e.g. after
+    an adaptation of the shares) is clipped to ``[0, 1]`` with one ``WARNING``
+    per call, so ``0 ≤ NE_x(l) ≤ demand(l)``.
 
     Parameters
     ----------
@@ -591,6 +593,10 @@ def non_energy_use(
         a ``location`` index level; a DataFrame has snapshots as columns.
     shares : pd.DataFrame | None
         Index (``country``, ``carrier``), column ``non_energy_share`` (C2.5).
+        Read from the CSV written by the sister package
+        ``eurostat-energy-balance_processing``
+        (``utils.calculate_industry_non_energy_shares``, written by
+        ``IAMC_Creator.write_industry_non_energy_shares``).
     carrier : str
         ``"Natural Gas"``, ``"Oil"``, ``"Coal"`` or ``"H2"``.
 
@@ -631,6 +637,15 @@ def non_energy_use(
             missing,
         )
     factor = countries.map(carrier_shares).fillna(carrier_shares.mean())
+    out_of_range = ~factor.between(0.0, 1.0)
+    if out_of_range.any():
+        logger.warning(
+            "Industry non-energy share of '%s' outside [0, 1] for %s; clipped to "
+            "[0, 1] so that 0 <= non-energy use <= demand (D5).",
+            carrier,
+            sorted(set(countries[out_of_range])),
+        )
+        factor = factor.clip(0.0, 1.0)
     return demand.mul(factor, axis=0)
 
 
