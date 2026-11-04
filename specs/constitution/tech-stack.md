@@ -11,7 +11,7 @@ Version constraints are taken from `pixi.toml` and `pyproject.toml`; locked vers
 |---|---|---|---|
 | Python | `>=3.11` | 3.14.3 | `pixi.toml` `[dependencies]`, `pyproject.toml` `requires-python`, `pixi.lock` |
 
-The package MUST support Python `>=3.11` (`pixi.toml`). `docs/contributing.md` was aligned in PR #125; `CLAUDE.md` still states ≥ 3.12 and is to be aligned on owner request (SC-12 in [open_questions.md](../open_questions.md)).
+The package MUST support Python `>=3.11` (`pixi.toml`). `docs/contributing.md` was aligned in PR #125, `CLAUDE.md` in PR #131 (SC-12 resolved, [open_questions.md](../open_questions.md)).
 
 ## Environment
 - Pixi workspace `pypsa-validation-processing`, channel `conda-forge`, platforms `linux-64`, `osx-arm64`, `osx-64`, `win-64` (`pixi.toml` `[workspace]`).
@@ -52,7 +52,8 @@ Which behaviour of each library the package relies on is specified in [contracts
 
 ## Formatting
 - Black (`>=26.5.1,<27`, locked 26.5.1), run via `pixi run black .` (`CLAUDE.md`, "Code Style").
-- NumPy-style docstrings without types; type hints in all signatures (`CLAUDE.md`).
+- NumPy-style docstrings without types; type hints in all signatures (`CLAUDE.md`). This includes private helpers and module constants (owner, PR #138 review 2026-11-04).
+- Module constants of `utils.py` (e.g. carrier lists of D2, D3, D8, `MWH_COAL_PER_MWH_COKE`) are defined in the constant block at the top of the module, not between functions (owner, reviews of PR #133, #134, #137, #138, 2026-11-04).
 
 ## Documentation
 - mkdocs (`>=1.6`, locked 1.6.1), mkdocs-material (`>=9.5`, locked 9.7.6), mkdocstrings[python] (`>=0.26`, locked 1.0.4); config `mkdocs.yml`, sources `docs/`.

@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -26,19 +26,20 @@ Work packages (WP) in implementation order. The order follows the dependencies: 
 
 ## WP3 Shared definitions in `utils.py` — depends on WP1 and on SC-14
 - [x] SC-14 resolved before the first helper or statistics function is implemented (WP3, WP4): resolved by PR #128 (2026-11-03); `CLAUDE.md` "Blueprint" and `sister_packages/CLAUDE.md` name P6 (`specs/constitution/principles.md`) as binding.
-- [ ] Non-versioned test configs in `config/test` with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03).
-One PR per definition, each with unit tests; listed with the variables that need it.
-- [ ] D1 location attribution — Electricity, Natural Gas, Oil, Net Imports|Oil, Transportation, Residential and Commercial
-- [ ] D2 `f_oil` — Oil, Net Imports|Oil
-- [ ] D3 `f_gas` — Natural Gas
-- [ ] D4 domestic shares `d_k(c)` (needs `energy_totals`) — Oil, Transportation
-- [ ] D5 non-energy use incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Coal, Industry
-- [ ] D6 coke correction `κ` — Coal, Industry
-- [ ] D7 `land transport oil` — Oil, Transportation: no division by an engine efficiency. No unit relabelling to `MWh_LHV` (OQ-29 resolved 2026-11-03); `land transport` stays a key of `UNITS_MAPPING` (owner, PR #123 review 2026-11-02); the functions MAY return the raw unit `land transport`, `Network_Processor` normalises it after the function (C8 step 2).
-- [ ] D8 decentral heat split — Agriculture, Industry, Residential and Commercial
+One PR per definition, each with unit tests; listed with the variables that need it. All merged 2026-11-04 as a stack; no statistics function was changed. The helpers are named in each D-section of `specs/variables/shared_definitions.md`.
+- [x] PR #132: D1 location attribution `attribute_locations` — Electricity, Natural Gas, Oil, Net Imports|Oil, Transportation, Residential and Commercial
+- [x] PR #133: D2 `f_oil` `fossil_oil_share` — Oil, Net Imports|Oil
+- [x] PR #134: D3 `f_gas` `fossil_gas_share` — Natural Gas
+- [x] PR #135: D4 domestic shares `d_k(c)` `apply_domestic_share` (needs `energy_totals`) — Oil, Transportation. The old `get_energy_totals_domestic_share` (`AT` for every location, OQ-1) stays until the WP4 PRs of Transportation and Oil replace it.
+- [x] PR #136: D5 non-energy use `non_energy_use` incl. mean for missing countries (needs the shares table) — Natural Gas, Oil, Coal, Industry. Owner (PR #136 review 2026-11-04): a share outside `[0, 1]` is clipped with a `WARNING` (D5).
+- [x] PR #137: D6 coke correction `apply_coke_correction` — Coal, Industry. Factor `1.366` to be checked after WP4 (see WP4).
+- [x] PR #137: D7 `land transport oil` — Oil, Transportation: no helper; `UNITS_MAPPING` comment and tests only (SC-9 resolved). No division by an engine efficiency, no relabelling to `MWh_LHV` (OQ-29); the functions MAY return the raw unit `land transport`, `Network_Processor` normalises it after the function (C8 step 2).
+- [x] PR #138: D8 decentral heat split `decentral_heat_split` — Agriculture, Industry, Residential and Commercial. Owner decisions in the PR #138 review (2026-11-04) are in D8.
+- [x] Spec review after WP3 (2026-11-04): D1–D8 name their helpers; owner decisions of the reviews of #132–#138 added to D5 and D8; SC-9, SC-12, SC-20, SC-43–SC-46 resolved.
 
 ## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
 One PR per function. Order: few dependencies first, so the framework is exercised end-to-end early.
+- [ ] Test configs in `pypsa_validation_processing/configs/test/`, not versioned because they refer to local data (`.gitignore` l.76; owner, PR #141 review 2026-11-04), with network `resources/electricity_network_0p3` (#129; owner, PR #127 review 2026-11-03). Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data. Needs the setups listed in `specs/configuration.md` first (spec-writer).
 - [ ] Net Imports|Electricity (none; SC-30; #70)
 - [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
 - [ ] Final Energy [by Carrier]|Electricity (D1; SC-38; #43)
@@ -51,14 +52,17 @@ One PR per function. Order: few dependencies first, so the framework is exercise
 - [ ] Final Energy [by Carrier]|Oil (D1, D2, D4, D5, D7; SC-28; #46, #53)
 - [ ] Final Energy [by Sector]|Industry (D5, D6, D8; SC-33; #12, #74)
 - [ ] All functions return every location (C6.13; SC-26) — checked in each PR above.
+- [ ] Deep review of the WP3 helpers after WP4, together with the statistics functions that use them, on workflow data (`pixi run workflow_test` and the test configs of #129); covers `attribute_locations` on real networks (owner, PR #132 and PR #138 reviews 2026-11-04).
+- [ ] Spec review after WP4: research the D6 coke factor `1.366` MWh coal per MWh coke (`MWH_COAL_PER_MWH_COKE` in `utils.py`, taken from pypsa-de `get_final_energy` l.2208–2225) in more depth and check it against the PyPSA code that preprocesses the industry data (owner, PR #137 review 2026-11-04).
+- [ ] Spec review after WP4: D8 tells CHP heat and solar thermal heat on decentral heat buses apart; the result carrier is `b` for both today (owner, PR #141 review 2026-11-04).
 
 ## WP5 Config, units and output (C1, C9, C10) — independent, parallel to WP3/WP4
 - [x] PR #122: config validation and defaults (SC-1–5, SC-18, SC-19). Decisions taken in the PR without asking: OQ-31 (case-sensitive codes, confirmed 2026-11-03); OQ-30 (`null` for optional keys, rejected 2026-11-03 → SC-44); OQ-4 (`XK` rejected; owner 2026-11-03: accept `XK` → SC-45).
 - [x] PR #123: unit handling (SC-10, SC-24; SC-9 partly: `land transport` stays in `UNITS_MAPPING`, owner decision 2026-11-02). Follow-ups: OQ-29 and OQ-32 resolved 2026-11-03 (no relabelling, no cross-year check); SC-43 open.
 - [x] PR #124: output names and timestamps (SC-15, SC-22). Owner (PR #124 review 2026-11-02): timezone-aware snapshots keep their timezone (C10.5).
 - [x] PR #125: environment and docs (SC-13, SC-16; OQ-16: `requests` removed, `pypsa` declared in `pixi.toml`; SC-12 for `docs/contributing.md`). SC-17 was already done in PR #112.
-- [ ] SC-12 (`CLAUDE.md` "Code Style": Python ≥ 3.12) and SC-20 (`CLAUDE.md` "Local debugging": all-NaN results "not valid"): need a `CLAUDE.md` change on explicit owner request ("Forbidden Actions"); not a spec PR.
-- [ ] PR: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43); `country: XK` accepted, pypsa-eur notation (C1.6, C1-AC2; SC-45). A unit with the same name as a carrier of `n` is valid; only non-empty keys of `UNITS_MAPPING` are checked (C6.5, C9.1; SC-46). Remove the unreachable warn-and-skip branch for a missing function in `_execute_function_for_variable` (missing functions raise at initialisation, C4; SC-6; owner, PR #130 review 2026-11-03).
+- [x] PR #131: SC-12 (`CLAUDE.md` "Code Style": Python ≥ 3.11) and SC-20 (`CLAUDE.md` "Local debugging": all-zero / all-NaN results valid, but check them against the network); `CLAUDE.md` change on explicit owner request, not a spec PR.
+- [x] PR #139: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43); `country: XK` accepted, pypsa-eur notation (C1.6, C1-AC2; SC-45). A unit with the same name as a carrier of `n` is valid; only non-empty keys of `UNITS_MAPPING` are checked (C6.5, C9.1; SC-46). Remove the unreachable warn-and-skip branch for a missing function in `_execute_function_for_variable` (missing functions raise at initialisation, C4; SC-6; owner, PR #130 review 2026-11-03).
 - [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44; OQ-4 decided 2026-11-03 (SC-45).
 
 ## Later (need specs first)
