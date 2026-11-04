@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: draft
+Status: reviewed
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
@@ -166,7 +166,7 @@ Consistency: for every `l` and `b`, `Σ_x σ_b,x(l) · I_b(l) = I_b(l)` (no ener
 Deviation from pypsa-de: pypsa-de assigns the full decentral input to Residential and Commercial (l.2297-2409) and counts `agriculture heat` (l.2556) and decentral `low-temperature heat for industry` (l.2121-2123) as heat. This double counts; AT 2025 (`electricity_network_0p3`): `rural heat` 2.60 TWh, `urban decentral heat` 0.09 TWh, total ≈ 9.7 PJ (OQ-22). Shares vary per location (`rural heat`, agriculture share 4.9–100 %), so a per-location split is required.
 
 Implemented by `utils.decentral_heat_split(n, aggregate_per_year)` (PR #138, 2026-11-04). Implementation rules, decided by the owner in the PR #138 review (2026-11-04):
-- **Result.** Index levels `sector` (`rc`, `agr`, `ind`, `other`), `location`, `carrier`, `unit` (normalised to `MWh`). `carrier` is the bus carrier of the input port (e.g. `low voltage`, `gas`, `oil`, `solid biomass`), not the Link carrier; for heat received from Generators and CHPs it is `b` itself, so solar thermal and CHP heat are not told apart (the sector variables do not need it). A network without a supplied decentral heat bus gives a result with zero rows; the calling statistics function turns it into `0.0` per location (C6.13).
+- **Result.** Index levels `sector` (`rc`, `agr`, `ind`, `other`), `location`, `carrier`, `unit` (normalised to `MWh`). `carrier` is the bus carrier of the input port (e.g. `low voltage`, `gas`, `oil`, `solid biomass`), not the Link carrier; for heat received from Generators and CHPs it is `b` itself, so solar thermal and CHP heat are not told apart (the sector variables do not need it); to be reviewed after WP4, CHP and solar thermal heat need to be told apart (owner, PR #141 review 2026-11-04, see TODO.md). A network without a supplied decentral heat bus gives a result with zero rows; the calling statistics function turns it into `0.0` per location (C6.13).
 - **Selection.** Heat suppliers are the Links and Generators with positive yearly supply to `b`; flows are selected by `(component, name)`, since a Generator and a Link MAY have the same name. A CHP is such a Link with positive yearly supply to a further bus carrier that is neither `b` nor a CO2 carrier.
 - **CO2 ports.** Bus carriers whose name contains `co2` are neither an input nor a CHP output. CO2 bus carriers are always named `co2…`; a check of the bus unit (`t_co2`) is not required.
 - **Storage.** Components whose carrier matches `water tanks`, `water pits` or `heat vent` are neither input nor demand; `Store` and `StorageUnit` are never demand. PyPSA-AT has no `StorageUnit` on decentral heat buses, but the code is prepared for it.
