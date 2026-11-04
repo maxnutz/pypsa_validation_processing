@@ -294,8 +294,11 @@ class Network_Processor:
         return re.sub(r"\s+", "_", value.strip())
 
     def _is_valid_country_identifier(self, country: str) -> bool:
-        """Check if country is an ISO 3166-1 alpha-2 code, ``EU`` or ``all`` (C1.6)."""
-        return country in ("all", "EU") or country in ISO_3166_ALPHA2_CODES
+        """Check if country is an ISO 3166-1 alpha-2 code, ``XK``, ``EU`` or ``all`` (C1.6).
+
+        ``XK`` (Kosovo) is not an assigned ISO code but is used by pypsa-eur.
+        """
+        return country in ("all", "EU", "XK") or country in ISO_3166_ALPHA2_CODES
 
     def _config_error(self, key: str, expected: str, hint: str = "") -> ValueError:
         """Build the ``ValueError`` for an invalid config value (C1.4)."""
@@ -316,7 +319,8 @@ class Network_Processor:
         ValueError
             If the config is not a mapping, a required key is missing, ``null``
             or empty, or a key has a wrong data type or a value outside the
-            allowed values.
+            allowed values. ``null`` for an optional key is removed from the
+            config, so that its default applies.
         FileNotFoundError
             If the results or definitions folder does not exist (C1.5).
         """
@@ -337,6 +341,10 @@ class Network_Processor:
                 raise ValueError(
                     f"'{key}' not set in config at {self.config_path}.{hint}"
                 )
+        # null for an optional key means "not set": the default applies (C1.4)
+        for key in set(_CONFIG_TYPES) - set(_REQUIRED_CONFIG_KEYS):
+            if key in self.config and self.config[key] is None:
+                del self.config[key]
         for key, (expected_type, expected) in _CONFIG_TYPES.items():
             if key in self.config and not isinstance(self.config[key], expected_type):
                 hint = (
@@ -349,7 +357,7 @@ class Network_Processor:
             raise self._config_error("definitions_path", "a folder path or false")
         if not self._is_valid_country_identifier(self.config["country"]):
             raise self._config_error(
-                "country", "an ISO 3166-1 alpha-2 code, 'EU' or 'all'"
+                "country", "an ISO 3166-1 alpha-2 code, 'XK', 'EU' or 'all'"
             )
         if self.config.get("aggregation_level", "country") not in ("country", "region"):
             raise self._config_error("aggregation_level", "'country' or 'region'")
@@ -896,7 +904,7 @@ class Network_Processor:
         -------
         pd.Series | None
             Computed values for the variable, or ``None`` if no function
-            is registered for it, if a declared input (``config``,
+            is mapped to it, if a declared input (``config``,
             ``energy_totals``, ``industry_non_energy_shares``) is ``None``,
             or if the function raises
             :class:`~pypsa_validation_processing.utils.MissingInputError`.
@@ -915,14 +923,8 @@ class Network_Processor:
         stats_module = importlib.import_module(
             "pypsa_validation_processing.statistics_functions"
         )
-        func = getattr(stats_module, func_name, None)
-        if func is None:
-            logger.warning(
-                "Variable %s: Function '%s' not found in statistics_functions.py",
-                variable,
-                func_name,
-            )
-            return None
+        # existence is checked at initialisation (C4, _validate_mapped_functions)
+        func = getattr(stats_module, func_name)
 
         params = self._function_parameter_cache.get(func)
         if params is None:
@@ -1084,15 +1086,12 @@ class Network_Processor:
         str | None
             Description of the violation, or ``None`` if all labels are valid.
         """
-        carriers = set(n.carriers.index)
+        # a unit may share its name with a carrier of n (SC-46)
         units = result.index.get_level_values("unit").unique()
         invalid_units = [
             u
             for u in units
-            if not isinstance(u, str)
-            or not u.strip()
-            or u in carriers
-            or u not in UNITS_MAPPING
+            if not isinstance(u, str) or not u.strip() or u not in UNITS_MAPPING
         ]
         if invalid_units:
             return f"invalid units {invalid_units} (C6.5, C9.1)"
@@ -1499,8 +1498,8 @@ class Network_Processor:
         KeyError
             If the unit is not found for the variable in the common definitions.
         ValueError
-            If a list of several units cannot be parsed; there is no fallback
-            unit (C9.3).
+            If a list of several units cannot be parsed, or a unit list is
+            empty (``"[]"``); there is no fallback unit (C9.3).
         RuntimeError
             If ``self.common_dsd`` is not initialized.
 
@@ -1537,6 +1536,16 @@ class Network_Processor:
             raise KeyError(
                 f"Unit information not found for variable '{variable}' in common definitions."
             )
+        stripped = str(target_unit).strip()
+        if stripped.startswith("[") and stripped.endswith("]") and "," not in stripped:
+            # a bracketed unit without comma is a single-element list (C9.3)
+            target_unit = stripped[1:-1].strip().strip("'\"").strip()
+            if not target_unit:
+                raise ValueError(
+                    f"Empty unit list {stripped!r} of variable '{variable}' in the "
+                    "definitions (C9.3)."
+                )
+            return target_unit
         if ("[" in target_unit) and ("]" in target_unit) and ("," in target_unit):
             logger.info(
                 "Several possible units defined for variable '%s' in common definitions. Take first one:",
