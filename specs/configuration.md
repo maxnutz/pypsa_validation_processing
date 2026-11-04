@@ -1,6 +1,6 @@
 # Configuration
 
-Status: reviewed
+Status: draft
 
 The package config is a YAML file passed via `--config <path>`; without `--config`, `pypsa_validation_processing/configs/config.default.yaml` is used and a `WARNING` is logged (`workflow.py::resolve_config_path`). Validation rules and errors: [contracts.md](contracts.md) C1.
 
@@ -26,7 +26,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 | `industry_non_energy_shares_path` | path (string) | no | – (not set) | CSV file written by `eurostat-energy-balance_processing` | Eurostat fallback for industrial non-energy use (C2.5, D5). An empty value (`null`) or an empty or whitespace-only string means "not set". Not set, not existing or not readable → variables needing it are skipped with `WARNING`. | wrong type: `ValueError`; unreadable file: `WARNING`, skip (C2.5); invalid content: `ValueError` (C2.5) |
 | `industry_non_energy_shares_year` | `latest` or int | no | `latest` | `latest`, a year present in the shares file | Year of the Eurostat shares (C2.5): `latest` = latest year per country and carrier; a year = rows of that year only. Empty value (`null`) = `latest`. Checked and used only if the shares file is read; ignored otherwise, also with a wrong type (C2.5). | only if the file is read: wrong type: `ValueError`; year not in the file: `ValueError` (C2.5) |
 
-Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). `null` (empty value) is not a wrong type for an optional key: it means "not set" and the default applies, for every optional key (owner, PR #127 review 2026-11-03, OQ-30). The code (PR #122) still raises `ValueError` for `null` in optional keys other than the two `industry_non_energy_shares_*` keys (SC-44). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
+Every key whose value has the wrong data type MUST make `Network_Processor` fail with `ValueError` (C1.4). `null` (empty value) is not a wrong type for an optional key: it means "not set" and the default applies, for every optional key (owner, PR #127 review 2026-11-03, OQ-30). Implemented in PR #139 (SC-44 resolved). All keys marked "no" are optional; a config with only the five required keys is valid (C1.3, checked against the code on 2026-10-07).
 
 Sources: `class_definitions.py::Network_Processor.__init__`, `_validate_config` (PR #122); `configs/config.default.yaml`; local example configs `configs/config.{country,region}-{year,timeseries}.yaml` (not versioned); `README.md` "Set the config parameters"; owner decisions in the kick-off (`output_path`, `map_country_codes_to_names`, `country`) and kick-off review (`output_path` = repository-root `resources/`).
 
@@ -43,7 +43,7 @@ Default choice and packaged config: `sister_packages/energy-scenarios-at-workflo
 
 YAML 1.1 (`yaml.safe_load`) parses some unquoted codes as non-strings: `country: NO` becomes boolean `false` (checked 2026-10-07). Such codes MUST be quoted (`country: "NO"`); an unquoted one is rejected as a wrong type (C1.4).
 
-Codes are case-sensitive; lower-case codes are rejected (owner, PR #127 review 2026-11-03, OQ-31). `country` uses the pypsa-eur notation (owner, 2026-11-03, OQ-4): ISO 3166-1 alpha-2 codes plus `XK` (Kosovo), `EU` and `all`. `GR` and `GB` are the codes for Greece and the United Kingdom (OQ-11); `EL`, `UK`, `GB0`, `GB1` are rejected. `country: XK` with `aggregation_level: country` gives one row `XK`. The code (PR #122, `utils.ISO_3166_ALPHA2_CODES`) still rejects `XK` (SC-45).
+Codes are case-sensitive; lower-case codes are rejected (owner, PR #127 review 2026-11-03, OQ-31). `country` uses the pypsa-eur notation (owner, 2026-11-03, OQ-4): ISO 3166-1 alpha-2 codes plus `XK` (Kosovo), `EU` and `all`. `GR` and `GB` are the codes for Greece and the United Kingdom (OQ-11); `EL`, `UK`, `GB0`, `GB1` are rejected. `country: XK` with `aggregation_level: country` gives one row `XK`. Implemented in PR #139 (SC-45 resolved).
 
 ### `convert_units`
 `config.default.yaml` sets it (`true`). In the local example configs (not versioned), `config.country-timeseries.yaml` and `config.region-timeseries.yaml` set it, the others rely on the default.
