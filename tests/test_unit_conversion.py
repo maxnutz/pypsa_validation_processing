@@ -205,6 +205,27 @@ class TestGetUnitFromCommonDefinitions:
         )
         assert processor._get_unit_from_common_definitions("A") == "GWh"
 
+    @pytest.mark.parametrize("unit", ["[TJ]", "['TJ']", " [ TJ ] "])
+    def test_parses_single_unit_bracket_string(
+        self, processor: Network_Processor, unit: str
+    ):
+        """C9-AC3b: a bracketed unit without comma is a one-element list (SC-43)."""
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": [unit]}
+        )
+        assert processor._get_unit_from_common_definitions("A") == "TJ"
+
+    @pytest.mark.parametrize("unit", ["[]", "[ ]", "['']"])
+    def test_raises_for_empty_unit_list(self, processor: Network_Processor, unit: str):
+        """C9-AC3b: an empty unit list raises ValueError naming the variable (SC-43)."""
+        processor.common_dsd = MagicMock()
+        processor.common_dsd.variable.to_pandas.return_value = pd.DataFrame(
+            {"variable": ["A"], "unit": [unit]}
+        )
+        with pytest.raises(ValueError, match="'A'"):
+            processor._get_unit_from_common_definitions("A")
+
     def test_raises_for_malformed_multi_unit_string(
         self, processor: Network_Processor
     ):
