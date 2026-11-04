@@ -207,6 +207,30 @@ def remap_unit_index(
     return out
 
 
+# D2: carriers that supply oil buses; only ``oil refining`` is fossil (OQ-23)
+OIL_FOSSIL_CARRIERS: tuple[str, ...] = ("oil refining",)
+OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Fischer-Tropsch",
+    "biomass to liquid",
+    "biomass to liquid CC",
+    "electrobiofuels",
+    "unsustainable bioliquids",
+    "import oil",
+)
+
+# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
+GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
+GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Sabatier",
+    "biogas to gas",
+    "biogas to gas CC",
+    "BioSNG",
+    "BioSNG CC",
+    "import gas",
+)
+# D3: gas transport, excluded together with every other Link between gas buses
+GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
+
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
@@ -370,18 +394,6 @@ def attribute_locations(
     return create_location_index_from_copperplate(flows, list(locations))
 
 
-# D2: carriers that supply oil buses; only ``oil refining`` is fossil (OQ-23)
-OIL_FOSSIL_CARRIERS: tuple[str, ...] = ("oil refining",)
-OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
-    "Fischer-Tropsch",
-    "biomass to liquid",
-    "biomass to liquid CC",
-    "electrobiofuels",
-    "unsustainable bioliquids",
-    "import oil",
-)
-
-
 def _fossil_share(
     supply: pd.Series,
     fossil: tuple[str, ...],
@@ -389,6 +401,12 @@ def _fossil_share(
     bus_carrier: str,
 ) -> float:
     """Return the fossil share of the yearly *supply* per carrier (D2, D3).
+
+    Internal helper of the ``fossil_<carrier>_share`` functions (e.g.
+    :func:`fossil_oil_share`); do not call it directly. It only works for bus
+    carriers whose supplying carriers are classified as fossil / non-fossil
+    in the spec, passed in as *fossil* and *non_fossil*. Other bus carriers
+    (e.g. ``urban central heat``) have no such classification.
 
     Parameters
     ----------
@@ -453,20 +471,6 @@ def fossil_oil_share(n: pypsa.Network) -> float:
     )
     supply = supply.drop("Store", level="component", errors="ignore")
     return _fossil_share(supply, OIL_FOSSIL_CARRIERS, OIL_NON_FOSSIL_CARRIERS, "oil")
-
-
-# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
-GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
-GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
-    "Sabatier",
-    "biogas to gas",
-    "biogas to gas CC",
-    "BioSNG",
-    "BioSNG CC",
-    "import gas",
-)
-# D3: gas transport, excluded together with every other Link between gas buses
-GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
 
 
 def fossil_gas_share(n: pypsa.Network) -> float:
