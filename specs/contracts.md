@@ -1,6 +1,6 @@
 # Contracts
 
-Status: reviewed
+Status: draft
 
 Contracts between the components of `pypsa_validation_processing`. Each contract lists the requirements, the sources it is based on, and acceptance criteria (AC) that can become unit tests in `tests/`. Spec-vs-code differences are referenced as `SC-n`, open questions as `OQ-n`, assumptions as `A-n` (all in [open_questions.md](open_questions.md)).
 
@@ -403,6 +403,7 @@ The package relies on the following behaviour. A dependency update that changes 
 | `pypsa` | `pypsa.NetworkCollection(list_of_paths)` reads `.nc` files; indexing yields `pypsa.Network`; `len()` gives the number of networks. | `_read_pypsa_network_collection`, `calculate_variables_values` |
 | `pypsa` | In PyPSA-AT networks, `n.meta["wildcards"]["planning_horizons"]` (or `["horizon"]`) holds the investment year, and `n.meta` holds the run config and `n.meta["resources"]["energy_totals"]`; the run config in `n.meta` is merged over `configs/config*<year>.yaml` (meta wins, C2.3); networks without `n.meta` (e.g. pypsa-eur) fall back to the file name and the results-folder files (C2.2–C2.4). | `calculate_variables_values` |
 | `pypsa` | `n.statistics.<metric>(…, groupby=[…, "location", "unit"], nice_names=False, groupby_time=…)` returns a Series (time-aggregated) or DataFrame (snapshots as columns) with the requested index levels; filters `components`, `carrier`, `bus_carrier`, `direction`, `at_port`; metrics used: `energy_balance`, `supply`, `withdrawal`, `transmission`. | statistics functions; `utils.statistics_kwargs*`; https://docs.pypsa.org/latest/api/networks/statistics/ |
+| `pypsa` (1.1.2, measured 2026-11-03) | Two limits the helpers work around: `supply` / `energy_balance` grouped by `name` without `bus_carrier` keep only one of several supplying ports of a Link (e.g. a `rural gas boiler` keeps its CO2 row and loses its heat row), so multi-port Links are evaluated with one call per `bus_carrier`; `components` given as a single string drops the `component` index level, so it is passed as a list where the level is needed (D1). A pypsa update that removes these limits does not break the helpers; one that changes the index levels does. | `utils.attribute_locations`, `utils.decentral_heat_split` (D1, D8) |
 | `pandas` | MultiIndex `Series`/`DataFrame`, `groupby(...).sum()` over index levels. | everywhere |
 | `eurostat-energy-balance_processing` (file, not an import) | Its industry non-energy shares CSV keeps the columns `country, carrier, siec, year, non_energy_share` and the carrier names `Natural Gas`, `Oil`, `Coal`, and writes ISO 3166-1 alpha-2 codes in `country` (`GR`, `GB`, not `EL`, `UK`) (C2.5). | `Network_Processor` initialisation |
 | `nomenclature-iamc` | `DataStructureDefinition(path)` reads `variable/` and `region/`; `.variable.to_pandas()` returns columns `variable` and `unit`; tag expansion such as `{Final Energy Carrier}`. | `read_definitions`, `_get_unit_from_common_definitions`, `calculate_variables_values` |

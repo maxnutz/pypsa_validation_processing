@@ -57,7 +57,7 @@ Sources: `README.md`; `docs/index.md` ("Scenario Explorer"); `pypsa_validation_p
 | `Network_Processor` | `pypsa_validation_processing/class_definitions.py` | Config validation, input reading, function dispatch, aggregation, unit handling, pyam structuring, export. |
 | `format_timestamps` | `pypsa_validation_processing/class_definitions.py` | Normalises column labels to integer years or timezone-aware timestamps (naive → UTC, aware kept; C10.5). |
 | Statistics functions | `pypsa_validation_processing/statistics_functions.py` | One stand-alone function per IAMC variable (C5–C7). |
-| Helpers and static data | `pypsa_validation_processing/utils.py` | Shared helpers for statistics functions; `UNITS_MAPPING`, `REGION_MAPPING`, `EU27_COUNTRY_CODES`, `statistics_kwargs*`. |
+| Helpers and static data | `pypsa_validation_processing/utils.py` | Shared helpers for statistics functions, incl. the shared definitions D1–D8 (`attribute_locations`, `fossil_oil_share`, `fossil_gas_share`, `apply_domestic_share`, `non_energy_use`, `apply_coke_correction`, `decentral_heat_split`; [variables/shared_definitions.md](variables/shared_definitions.md)); `UNITS_MAPPING`, `REGION_MAPPING`, `EU27_COUNTRY_CODES`, `ISO_3166_ALPHA2_CODES`, `statistics_kwargs*`. |
 | Configs and mappings | `pypsa_validation_processing/configs/` | Packaged default config, example setups, mapping files. |
 | Definitions | default `sister_packages/energy-scenarios-at-workflow/definitions/`, or any IAMC-valid folder set via `definitions_path` | IAMC variable names, units, regions. The default definitions are out of scope and never changed (P3). |
 

@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: reviewed
+Status: draft
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
@@ -29,7 +29,7 @@ Exception: `Final Energy [by Sector]|Transportation` and `Final Energy [by Carri
 3. Exception for copperplate buses: if that bus is a copperplate bus (its location is `EU`), the flow MUST be attributed to `n.buses.location` of the Link's `bus1` (the bus that receives the converted energy, e.g. `AT11 rural heat` for a `rural oil boiler` fed from `EU oil`).
 4. If `bus1` is a copperplate bus as well, the flow stays at the pseudo-location `EU`. Statistics functions return it (C6.13); `Network_Processor` drops it from the output (C8.7, OQ-17). The pseudo-location `EU` is the copperplate, not the European Union (`country: EU`, C8.8).
 
-Reason: in PyPSA-AT, oil and coal are single copperplate buses (`EU oil`, `EU coal`; measured: 1 bus each), so withdrawals from them carry no regional information. Gas has regional buses (53 `… gas` buses), so the exception does not apply. pypsa-de achieves the same with `.filter(like=region)` on the component name (`export_ariadne_variables.py::get_final_energy`, e.g. l.2372-2381). Existing helper: `utils.create_location_index_from_copperplate`.
+Reason: in PyPSA-AT, oil and coal are single copperplate buses (`EU oil`, `EU coal`; measured: 1 bus each), so withdrawals from them carry no regional information. Gas has regional buses (53 `… gas` buses), so the exception does not apply. pypsa-de achieves the same with `.filter(like=region)` on the component name (`export_ariadne_variables.py::get_final_energy`, e.g. l.2372-2381). Implemented by `utils.attribute_locations` (PR #132, 2026-11-04). It needs the index levels `component`, `name` and `location` (pass `components` as a list, C11) and does not regroup rows. Low-level helper: `utils.create_location_index_from_copperplate`.
 
 ## D2 Fossil share of oil `f_oil`
 One yearly value for the whole network (owner decision, 2026-10-22: system-wide, pypsa-de approach):
@@ -54,6 +54,8 @@ Classification of supplying carriers (owner decision 2026-10-23, OQ-23): a suppl
 
 Evidence for `import oil` / `import gas` (measured 2026-10-23 on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2030,2040,2050}.nc`): both are Links `co2 atmosphere` (bus0) → `EU oil` / regional `gas` (bus1), built by pypsa-eur `add_import_options` ("Add green energy import options", `prepare_sector_network.py` l.6445-6515). They withdraw 1/`efficiency` = 0.2571 t CO2 per MWh oil and 0.198 t CO2 per MWh gas from `co2 atmosphere`, equal to `efficiency2` (emission to `co2 atmosphere`) of the oil consumers (`kerosene for aviation`, `land transport oil`, `rural oil boiler`) and gas consumers (`rural gas boiler`, `gas for industry`, `CCGT`). `p0 ≥ 0` in every snapshot (only removal). Atmosphere balance 2025/2030/2040/2050: `import oil` 0/0/−129.30/0 Mt (2040: 502.91 TWh, `f_oil` = 0.697), `import gas` −0.24/−0.28/0/0 Mt. Fossil supply (`oil primary` → `oil refining`, gas Generators) has no such offset.
 
+Implemented by `utils.fossil_oil_share` (PR #133, 2026-11-04); carrier lists `OIL_FOSSIL_CARRIERS`, `OIL_NON_FOSSIL_CARRIERS`. The internal `_fossil_share` works only for bus carriers whose supplying carriers are classified here (D2, D3), e.g. not for `urban central heat` (owner, PR #133 review 2026-11-04).
+
 ## D3 Fossil share of gas `f_gas`
 One yearly value for the whole network, as D2:
 
@@ -69,6 +71,8 @@ r ∈ G_renewable = {"Sabatier", "biogas to gas", "biogas to gas CC", "BioSNG", 
 
 Sources: `_get_fuel_fractions` l.109-242 (`fuel_fractions["Natural Gas"]` = gas compressing share; `"Efuel"` = Sabatier; `"Biomass"` = `bio*`). Supplying carriers measured: 2020 Generators `pipeline gas` 2006.07 TWh, `production gas` 1714.52, `lng gas` 158.43; Links `biogas to gas` 196.11, `Sabatier` 19.44, `biogas to gas CC` 1.72, `BioSNG` 0.01, `BioSNG CC` 0.00; transport `gas pipeline` 1024.75, `gas pipeline new` 6390.43; Store `gas` 667.35.
 
+Implemented by `utils.fossil_gas_share` (PR #134, 2026-11-04); carrier lists `GAS_FOSSIL_CARRIERS`, `GAS_NON_FOSSIL_CARRIERS`, `GAS_TRANSPORT_CARRIERS`. A Link counts as gas transport if its carrier is in `GAS_TRANSPORT_CARRIERS` or its `bus0` and `bus1` are both `gas` buses.
+
 ## D4 Domestic share of aviation and navigation `d_k(c)`
 For `k ∈ {aviation, navigation}` and country `c` = the first two characters of the location (e.g. `AT11 → AT`):
 
@@ -77,7 +81,7 @@ d_k(c) = total domestic k / (total domestic k + total international k)
 ```
 
 - The values are read from the `energy_totals` table (C2.4: from `n.meta`, else from `energy_totals.csv`), columns `total domestic aviation`, `total international aviation`, `total domestic navigation`, `total international navigation`, row `country == c`.
-- The share MUST be determined per country, not one value for all locations (current `utils.get_energy_totals_domestic_share` uses `AT` for all, OQ-1).
+- The share MUST be determined per country, not one value for all locations (the old `utils.get_energy_totals_domestic_share` uses `AT` for all, OQ-1; it is removed in the WP4 PRs of Transportation and Oil, which use D4).
 - The year is the energy totals year of the model run (`n.meta["energy"]["energy_totals_year"]` or `config["energy"]["energy_totals_year"]`, C2.4; OQ-1 resolved). The table passed holds that year only.
 - The lookup is made only for locations with non-zero demand in a term weighted by `d_k`. A location whose weighted terms are all 0 (e.g. the pseudo-location `EU`, C6.13) gets 0 for them without a lookup.
 - A location with non-zero weighted demand whose country has no row → `ValueError` naming the country. Measured: the `energy_totals` tables hold all 34 countries of the networks, and aviation and navigation Loads exist only at country locations, none at `EU` (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
@@ -85,6 +89,8 @@ d_k(c) = total domestic k / (total domestic k + total international k)
 - Energy totals not available → the variable is skipped per C2.4 / P5.
 
 Source: `export_ariadne_variables.py::get_final_energy` l.2453-2474 (`international_*_fraction`; `d_k = 1 − international fraction`); `resources/AT_KN2040/resources/energy_totals.csv`.
+
+Implemented by `utils.apply_domestic_share(energy_stats, energy_totals, kind)` (PR #135, 2026-11-04): multiplies each row by `d_k` of its country; rows that are 0 in every snapshot get no lookup.
 
 ## D5 Non-energy use `NE_x(l)`
 Non-energy use of carrier `x ∈ {gas, naphtha, H2, coal}` in industry at location `l`. The sector definition excludes non-energy use: "industrial sector excluding non-energy use (e.g.feedstocks)" (`definitions/variable/tag_sector.yaml`). So final energy variables that contain industry demand of these carriers MUST subtract `NE_x(l)`.
@@ -107,7 +113,9 @@ Owner decision 2026-10-28 (OQ-18 resolved, option C): physical method if the net
   - The share is constant over snapshots; for time series output it is applied to every snapshot.
   - Measured (eurostat-energy-balance_processing#8, 2024): AT gas 0.104, AT oil 0.807; DE gas 0.103, DE oil 0.910; EU27_2020 gas 0.138. The current code uses one EU-27 gas factor of 0.060 (#61).
 - Functions that use D5 MUST declare `industry_non_energy_shares` (C5); without the table they are skipped (C2.5).
-- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l` at every location and in every snapshot, so that the energy part stays ≥ 0 (G2). `NE_x(l)` is computed from the demand at `l` itself, never from a country or system total. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5; also holds for the mean).
+- Every method MUST guarantee `0 ≤ NE_x(l) ≤` industry demand of `x` at `l` at every location and in every snapshot, so that the energy part stays ≥ 0 (G2). `NE_x(l)` is computed from the demand at `l` itself, never from a country or system total. With the fallback this follows from `0 ≤ S ≤ 1` (checked at initialisation, C2.5; also holds for the mean). As a safeguard for shares adapted after the check, the helper clips a share outside `[0, 1]` to `[0, 1]`, with one `WARNING` per call naming carrier and countries (owner, PR #136 review 2026-11-04). This clips a share, not a result, so G2 ("results are not clipped") still holds.
+
+Implemented by `utils.non_energy_use(demand, shares, carrier)` (PR #136, 2026-11-04), `carrier ∈ {Natural Gas, Oil, Coal, H2}`, Eurostat fallback only. The shares file is written by `eurostat-energy-balance_processing` (C2.5, C11).
 
 ## D6 Coke correction for industrial coal `κ(l)`
 pypsa-de counts the coke part of `coal for industry` as secondary energy and converts it back with `mwh_coal_per_mwh_coke = 1.366`:
@@ -123,6 +131,8 @@ FE_coal_industry = (L[coal for industry] − NE_coal)·(1 − κ) + (L[coal for 
 - **Eurostat fallback.** `κ(l) = 0`, with one `WARNING` per call (C2.5). Eurostat gives no usable value: it books blast-furnace coke as transformation, not as industrial final consumption, and reports no non-energy coke for AT (`FC_IND_NE` `C0311`: `: m`). `n.meta["resources"]["industrial_demand_overrides"]` splits `coal` and `coke` per region, but only for 2025 (measured in `20261020_carbon_accounting_run`), so it is not used.
 - `κ = 0` overestimates coal final energy by at most the factor `1.366` on the coke part.
 
+Implemented by `utils.apply_coke_correction(coal_energy, kappa=None)` (PR #137, 2026-11-04): `κ` is one scalar per call; `None` = Eurostat fallback `κ = 0` with one `WARNING`; `κ` outside `[0, 1]` → `ValueError`. The physical method needs `κ(l)` per location; the follow-up spec (C2.5) decides whether the helper then takes a per-location `κ`. The factor `1.366` (`MWH_COAL_PER_MWH_COKE`) is checked against the PyPSA industry preprocessing in the spec review after WP4 (owner, PR #137 review 2026-11-04; `TODO.md` WP4).
+
 ## D7 Unit of `land transport oil`
 `land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is the bus unit label that pypsa-eur assigns (`add_ice_cars` l.2751-2757: `unit="land transport"`); it is a unit of the network, not the name of a physical unit. It is a permanent key of `UNITS_MAPPING` (→ `MWh`; owner, PR #123 review 2026-11-02; C9.1), so it passes result validation. The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.
 
@@ -130,15 +140,18 @@ A statistics function MAY report this flow with its raw unit label `land transpo
 
 Boundary between function and post-processing: the results of `Final Energy [by Carrier]|Oil` and `Final Energy [by Sector]|Transportation` MAY contain the raw unit `land transport` (one row per location and raw unit). `Network_Processor` normalises it to `MWh` via `UNITS_MAPPING` after the function (C8 step 2, C9.1) and sums the rows of one location (C8 step 3). Only the post-processed output is in `MWh` (or the definition unit, C9.2). A function that sums flows of different units within one row MUST normalise them first (C6.5).
 
+No helper (PR #137, 2026-11-04): the comment at `UNITS_MAPPING` and tests only (SC-9 resolved).
+
 ## D8 Split of decentral heat input between sectors `D8_sec(l)`
 Owner decision 2026-10-22 (OQ-22 resolved): for decentral heat, the `Final Energy [by Sector]` variables measure the **energy input** to decentral heat supply, not the delivered heat. The input is split between sectors per location, in proportion to their heat demands. District heat (`urban central heat`) is not affected; there the delivered heat is counted (`Final Energy [by Carrier]|District Heat`).
 
 For each decentral bus type `b ∈ {rural heat, urban decentral heat}` and location `l`:
 
 1. **Input `I_b(l)`**: energy entering the decentral heat supply of `b` at `l`, kept per input carrier:
-   - Links whose heat output goes to a `b` bus (`rural|urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`): withdrawal at the input port, i.e. at the bus that is not the heat bus. For heat pumps in PyPSA-AT this is `bus1` = `low voltage`, because `bus0` is the heat bus (measured AT11 2025). Location per D1 (e.g. `rural oil boiler` from `EU oil` → location of its heat bus).
-   - Generators `rural solar thermal`, `urban decentral solar thermal`: the heat that consumers on `b` receive from them, measured at the consumer (G1); numerically equal to their heat supply at the `b` bus (as pypsa-de, l.2349-2350: "for solar thermal secondary energy == Final energy").
+   - Every Link with positive yearly heat supply to a `b` bus that is not a CHP (in PyPSA-AT: `rural|urban decentral` `gas boiler`, `oil boiler`, `biomass boiler`, `resistive heater`, `air heat pump`, `ground heat pump`): withdrawal at the input port, i.e. at the bus that is not the heat bus. For heat pumps in PyPSA-AT this is `bus1` = `low voltage`, because `bus0` is the heat bus (measured AT11 2025). Location per D1 (e.g. `rural oil boiler` from `EU oil` → location of its heat bus).
+   - Every Generator with positive yearly heat supply to a `b` bus (in PyPSA-AT: `rural solar thermal`, `urban decentral solar thermal`): the heat that consumers on `b` receive from them, measured at the consumer (G1); numerically equal to their heat supply at the `b` bus (as pypsa-de, l.2349-2350: "for solar thermal secondary energy == Final energy").
    - CHPs, i.e. Links with a heat output to a `b` bus and a further non-heat output (e.g. `biogas CHP`: bus0 `biogas`, bus1 `AC`, bus2 `rural heat`): the heat that consumers on `b` receive from them, measured at the consumer (G1); numerically equal to the CHP heat supply at the `b` port. Neither the CHP input nor its electricity output is part of `I_b` (the electricity is counted where it is consumed). This treats CHP heat on decentral buses like CHP heat on `urban central heat` buses, where the heat received by consumers is counted (`Final Energy [by Carrier]|District Heat`). Owner decision 2026-10-23 (OQ-25, G1).
+   - The carrier lists above describe PyPSA-AT; they are not exhaustive. A new heat technology on a `b` bus is counted by the same rules without a spec change (owner, 2026-11-04, WP3 spec review).
    - Excluded: water-tank/pit chargers and dischargers (storage), heat vents (dumped heat). Ambient heat drawn by heat pumps is not part of `I_b` (`Final Energy [by Carrier]|Ambient Heat`, #75).
 2. **Heat demands `H_b,x(l)`** (yearly, withdrawals from `b` buses at `l`):
    - `x = rc`: Load `rural heat` (on `rural heat`), Load `urban decentral heat` (on `urban decentral heat`);
@@ -151,3 +164,10 @@ For each decentral bus type `b ∈ {rural heat, urban decentral heat}` and locat
 Consistency: for every `l` and `b`, `Σ_x σ_b,x(l) · I_b(l) = I_b(l)` (no energy is counted twice or lost). `Final Energy [by Carrier]|*` variables are not split by sector and keep counting the full input of their carrier (e.g. all `rural oil boiler` oil in `Final Energy [by Carrier]|Oil`).
 
 Deviation from pypsa-de: pypsa-de assigns the full decentral input to Residential and Commercial (l.2297-2409) and counts `agriculture heat` (l.2556) and decentral `low-temperature heat for industry` (l.2121-2123) as heat. This double counts; AT 2025 (`electricity_network_0p3`): `rural heat` 2.60 TWh, `urban decentral heat` 0.09 TWh, total ≈ 9.7 PJ (OQ-22). Shares vary per location (`rural heat`, agriculture share 4.9–100 %), so a per-location split is required.
+
+Implemented by `utils.decentral_heat_split(n, aggregate_per_year)` (PR #138, 2026-11-04). Implementation rules, decided by the owner in the PR #138 review (2026-11-04):
+- **Result.** Index levels `sector` (`rc`, `agr`, `ind`, `other`), `location`, `carrier`, `unit` (normalised to `MWh`). `carrier` is the bus carrier of the input port (e.g. `low voltage`, `gas`, `oil`, `solid biomass`), not the Link carrier; for heat received from Generators and CHPs it is `b` itself, so solar thermal and CHP heat are not told apart (the sector variables do not need it). A network without a supplied decentral heat bus gives a result with zero rows; the calling statistics function turns it into `0.0` per location (C6.13).
+- **Selection.** Heat suppliers are the Links and Generators with positive yearly supply to `b`; flows are selected by `(component, name)`, since a Generator and a Link MAY have the same name. A CHP is such a Link with positive yearly supply to a further bus carrier that is neither `b` nor a CO2 carrier.
+- **CO2 ports.** Bus carriers whose name contains `co2` are neither an input nor a CHP output. CO2 bus carriers are always named `co2…`; a check of the bus unit (`t_co2`) is not required.
+- **Storage.** Components whose carrier matches `water tanks`, `water pits` or `heat vent` are neither input nor demand; `Store` and `StorageUnit` are never demand. PyPSA-AT has no `StorageUnit` on decentral heat buses, but the code is prepared for it.
+- **Input without demand.** A location with `I_b(l) > 0` and no heat demand on `b` gets `σ_b,x(l) = 0` (step 3), so its input is in no sector. This does not occur in valid networks (heat supply follows heat demand), so no `WARNING` is logged.
