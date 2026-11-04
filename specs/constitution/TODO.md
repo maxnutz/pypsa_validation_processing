@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -40,7 +40,7 @@ One PR per definition, each with unit tests; listed with the variables that need
 ## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
 One PR per function. Order: few dependencies first, so the framework is exercised end-to-end early.
 - [x] Spec PR: test config setups in `specs/configuration.md` "Test configs" (#129; owner, PR #127 review 2026-11-03; location `pypsa_validation_processing/configs/test/`, not versioned because they refer to local data, owner 2026-11-04 and PR #141 review).
-- [ ] PR: test configs (#129): `pixi.toml` `workflow_test` runs the setups of `specs/configuration.md` "Test configs" on `resources/electricity_network_0p3`; `README.md` l.79, l.109 updated (SC-47). The configs themselves are created locally (not versioned). `CLAUDE.md` "Full local check" on explicit owner request. Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data.
+- [ ] PR: test configs (#129): `pixi.toml` `workflow_test` runs the setups of `specs/configuration.md` "Test configs" on `resources/electricity_network_0p3`; `README.md` l.79, l.109 updated; the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` removed (SC-47, CT-AC5). The configs themselves are created locally (not versioned). `CLAUDE.md` "Full local check" on explicit owner request. Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data.
 - [ ] Net Imports|Electricity (none; SC-30; #70)
 - [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
 - [ ] Final Energy [by Carrier]|Electricity (D1; SC-38; #43)

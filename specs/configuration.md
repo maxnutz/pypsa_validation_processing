@@ -1,12 +1,12 @@
 # Configuration
 
-Status: draft
+Status: reviewed
 
 The package config is a YAML file passed via `--config <path>`; without `--config`, `pypsa_validation_processing/configs/config.default.yaml` is used and a `WARNING` is logged (`workflow.py::resolve_config_path`). Validation rules and errors: [contracts.md](contracts.md) C1.
 
 "Packaged config" below means the value in `configs/config.default.yaml`; "Default" means the value used when an optional key is absent or `null` (C1.4). Both can differ.
 
-`configs/config.default.yaml` is the only versioned config. The test configs used by `pixi run workflow_test` are local files only (section "Test configs"; #129). They replace the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml`, which `workflow_test` no longer uses.
+`configs/config.default.yaml` is the only versioned config. The test configs used by `pixi run workflow_test` are local files only (section "Test configs"; #129). They replace the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml`, which are removed: they are no longer needed (owner, PR #142 review 2026-11-04).
 
 ## Keys
 
@@ -98,6 +98,7 @@ Owner decisions: #129 and PR #127 review (2026-11-03); location and versioning 2
 - CT-AC2: The outputs of all setups contain the configured model and scenario and no region for the copperplate `EU`.
 - CT-AC3: `minimal` logs one `WARNING` that the shares file is not set, if a mapped function declares `industry_non_energy_shares` (C2.5, C2-AC8); its other variables are written.
 - CT-AC4: `pixi run workflow_test` runs exactly the setups of this section, then `pytest tests/ -v`.
+- CT-AC5: The earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` are removed; no task, document or test refers to them (owner, PR #142 review 2026-11-04).
 
 Not covered by the test configs (covered by unit tests in `tests/`): networks without `n.meta` (fallback to `configs/` and `energy_totals.csv`, C2.3, C2.4), invalid configs (C1), `null` for optional keys (C1.4), unreadable shares files (C2.5).
 
