@@ -705,6 +705,56 @@ class TestDecentralHeatSplit:
         result = decentral_heat_split(n)
         assert result.xs("rc", level="sector").sum() == pytest.approx(6.0)
 
+    def test_heat_bus_without_supply(self):
+        """D8: a decentral heat bus without supplying Link or Generator gives an empty result."""
+        n = _network(["AT11"])
+        n.buses["unit"] = "MWh_th"
+        self._load(n, "AT11 rural heat", "AT11 rural heat", 1.0)
+        assert decentral_heat_split(n).empty
+        assert decentral_heat_split(n, aggregate_per_year=False).empty
+
+    def test_generator_and_link_with_same_name(self):
+        """D8: a Generator is input even if a converter Link has the same name."""
+        n = _network(["AT11"])
+        n.buses["unit"] = "MWh_th"
+        n.add("Bus", "AT11 gas", carrier="gas", location="AT11", unit="MWh_LHV")
+        name = "AT11 rural heat supply"
+        self._link(
+            n,
+            name,
+            {0: 1.0, 1: -1.0},
+            bus0="AT11 gas",
+            bus1="AT11 rural heat",
+            carrier="rural gas boiler",
+        )
+        n.add("Generator", name, bus="AT11 rural heat", carrier="rural solar thermal")
+        n.generators_t.p[name] = [1.0, 1.0]
+        self._load(n, "AT11 rural heat", "AT11 rural heat", 2.0)
+        result = decentral_heat_split(n).xs("rc", level="sector")
+        assert result.droplevel(["location", "unit"]).to_dict() == pytest.approx(
+            {"gas": 6.0, "rural heat": 6.0}
+        )
+
+    def test_storage_unit_is_no_demand(self):
+        """D8.2: a StorageUnit charging from a heat bus is no (other) demand."""
+        n = _network(["AT11"])
+        n.buses["unit"] = "MWh_th"
+        n.add(
+            "Generator",
+            "AT11 rural solar thermal",
+            bus="AT11 rural heat",
+            carrier="rural solar thermal",
+        )
+        n.generators_t.p["AT11 rural solar thermal"] = [2.0, 2.0]
+        n.add("StorageUnit", "AT11 rural heat storage", bus="AT11 rural heat")
+        n.storage_units_t.p["AT11 rural heat storage"] = [-1.0, -1.0]
+        n.storage_units_t.p_store["AT11 rural heat storage"] = [1.0, 1.0]
+        n.storage_units_t.p_dispatch["AT11 rural heat storage"] = [0.0, 0.0]
+        self._load(n, "AT11 rural heat", "AT11 rural heat", 1.0)
+        result = decentral_heat_split(n)
+        assert result.xs("rc", level="sector").sum() == pytest.approx(12.0)
+        assert result.xs("other", level="sector").sum() == pytest.approx(0.0)
+
     def test_network_without_decentral_heat(self):
         """D8: a network without decentral heat buses gives an empty result."""
         n = pypsa.Network()
