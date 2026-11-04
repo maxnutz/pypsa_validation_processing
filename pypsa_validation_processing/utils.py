@@ -209,6 +209,30 @@ def remap_unit_index(
     return out
 
 
+# D2: carriers that supply oil buses; only ``oil refining`` is fossil (OQ-23)
+OIL_FOSSIL_CARRIERS: tuple[str, ...] = ("oil refining",)
+OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Fischer-Tropsch",
+    "biomass to liquid",
+    "biomass to liquid CC",
+    "electrobiofuels",
+    "unsustainable bioliquids",
+    "import oil",
+)
+
+# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
+GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
+GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
+    "Sabatier",
+    "biogas to gas",
+    "biogas to gas CC",
+    "BioSNG",
+    "BioSNG CC",
+    "import gas",
+)
+# D3: gas transport, excluded together with every other Link between gas buses
+GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
+
 ## standards for statistics-functions
 # standardize kwargs for pypsa-statistics statements
 statistics_kwargs = {
@@ -372,18 +396,6 @@ def attribute_locations(
     return create_location_index_from_copperplate(flows, list(locations))
 
 
-# D2: carriers that supply oil buses; only ``oil refining`` is fossil (OQ-23)
-OIL_FOSSIL_CARRIERS: tuple[str, ...] = ("oil refining",)
-OIL_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
-    "Fischer-Tropsch",
-    "biomass to liquid",
-    "biomass to liquid CC",
-    "electrobiofuels",
-    "unsustainable bioliquids",
-    "import oil",
-)
-
-
 def _fossil_share(
     supply: pd.Series,
     fossil: tuple[str, ...],
@@ -391,6 +403,12 @@ def _fossil_share(
     bus_carrier: str,
 ) -> float:
     """Return the fossil share of the yearly *supply* per carrier (D2, D3).
+
+    Internal helper of the ``fossil_<carrier>_share`` functions (e.g.
+    :func:`fossil_oil_share`); do not call it directly. It only works for bus
+    carriers whose supplying carriers are classified as fossil / non-fossil
+    in the spec, passed in as *fossil* and *non_fossil*. Other bus carriers
+    (e.g. ``urban central heat``) have no such classification.
 
     Parameters
     ----------
@@ -457,20 +475,6 @@ def fossil_oil_share(n: pypsa.Network) -> float:
     return _fossil_share(supply, OIL_FOSSIL_CARRIERS, OIL_NON_FOSSIL_CARRIERS, "oil")
 
 
-# D3: Generators that supply fossil gas, Links that supply non-fossil gas (OQ-23)
-GAS_FOSSIL_CARRIERS: tuple[str, ...] = ("lng gas", "pipeline gas", "production gas")
-GAS_NON_FOSSIL_CARRIERS: tuple[str, ...] = (
-    "Sabatier",
-    "biogas to gas",
-    "biogas to gas CC",
-    "BioSNG",
-    "BioSNG CC",
-    "import gas",
-)
-# D3: gas transport, excluded together with every other Link between gas buses
-GAS_TRANSPORT_CARRIERS: tuple[str, ...] = ("gas pipeline", "gas pipeline new")
-
-
 def fossil_gas_share(n: pypsa.Network) -> float:
     """Return the system-wide fossil share of gas ``f_gas`` (D3).
 
@@ -511,7 +515,7 @@ def fossil_gas_share(n: pypsa.Network) -> float:
 
 
 def apply_domestic_share(
-    flows: pd.Series | pd.DataFrame,
+    energy_stats: pd.Series | pd.DataFrame,
     energy_totals: pd.DataFrame | None,
     kind: str,
 ) -> pd.Series | pd.DataFrame:
@@ -524,8 +528,8 @@ def apply_domestic_share(
 
     Parameters
     ----------
-    flows : pd.Series | pd.DataFrame
-        Flows with a ``location`` index level; a DataFrame has snapshots as
+    energy_stats : pd.Series | pd.DataFrame
+        Energy statistics with a ``location`` index level; a DataFrame has snapshots as
         columns.
     energy_totals : pd.DataFrame | None
         Energy totals of one year, indexed by ``country`` (C2.4).
@@ -535,23 +539,23 @@ def apply_domestic_share(
     Returns
     -------
     pd.Series | pd.DataFrame
-        *flows* multiplied row-wise by ``d_k``; a denominator of 0 gives 0.
+        *energy_stats* multiplied row-wise by ``d_k``; a denominator of 0 gives 0.
 
     Raises
     ------
     ValueError
         If *energy_totals* is ``None``, *kind* is not supported, or a row
-        with non-zero flow belongs to a country without a row in
+        with non-zero Energy statistics belongs to a country without a row in
         *energy_totals*.
     """
     if energy_totals is None:
         raise ValueError("energy_totals is required to compute domestic shares (D4).")
     if kind not in ("aviation", "navigation"):
         raise ValueError(f"kind must be 'aviation' or 'navigation', got: {kind!r}")
-    nonzero = flows.ne(0)
-    if isinstance(flows, pd.DataFrame):
+    nonzero = energy_stats.ne(0)
+    if isinstance(energy_stats, pd.DataFrame):
         nonzero = nonzero.any(axis=1)
-    countries = flows.index.get_level_values("location").str[:2]
+    countries = energy_stats.index.get_level_values("location").str[:2]
     needed = pd.Index(countries[nonzero.to_numpy()]).unique()
     missing = needed.difference(energy_totals.index)
     if not missing.empty:
@@ -562,8 +566,8 @@ def apply_domestic_share(
     domestic = energy_totals.loc[needed, f"total domestic {kind}"]
     total = domestic + energy_totals.loc[needed, f"total international {kind}"]
     share = domestic.div(total).where(total.ne(0), 0.0)
-    factor = pd.Series(countries, index=flows.index).map(share).fillna(0.0)
-    return flows.mul(factor, axis=0)
+    factor = pd.Series(countries, index=energy_stats.index).map(share).fillna(0.0)
+    return energy_stats.mul(factor, axis=0)
 
 
 def non_energy_use(
