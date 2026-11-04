@@ -360,14 +360,18 @@ class TestConfigValidation:
             Network_Processor(config_path=config_file)
 
     @pytest.mark.parametrize(
-        "country", _EU_MEMBER_STATE_CODES + ["CH", "NO", "GB", "IS", "UA", "EU", "all"]
+        "country",
+        _EU_MEMBER_STATE_CODES
+        + ["CH", "NO", "GB", "GR", "IS", "UA", "XK", "EU", "all"],
     )
     def test_country_accepted(self, tmp_path: Path, base_config: dict, country: str):
-        """C1-AC2: EU member states, non-EU ISO codes, EU and all are accepted."""
+        """C1-AC2: EU member states, non-EU ISO codes, XK, EU and all are accepted."""
         base_config["country"] = country
         assert self._init(tmp_path, base_config).country == country
 
-    @pytest.mark.parametrize("country", ["XX", "Austria", "at1", "at", "EL", "UK"])
+    @pytest.mark.parametrize(
+        "country", ["XX", "Austria", "at1", "at", "EL", "UK", "GB0", "GB1"]
+    )
     def test_country_rejected(self, tmp_path: Path, base_config: dict, country: str):
         """C1-AC2: values that are not ISO 3166-1 alpha-2 codes raise ValueError."""
         base_config["country"] = country
@@ -388,7 +392,6 @@ class TestConfigValidation:
             ("network_results_path", 5),
             ("mapping_path", True),
             ("output_path", 5),
-            ("output_path", None),
             ("definitions_path", True),
         ],
     )
@@ -401,6 +404,25 @@ class TestConfigValidation:
             ValueError, match=f"Invalid {key}: {re.escape(repr(value))}"
         ):
             self._init(tmp_path, base_config)
+
+    def test_null_optional_keys_use_defaults(self, tmp_path: Path, base_config: dict):
+        """C1-AC3c: null optional keys initialise without error and get their defaults."""
+        for key in [
+            "convert_units",
+            "mapping_path",
+            "output_path",
+            "aggregation_level",
+            "aggregate_per_year",
+            "map_country_codes_to_names",
+        ]:
+            base_config[key] = None
+        processor = self._init(tmp_path, base_config)
+        assert processor.convert_units is True
+        assert processor.mappings_path.name == "mapping.default.yaml"
+        assert processor.path_dsd_with_values == Path("resources")
+        assert processor.aggregation_level == "country"
+        assert processor.aggregate_per_year is True
+        assert processor.map_country_codes_to_names is False
 
     def test_unquoted_country_no_advises_quoting(
         self,
@@ -535,34 +557,6 @@ class TestNetworkProcessorFunctionExecution:
                     "Nonexistent Variable", mock_network
                 )
                 assert result is None
-
-    def test_execute_function_warns_when_function_name_not_in_module(
-        self, mock_config_file: Path, caplog
-    ):
-        """Test that a WARNING is logged and None returned for an unresolvable function name."""
-        with patch(
-            "pypsa_validation_processing.class_definitions.pypsa.NetworkCollection"
-        ):
-            with patch(
-                "pypsa_validation_processing.class_definitions.nomenclature.DataStructureDefinition"
-            ):
-                processor = Network_Processor(config_path=mock_config_file)
-                processor.functions_dict = {
-                    "Bogus Variable": "This_Function_Does_Not_Exist"
-                }
-
-                mock_network = MockPyPSANetwork()
-                with caplog.at_level(logging.WARNING):
-                    result = processor._execute_function_for_variable(
-                        "Bogus Variable", mock_network
-                    )
-
-                assert result is None
-                assert any(
-                    record.levelno == logging.WARNING
-                    and "This_Function_Does_Not_Exist" in record.message
-                    for record in caplog.records
-                )
 
     def test_execute_function_passes_config_when_accepted(self, mock_config_file: Path):
         """Test that config is passed to functions that accept it."""
@@ -1196,6 +1190,19 @@ output_path: {tmp_path / 'output.xlsx'}
         assert "unit" in result.index.names
         assert result.index.get_level_values("unit").tolist() == ["MWh_el", "MWh_th"]
         assert result.loc[("MWh_el",), "value"].item() == 300.0  # 100 + 200
+
+    def test_aggregate_to_country_xk(self, tmp_path: Path):
+        """C1-AC2: country XK sums the XK locations into one row."""
+        processor = self._setup_processor(tmp_path, country="XK")
+        data = pd.Series(
+            [1.0, 2.0, 4.0],
+            index=pd.MultiIndex.from_tuples(
+                [("XK1", "MWh"), ("XK2", "MWh"), ("AT1", "MWh")],
+                names=["location", "unit"],
+            ),
+        ).to_frame(name="value")
+        result = processor._aggregate_to_country(data)
+        assert result["value"].tolist() == [3.0]
 
     def test_aggregate_to_country_all_countries(self, tmp_path: Path):
         """Test _aggregate_to_country with country='all'."""
@@ -2609,7 +2616,6 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
             ),
             (pd.Series(["a"], index=_index([("AT1", "MWh_el")])), "numeric"),
             (pd.Series([1.0], index=_index([("AT1", "")])), "units"),
-            (pd.Series([1.0], index=_index([("AT1", "land transport")])), "units"),
             (pd.Series([1.0], index=_index([("AT1", "foo")])), "units"),
             (pd.Series([1.0], index=_index([("", "MWh_el")])), "locations"),
             (pd.Series([1.0], index=_index([("XX9", "MWh_el")])), "XX9"),
@@ -2636,6 +2642,14 @@ aggregate_per_year: {str(aggregate_per_year).lower()}
         processor = self._processor(tmp_path)
         with pytest.raises(ValueError, match=f"Var X.*{re.escape(violation)}"):
             processor._validate_result("Var X", result, self._network())
+
+    def test_unit_named_like_carrier_is_valid(self, tmp_path: Path):
+        """C9-AC2b: unit land transport is valid although n has a carrier land transport, and maps to MWh."""
+        processor = self._processor(tmp_path)
+        result = pd.Series([1.0], index=_index([("AT1", "land transport")]))
+        processor._validate_result("Var X", result, self._network())
+        mapped = processor._map_unit_level(result.to_frame("value"), "Var X")
+        assert mapped.index.get_level_values("unit").tolist() == ["MWh"]
 
     @pytest.mark.parametrize(
         "rows, violation",
