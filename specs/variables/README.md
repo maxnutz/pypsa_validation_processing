@@ -2,7 +2,7 @@
 
 One spec per IAMC variable, written from [../templates/statistics_function.md](../templates/statistics_function.md). File name: `<function_name>.md` (see [../README.md](../README.md) "Naming of spec files").
 
-Rules and quantities used by several variables (final energy measured at the consumer, final energy never negative, location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input) are specified once in [shared_definitions.md](shared_definitions.md) (G1, G2, D1–D8).
+Rules and quantities used by several variables (final energy measured at the consumer, final energy never negative, location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input, demand-weighted price of industry Loads) are specified once in [shared_definitions.md](shared_definitions.md) (G1, G2, D1–D9).
 
 ## Index
 | IAMC variable | Spec | Match type | Status |
@@ -18,5 +18,11 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Final Energy [by Sector]\|Industry` | [Final_Energy_by_Sector__Industry.md](Final_Energy_by_Sector__Industry.md) | semantic | reviewed |
 | `Final Energy [by Sector]\|Agriculture` | [Final_Energy_by_Sector__Agriculture.md](Final_Energy_by_Sector__Agriculture.md) | exact | reviewed |
 | `Final Energy [by Sector]\|Residential and Commercial` | [Final_Energy_by_Sector__Residential_and_Commercial.md](Final_Energy_by_Sector__Residential_and_Commercial.md) | exact | reviewed |
+| `Price\|Final Energy\|Industry\|Electricity` | [Price__Final_Energy__Industry__Electricity.md](Price__Final_Energy__Industry__Electricity.md) | exact | draft |
+| `Price\|Final Energy\|Industry\|Gases` | [Price__Final_Energy__Industry__Gases.md](Price__Final_Energy__Industry__Gases.md) | semantic | draft |
+| `Price\|Final Energy\|Industry\|Hydrogen` | [Price__Final_Energy__Industry__Hydrogen.md](Price__Final_Energy__Industry__Hydrogen.md) | exact | draft |
+| `Price\|Final Energy\|Industry\|Solids\|Biomass` | [Price__Final_Energy__Industry__Solids__Biomass.md](Price__Final_Energy__Industry__Solids__Biomass.md) | exact | draft |
+| `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | draft |
+| `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | draft |
 
-Not yet specified: `Prices|Final Energy|Electricity` (#99; no implementation, no entry in `mapping.default.yaml`; it will be the first `intensive` variable, C4.5).
+Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76 (`industry methanol`, `low-temperature heat for industry`, OQ-35).
