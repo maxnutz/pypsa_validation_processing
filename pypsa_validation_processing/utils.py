@@ -711,6 +711,69 @@ def apply_coke_correction(
     return coal_energy * (1.0 - kappa) + coal_energy * kappa / MWH_COAL_PER_MWH_COKE
 
 
+def ensure_all_locations(
+    result: pd.Series | pd.DataFrame,
+    n: pypsa.Network,
+    unit: str,
+    aggregate_per_year: bool,
+) -> pd.Series | pd.DataFrame:
+    """Add every location of *n* missing in *result* with ``0.0`` (C6.13).
+
+    Parameters
+    ----------
+    result : pd.Series | pd.DataFrame
+        Result of a statistics function with index levels ``location`` and
+        ``unit`` only, or a result with zero rows (e.g. an empty
+        ``n.statistics`` result).
+    n : pypsa.Network
+        Evaluated network; its locations are the non-empty values of
+        ``n.buses.location``.
+    unit : str
+        Normalised unit of the variable (a key of ``UNITS_MAPPING``) for the
+        added rows.
+    aggregate_per_year : bool
+        If ``True``, return a :class:`pandas.Series`; if ``False``, a
+        :class:`pandas.DataFrame` with the snapshots of *n* as columns. Needed
+        because ``n.statistics`` returns an empty ``pd.Series`` in both modes.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        *result* plus one ``(location, unit)`` row per missing location, with
+        ``0.0`` (``aggregate_per_year=False``: in every snapshot column of *n*).
+
+    Raises
+    ------
+    ValueError
+        If a non-empty *result* has index levels other than ``location`` and
+        ``unit``.
+    """
+    locations = n.buses["location"]
+    locations = pd.Index(locations[locations.notna() & (locations != "")].unique())
+    if result.empty:
+        present = pd.Index([])
+    elif list(result.index.names) != statistics_grouping_index:
+        raise ValueError(
+            f"Index levels must be {statistics_grouping_index}, "
+            f"got: {list(result.index.names)}"
+        )
+    else:
+        present = result.index.get_level_values("location")
+    missing = locations.difference(present)
+    index = pd.MultiIndex.from_arrays(
+        [missing, [unit] * len(missing)], names=statistics_grouping_index
+    )
+    if not aggregate_per_year:
+        filled = pd.DataFrame(0.0, index=index, columns=n.snapshots)
+    else:
+        filled = pd.Series(0.0, index=index)
+    if result.empty:
+        return filled
+    if missing.empty:
+        return result
+    return pd.concat([result, filled])
+
+
 def _decentral_heat_input(
     n: pypsa.Network, bus_carrier: str, aggregate_per_year: bool
 ) -> list[pd.Series | pd.DataFrame]:

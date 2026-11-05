@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
+import pypsa
 import pytest
 
 from pypsa_validation_processing.statistics_functions import (
@@ -20,6 +21,8 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Electricity,
     Net_Imports__Oil,
 )
+
+from pypsa_validation_processing.utils import UNITS_MAPPING
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
 
@@ -233,134 +236,160 @@ class TestFinalEnergyByCarrierElectricity:
 
 
 class TestNetImportsElectricity:
-    """Test suite for Net_Imports__Electricity function."""
+    """Test suite for Net_Imports__Electricity (spec AC1-AC7, C6-AC1/2/3/6)."""
 
-    class _ElectricityTradeStatisticsAccessor:
-        """Minimal accessor for electricity net-import tests."""
+    WEIGHT = 3.0
 
-        def __init__(self):
-            self.calls: list[dict[str, object]] = []
+    @classmethod
+    def _network(cls, locations: tuple[str, ...] = ("A", "B", "C")) -> pypsa.Network:
+        """Return a network with two 3-hour snapshots and one AC bus per location."""
+        n = pypsa.Network()
+        n.set_snapshots(pd.date_range("2025-01-01", periods=2, freq="3h"))
+        n.snapshot_weightings.loc[:, :] = cls.WEIGHT
+        for location in locations:
+            n.add("Bus", location, carrier="AC", unit="MWh_el", location=location)
+        return n
 
-        @staticmethod
-        def _transmission_rows(groupby_time: bool) -> pd.Series | pd.DataFrame:
-            if groupby_time:
-                index = pd.MultiIndex.from_tuples(
-                    [("AT0", "AT1", "MWh_el"), ("AT1", "AT0", "MWh_el")],
-                    names=["bus0", "bus1", "unit"],
-                )
-                return pd.Series([15.0, 4.0], index=index, dtype=float)
+    @staticmethod
+    def _add_branch(
+        n: pypsa.Network,
+        component: str,
+        name: str,
+        p0: list[float],
+        efficiency: float = 1.0,
+        **attrs: object,
+    ) -> None:
+        """Add a Line or Link with dispatch *p0* and ``p1 = -efficiency * p0``."""
+        if component == "Link":
+            attrs["efficiency"] = efficiency
+        n.add(component, name, **attrs)
+        dispatch = n.lines_t if component == "Line" else n.links_t
+        dispatch.p0[name] = p0
+        dispatch.p1[name] = [-efficiency * v for v in p0]
 
-            timestamps = pd.date_range(
-                "2019-01-01", periods=4, freq="6h", name="snapshot"
-            )
-            return pd.DataFrame(
-                [
-                    {
-                        "bus0": "AT0",
-                        "bus1": "AT1",
-                        "unit": "MWh_el",
-                        timestamps[0]: 10.0,
-                        timestamps[1]: 5.0,
-                        timestamps[2]: 0.0,
-                        timestamps[3]: 0.0,
-                    },
-                    {
-                        "bus0": "AT1",
-                        "bus1": "AT0",
-                        "unit": "MWh_el",
-                        timestamps[0]: 1.0,
-                        timestamps[1]: 1.0,
-                        timestamps[2]: 1.0,
-                        timestamps[3]: 1.0,
-                    },
-                ]
-            )
+    def _ac3_network(self) -> pypsa.Network:
+        """Line A→B with p0 = 10, DC link C→A with p0 = 5 and efficiency 0.9."""
+        n = self._network()
+        self._add_branch(
+            n, "Line", "A-B", [10.0, 0.0], bus0="A", bus1="B", carrier="AC", x=0.1
+        )
+        self._add_branch(
+            n,
+            "Link",
+            "C-A",
+            [5.0, 0.0],
+            efficiency=0.9,
+            bus0="C",
+            bus1="A",
+            carrier="DC",
+        )
+        return n
 
-        def transmission(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby: list[str] | None = None,
-            groupby_time: bool = True,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby": groupby,
-                    "groupby_time": groupby_time,
-                    "nice_names": nice_names,
-                }
-            )
+    @staticmethod
+    def _check_format(result: pd.Series | pd.DataFrame, n: pypsa.Network) -> None:
+        """C6-AC1 / C6-AC2 checks shared by both modes."""
+        assert isinstance(result.index, pd.MultiIndex)
+        assert {"location", "unit"} <= set(result.index.names)
+        assert len(result) > 0
+        units = result.index.get_level_values("unit")
+        assert all(u and u in UNITS_MAPPING for u in units)
+        locations = result.index.get_level_values("location")
+        assert set(locations) <= set(n.buses.location) and "" not in set(locations)
 
-            if (
-                bus_carrier == ["AC", "DC"]
-                and carrier is None
-                and components == ["Link", "Line"]
-                and groupby == ["bus0", "bus1", "unit"]
-            ):
-                return self._transmission_rows(groupby_time)
-
-            return pd.DataFrame(columns=["bus0", "bus1", "unit", "value"])
-
-    class _ElectricityTradeNetwork:
-        """Minimal network exposing the custom electricity trade accessor."""
-
-        def __init__(self):
-            self.statistics = (
-                TestNetImportsElectricity._ElectricityTradeStatisticsAccessor()
-            )
-
-    def _electricity_trade_network(self):
-        return self._ElectricityTradeNetwork()
-
-    def test_returns_net_imports_in_expected_sign_convention(self):
-        """Net imports should equal imports minus exports."""
-        network = self._electricity_trade_network()
-
-        result = Net_Imports__Electricity(network)
+    def test_ac3_yearly_values(self):
+        """AC3: A = −10 + 4.5, B = 10, C = −5 per snapshot, weighted per C6.10."""
+        n = self._ac3_network()
+        result = Net_Imports__Electricity(n)
 
         assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert result.loc[("AT1", "MWh_el")] == pytest.approx(11.0)
-        assert result.loc[("AT0", "MWh_el")] == pytest.approx(-11.0)
+        self._check_format(result, n)
+        values = result.droplevel("unit")
+        assert values["A"] == pytest.approx(-5.5 * self.WEIGHT)
+        assert values["B"] == pytest.approx(10.0 * self.WEIGHT)
+        assert values["C"] == pytest.approx(-5.0 * self.WEIGHT)
+        assert set(result.index.get_level_values("unit")) == {"MWh_el"}
 
-        calls = network.statistics.calls
-        assert len(calls) == 1
-        assert calls[0]["bus_carrier"] == ["AC", "DC"]
-        assert calls[0]["components"] == ["Link", "Line"]
-        assert calls[0]["groupby"] == ["bus0", "bus1", "unit"]
-        assert calls[0]["groupby_time"] is True
-
-    def test_returns_dataframe_for_aggregate_per_year_false(self):
-        """aggregate_per_year=False returns a timeseries DataFrame."""
-        network = self._electricity_trade_network()
-
-        result = Net_Imports__Electricity(network, aggregate_per_year=False)
-        aggregated = Net_Imports__Electricity(network)
+    def test_ac3_timeseries(self):
+        """AC2/AC3: aggregate_per_year=False gives unweighted snapshot values."""
+        n = self._ac3_network()
+        result = Net_Imports__Electricity(n, aggregate_per_year=False)
 
         assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert any(isinstance(column, pd.Timestamp) for column in result.columns)
-        assert result.shape[1] == 4
+        self._check_format(result, n)
+        assert set(result.columns) <= set(n.snapshots)
+        assert all(pd.api.types.is_numeric_dtype(d) for d in result.dtypes)
+        first = result.droplevel("unit")[n.snapshots[0]]
+        assert first["A"] == pytest.approx(-5.5)
+        assert first["B"] == pytest.approx(10.0)
+        assert first["C"] == pytest.approx(-5.0)
+
+    def test_flow_consistency(self):
+        """AC4 / C6-AC3: weighted column sum of the False result equals True."""
+        n = self._ac3_network()
+        yearly = Net_Imports__Electricity(n)
+        series = Net_Imports__Electricity(n, aggregate_per_year=False)
+
+        weighted = series.mul(n.snapshot_weightings.objective, axis=1).sum(axis=1)
         pd.testing.assert_series_equal(
-            result.sum(axis=1), aggregated, check_names=False
+            weighted.sort_index(), yearly.sort_index(), check_names=False
         )
 
-        timestamps = list(result.columns)
-        ts0, ts1 = timestamps[0], timestamps[1]
+    def test_sum_over_locations_is_minus_losses(self):
+        """AC5: the sum over all locations equals −(link losses)."""
+        n = self._ac3_network()
+        result = Net_Imports__Electricity(n)
+        assert result.sum() == pytest.approx(-0.5 * self.WEIGHT)
 
-        # AT0->AT1=10, AT1->AT0=1 at ts0; AT0->AT1=5, AT1->AT0=1 at ts1.
-        assert result.loc[("AT1", "MWh_el"), ts0] == pytest.approx(9.0)
-        assert result.loc[("AT0", "MWh_el"), ts0] == pytest.approx(-9.0)
-        assert result.loc[("AT1", "MWh_el"), ts1] == pytest.approx(4.0)
-        assert result.loc[("AT0", "MWh_el"), ts1] == pytest.approx(-4.0)
+    def test_lossless_line_is_antisymmetric(self):
+        """Edge case: NI(A) = −NI(B) for a lossless line A–B."""
+        n = self._network(("A", "B"))
+        self._add_branch(
+            n, "Line", "A-B", [4.0, -2.0], bus0="A", bus1="B", carrier="AC", x=0.1
+        )
+        values = Net_Imports__Electricity(n).droplevel("unit")
+        assert values["A"] == pytest.approx(-values["B"])
+        assert values["B"] == pytest.approx(2.0 * self.WEIGHT)
+
+    def test_distribution_grid_link_is_ignored(self):
+        """AC7: an `electricity distribution grid` link does not change the result."""
+        n = self._ac3_network()
+        expected = Net_Imports__Electricity(n)
+        n.add("Bus", "B low voltage", carrier="low voltage", location="B")
+        self._add_branch(
+            n,
+            "Link",
+            "B distribution",
+            [7.0, 7.0],
+            bus0="B",
+            bus1="B low voltage",
+            carrier="electricity distribution grid",
+        )
+        pd.testing.assert_series_equal(Net_Imports__Electricity(n), expected)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_location_without_branches_is_zero(self, aggregate_per_year):
+        """C6-AC6: a location without branches is present with 0.0."""
+        n = self._ac3_network()
+        n.add("Bus", "D", carrier="AC", unit="MWh_el", location="D")
+        result = Net_Imports__Electricity(n, aggregate_per_year=aggregate_per_year)
+
+        self._check_format(result, n)
+        assert set(result.index.get_level_values("location")) == {"A", "B", "C", "D"}
+        assert (result.xs("D", level="location") == 0.0).all(axis=None)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_network_without_branches(self, aggregate_per_year):
+        """C6-AC6 / C6.13: no Lines and no DC links → 0.0 for every location."""
+        n = self._network()
+        result = Net_Imports__Electricity(n, aggregate_per_year=aggregate_per_year)
+
+        expected_type = pd.Series if aggregate_per_year else pd.DataFrame
+        assert isinstance(result, expected_type)
+        self._check_format(result, n)
+        assert set(result.index.get_level_values("location")) == {"A", "B", "C"}
+        assert (result == 0.0).all(axis=None)
+        if not aggregate_per_year:
+            assert list(result.columns) == list(n.snapshots)
 
 
 # ---------------------------------------------------------------------------

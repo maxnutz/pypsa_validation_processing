@@ -34,6 +34,7 @@ import pypsa
 from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
     statistics_kwargs as kwargs,
+    statistics_grouping_index,
     statistics_kwargs_for_imports as kwargs_imports,
     UNITS_MAPPING,
     remap_unit_index,
@@ -41,6 +42,7 @@ from pypsa_validation_processing.utils import (
 from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
     create_location_index_from_copperplate,
+    ensure_all_locations,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,8 +154,14 @@ def Net_Imports__Electricity(
 ) -> pd.Series | pd.DataFrame:
     """Extract net imports of electricity from a PyPSA Network.
 
-    Evaluation of imports is performed on regional level, national
-    level is covered as a result of aggregation.
+    For location ``l``: ``NI(l) = Σ (−p_port)`` over all ports of ``AC``
+    Lines and ``DC`` Links at ``AC`` buses in ``l``, i.e. the energy fed
+    into ``l`` minus the energy withdrawn from it. Imports over a lossy
+    branch are counted at the receiving port, exports at the sending port.
+    Positive = net import, negative = net export. Country values follow
+    from summing locations (C8, class ``flow``); losses of branches within
+    one country, or within one location, stay in that sum as negative net
+    imports (spec ``Net_Imports__Electricity.md`` section 7).
 
     Parameters
     ----------
@@ -167,70 +175,24 @@ def Net_Imports__Electricity(
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    The evaluation pathway in this function strongly depends on the input of the
-    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
-    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
-    (with ``aggregate_per_year`` is ``True``) are processed as they come.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network; locations without branches get
+        ``0.0`` (C6.13).
     """
-    imports_raw = (
-        n.statistics.transmission(
-            bus_carrier=["AC", "DC"],
-            components=["Link", "Line"],
-            groupby_time=aggregate_per_year,
-            **kwargs_imports,
-        )
-        .groupby(["bus0", "bus1", "unit"])
-        .sum()
+    result = n.statistics.energy_balance(
+        components=["Line", "Link"],
+        carrier=["AC", "DC"],
+        bus_carrier="AC",
+        groupby_time=aggregate_per_year,
+        **kwargs,
     )
-
-    # process non-aggregated data - stack to long format with single column
-    if isinstance(imports_raw, pd.DataFrame):
-        imports_long = (
-            imports_raw.stack(future_stack=True)
-            .rename("value")
-            .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
-            .reset_index()
-        )
-        groupby_columns = ["location", "unit", "snapshot"]
-    # process aggregated data - process single column as is
-    else:
-        imports_long = (
-            imports_raw.rename("value")
-            .rename_axis(index=["location_from", "location_to", "unit"])
-            .reset_index()
-        )
-        groupby_columns = ["location", "unit"]
-
-    net_imports = pd.concat(
-        [
-            imports_long.assign(
-                location=imports_long["location_to"], value=imports_long["value"]
-            ),
-            imports_long.assign(
-                location=imports_long["location_from"], value=-imports_long["value"]
-            ),
-        ],
-        ignore_index=True,
+    if not result.empty:
+        result = result.groupby(level=statistics_grouping_index).sum()
+    result = ensure_all_locations(
+        result, n, unit="MWh", aggregate_per_year=aggregate_per_year
     )
-    net_imports_grouped = net_imports.groupby(groupby_columns, sort=False)[
-        "value"
-    ].sum()
-
-    if isinstance(imports_raw, pd.DataFrame):
-        result = net_imports_grouped.unstack("snapshot")
-    else:
-        result = net_imports_grouped
-
-    logger.debug(f"Net Imports|Electricity finished. Resulting shape: {result.shape}. ")
+    logger.debug(f"Net Imports|Electricity finished. Resulting shape: {result.shape}.")
     return result
 
 
