@@ -48,6 +48,7 @@ from pypsa_validation_processing.utils import (
     fossil_oil_share,
     fossil_gas_share,
     decentral_heat_split,
+    DECENTRAL_HEAT_BUS_CARRIERS,
 )
 
 logger = logging.getLogger(__name__)
@@ -963,11 +964,17 @@ def Final_Energy_by_Sector__Agriculture(
 def Final_Energy_by_Sector__Residential_and_Commercial(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    config: dict | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extract residential and commercial-sector final energy from a PyPSA Network.
+    """Extract Final Energy [by Sector]|Residential and Commercial.
 
-    Returns the total energy consumed by the sector residentials and
-    commercials across the pypsa-network.
+    ``FE(l) = Σ W[low voltage, c](l) + L[urban central heat](l) / (1 + λ)
+    + D8_rc(l)``. The electricity term covers the ``low voltage`` consumers
+    of the sector; it excludes industry, agriculture, transport (``rail``,
+    ``road``, ``BEV charger``), storage chargers, the distribution grid,
+    district-heat suppliers and every Link supplying a decentral heat bus,
+    whose input enters only via the residential/commercial share of the
+    decentral heat input (D8).
 
     Parameters
     ----------
@@ -975,123 +982,83 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
         PyPSA network to process.
     aggregate_per_year : bool, optional
         If ``True`` (default), aggregate over all snapshots and return a
-        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
+    config : dict | None, optional
+        Network config; ``λ`` is
+        ``config["sector"]["district_heating"]["district_heating_loss"]``.
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        (``MWh``) and every location of the network (C6.13).
 
-    Notes
-    -----
-    excludes EV-charging, as covered by Sector Transportation. Concerning Carrier heat, the Function distinguishes between
-    central heating systems (Final Energy is Heat) and decentral heating systems (Final Energy is Electricity, Gas, Liquids
-    or Solids).
+    Raises
+    ------
+    MissingInputError
+        If the district heating loss is missing in *config*.
     """
-    # Final Energy|Residential and Commercial|Electricity
-    # include home batteries
-    # include decentral heating technologies
-    # exclude central heating technologies
-    # exclude EV charging.
-    low_voltage_elec = n.statistics.withdrawal(
-        bus_carrier="low voltage",
-        carrier=[
-            "rural resistive heater",
-            "urban decentral resistive heater",
-            "home battery discharger",
-            "home battery charger",
-            "rural air heat pump",
-            "rural ground heat pump",
-            "urban decentral air heat pump",
-        ],
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # Final Energy|Residential and Commercial|Heat
-    # urban central heat as bus_carrier
-    # decentral solar thermal
-    # exclude urban central heat vent
-    # exclude low-temperature-teat for industry
-    # exclude decentral heating systems
-    urban_central_heat = n.statistics.withdrawal(
-        bus_carrier="urban central heat",
-        carrier=[
-            "urban central water pits charger",
-            "urban central water tanks charger",
-            "DAC",
-            "urban central heat",
-        ],
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # Final Energy|Residential and Commercial|Gases
-    # urban decentral gas boiler, rural gas boiler
-    rescom_gas = n.statistics.energy_balance(
-        carrier=["urban decentral gas boiler", "rural gas boiler"],
-        components="Link",
-        at_port="bus0",  # count gas not heat
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    ).mul(
-        -1
-    )  # positive Load
-
-    # Final Energy|Residential and Commercial|Liquids -> needs regionalization
-    raw_rescom = n.statistics.energy_balance(
-        bus_carrier="oil",
-        carrier=["rural oil boiler", "urban decentral oil boiler"],
-        groupby=kwargs_filtering["groupby"] + ["bus1"],
-        at_port="bus0",  # count oil not heat
-        groupby_time=aggregate_per_year,
-    ).mul(
-        -1
-    )  # positive Load
-    if raw_rescom.empty:
-        rescom_liquids = raw_rescom
-    else:
-        raw_rescom = raw_rescom.drop("Store", errors="ignore")
-        usage_location = [
-            bus.split(" ")[0] for bus in list(raw_rescom.index.get_level_values("bus1"))
+    try:
+        loss = float(config["sector"]["district_heating"]["district_heating_loss"])
+    except (KeyError, TypeError) as exc:
+        raise MissingInputError(
+            "sector.district_heating.district_heating_loss"
+        ) from exc
+    excluded = r"urban central|industry|agriculture|charger|distribution|rail|road"
+    stats = {"groupby_time": aggregate_per_year, **kwargs}
+    bus_carriers = n.buses["carrier"]
+    port_buses = n.links.filter(regex=r"^bus\d+$")
+    heat_inputs = set(
+        n.links.loc[
+            port_buses.apply(
+                lambda col: col.map(bus_carriers).isin(DECENTRAL_HEAT_BUS_CARRIERS)
+            ).any(axis=1),
+            "carrier",
         ]
-        rescom_liquids = (
-            create_location_index_from_copperplate(raw_rescom, usage_location)
-            .groupby(kwargs["groupby"])
-            .sum()
-        )
-
-    # Final Energy|Residential and Commercial|Solids (Biomass)
-    solids_usage = n.statistics.energy_balance(
-        bus_carrier="solid biomass",
-        carrier=["rural biomass boiler", "urban decentral biomass boiler"],
-        components="Link",
-        at_port="bus0",  # account for biomass not for heat
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    ).mul(
-        -1
-    )  # positive Load
-
-    series_list = [
-        low_voltage_elec,
-        urban_central_heat,
-        rescom_gas,
-        rescom_liquids,
-        solids_usage,
-    ]
-    series_list = [
-        df.groupby(kwargs["groupby"]).sum() for df in series_list if not df.empty
-    ]
-    total = pd.concat(series_list)
-    logger.debug(
-        "Final Energy by Sector|Residential and Commercial finished. "
-        f"Resulting shape: {total.shape}. "
     )
-    return total
+    split = decentral_heat_split(n, aggregate_per_year)
+    parts = (
+        [split.xs("rc", level="sector")]
+        if "rc" in split.index.get_level_values("sector")
+        else []
+    )
+    if "low voltage" in set(bus_carriers):
+        lv_carriers = n.statistics.withdrawal(
+            bus_carrier="low voltage", groupby="carrier", nice_names=False
+        ).index.get_level_values("carrier")
+        included = [
+            c
+            for c in lv_carriers.unique()
+            if not re.search(excluded, c) and c not in heat_inputs
+        ]
+        if included:
+            parts.append(
+                n.statistics.withdrawal(
+                    bus_carrier="low voltage", carrier=included, **stats
+                )
+            )
+    if "urban central heat" in set(n.loads["carrier"]):
+        central = n.statistics.withdrawal(
+            carrier="urban central heat", components="Load", **stats
+        )
+        parts.append(central / (1.0 + loss))
+    parts = [
+        remap_unit_index(part.fillna(0.0))
+        .groupby(level=statistics_grouping_index)
+        .sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
+    )
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
+    logger.debug(
+        "Final Energy [by Sector]|Residential and Commercial finished. "
+        f"Shape: {result.shape}."
+    )
+    return result
