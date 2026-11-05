@@ -10,7 +10,7 @@ This repository is a Python package that computes IAMC variables from PyPSA netw
 - Package manager/environment: Pixi (`pixi run ...`).
 - Main run command: `pixi run workflow`.
 - Test command: `pixi run test` (pytest with coverage, fails below 90 %).
-- Full local check: `pixi run workflow_test` (runs the four `config.{country,region}-{year,timeseries}.yaml` setups, then pytest).
+- Full local check: `pixi run workflow_test` (runs the six local test configs in `pypsa_validation_processing/configs/test/`, see `specs/configuration.md` "Test configs", then pytest).
 - CLI flags: `--config <path>` (defaults to packaged `configs/config.default.yaml`), `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`.
 
 ## Project Context
