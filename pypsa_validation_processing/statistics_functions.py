@@ -44,6 +44,8 @@ from pypsa_validation_processing.utils import (
     create_location_index_from_copperplate,
     ensure_all_locations,
     MissingInputError,
+    non_energy_use,
+    apply_coke_correction,
 )
 
 logger = logging.getLogger(__name__)
@@ -185,8 +187,14 @@ def Net_Imports__Electricity(
 def Final_Energy_by_Carrier__Coal(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    industry_non_energy_shares: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.
+    """Extract Final Energy [by Carrier]|Coal from a PyPSA Network.
+
+    ``FE(l) = E(l) · (1 − κ) + E(l) · κ / 1.366`` with
+    ``E(l) = L[coal for industry](l) − NE_coal(l)``: the ``coal for industry``
+    Load minus its non-energy use (D5), with the coke correction (D6). Coal for
+    power plants and CHPs is transformation, not final energy.
 
     Parameters
     ----------
@@ -196,43 +204,36 @@ def Final_Energy_by_Carrier__Coal(
         If ``True`` (default), aggregate over all snapshots and return a
         :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
+    industry_non_energy_shares : pd.DataFrame | None, optional
+        Eurostat non-energy shares, index (``country``, ``carrier``), column
+        ``non_energy_share`` (C2.5). Without industry production data in the
+        network, ``κ = 0`` (Eurostat fallback, D6).
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    This function includes only the Final Energy consumption of coal. This excludes
-    coal for electricity or CHP, but only focuses on the carrier ``coal for industry``
-    as Final Energy of Coal. If this carrier is not present in the network, every
-    location gets ``0.0`` with unit ``MWh`` (C6.13).
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
     """
-    if "coal for industry" not in n.carriers.index:
-        locations = [loc for loc in n.buses.location.dropna().unique() if loc]
-        index = pd.MultiIndex.from_product(
-            [locations, ["MWh"]], names=["location", "unit"]
+    carrier = "coal for industry"
+    if carrier not in set(n.loads["carrier"]):
+        return ensure_all_locations(
+            pd.Series(dtype=float), n, "MWh", aggregate_per_year
         )
-        if aggregate_per_year:
-            return pd.Series(0.0, index=index)
-        return pd.DataFrame(0.0, index=index, columns=n.snapshots)
-    industry = n.statistics.withdrawal(
-        bus_carrier="coal for industry",
-        carrier="coal for industry",
+    demand = n.statistics.withdrawal(
+        carrier=carrier,
         components="Load",
         groupby_time=aggregate_per_year,
         **kwargs,
-    )
-    logger.debug(
-        f"Final Energy by Carrier|Coal finished. Resulting shape: {industry.shape}. "
-    )
-    return industry
+    ).fillna(0.0)
+    energy = demand - non_energy_use(demand, industry_non_energy_shares, "Coal")
+    result = apply_coke_correction(energy)
+    if not result.empty:
+        result = result.groupby(level=statistics_grouping_index).sum()
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
+    logger.debug(f"Final Energy [by Carrier]|Coal finished. Shape: {result.shape}.")
+    return result
 
 
 def Final_Energy_by_Carrier__Oil(

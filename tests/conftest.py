@@ -175,6 +175,7 @@ class MockPyPSANetwork:
             },
             index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
         )
+        self.loads = pd.DataFrame({"carrier": pd.Series(dtype=str)})
         # Add carriers attribute with empty index by default
         self.carriers = pd.DataFrame(index=[])
         # Locations and snapshots used by result validation (C6.2, C6.6)

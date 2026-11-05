@@ -22,7 +22,12 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Oil,
 )
 
-from pypsa_validation_processing.utils import MissingInputError, UNITS_MAPPING
+from pypsa_validation_processing.utils import (
+    MissingInputError,
+    UNITS_MAPPING,
+    apply_coke_correction,
+    remap_unit_index,
+)
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
 
@@ -85,8 +90,12 @@ def _check_flow_consistency(func, n: pypsa.Network, **kwargs: object) -> None:
     yearly = func(n, aggregate_per_year=True, **kwargs)
     series = func(n, aggregate_per_year=False, **kwargs)
     weighted = series.mul(n.snapshot_weightings.objective, axis=1).sum(axis=1)
+    # rows dropped by groupby_time=True are refilled with the normalised unit
+    # (C6.13), while False keeps pypsa's label (C6.10); C8 normalises both
     pd.testing.assert_series_equal(
-        weighted.sort_index(), yearly.sort_index(), check_names=False
+        remap_unit_index(weighted).sort_index(),
+        remap_unit_index(yearly).sort_index(),
+        check_names=False,
     )
 
 
@@ -1332,150 +1341,129 @@ class TestFinalEnergyByCarrierDistrictHeat:
 # ---------------------------------------------------------------------------
 
 
+def _shares(**values: float) -> pd.DataFrame:
+    """Non-energy shares table (C2.5) for ``carrier=value`` pairs of country ``AA``.
+
+    Every carrier of ``{Natural Gas, Oil, Coal}`` is present (as after the
+    initialisation checks); unspecified carriers get share ``0.0``.
+    """
+    carriers = {"Natural Gas": 0.0, "Oil": 0.0, "Coal": 0.0}
+    carriers.update({k.replace("_", " "): v for k, v in values.items()})
+    index = pd.MultiIndex.from_tuples(
+        [("AA", c) for c in carriers], names=["country", "carrier"]
+    )
+    return pd.DataFrame({"non_energy_share": list(carriers.values())}, index=index)
+
+
 class TestFinalEnergyByCarrierCoal:
-    """Test suite for Final_Energy_by_Carrier__Coal function."""
+    """Spec Final_Energy_by_Carrier__Coal.md AC1-AC6."""
 
-    class _CoalStatisticsAccessor:
-        """Minimal accessor to verify coal-carrier extraction behavior."""
-
-        def __init__(self, raise_missing: bool = False):
-            self.raise_missing = raise_missing
-            self.calls: list[dict] = []
-
-        @staticmethod
-        def _series_from_groupby(
-            groupby: list[str],
-            values: list[float],
-            location: str = "AT1",
-            unit: str = "MWh_th",
-        ) -> pd.Series:
-            index = pd.MultiIndex.from_tuples(
-                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
-                names=groupby,
+    @staticmethod
+    def _network(with_coal: bool = True) -> pypsa.Network:
+        """Coal for industry Load of 10 MW at AA1 over 2 snapshots (weighting 1)."""
+        n = _real_network()
+        n.snapshot_weightings.loc[:, :] = 1.0
+        _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
+        _add_bus(n, "AA2", "AC", "MWh_el", "AA2")
+        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        if with_coal:
+            _add_bus(n, "AA1 coal for industry", "coal for industry", "MWh_LHV", "AA1")
+            _add_bus(n, "AA2 coal for industry", "coal for industry", "MWh_LHV", "AA2")
+            _add_dispatched(
+                n,
+                "Load",
+                "AA1 coal for industry",
+                {"p": [10.0, 10.0]},
+                bus="AA1 coal for industry",
+                carrier="coal for industry",
             )
-            return pd.Series(values, index=index, dtype=float)
-
-        def withdrawal(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby_time: bool = True,
-            groupby: list[str] | None = None,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby_time": groupby_time,
-                    "groupby": groupby,
-                    "nice_names": nice_names,
-                }
+            _add_dispatched(
+                n,
+                "Load",
+                "AA2 coal for industry",
+                {"p": [0.0, 0.0]},
+                bus="AA2 coal for industry",
+                carrier="coal for industry",
             )
+        return n
 
-            if self.raise_missing:
-                raise ValueError("coal carrier missing")
-
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            if bus_carrier == "coal for industry" and carrier == "coal for industry":
-                return self._series_from_groupby(groupby, [25.0])
-
-            return pd.Series(
-                dtype=float,
-                index=pd.MultiIndex.from_tuples([], names=groupby),
-            )
-
-    class _CoalNetwork:
-        """Minimal network exposing the custom coal statistics accessor."""
-
-        def __init__(
-            self,
-            raise_missing: bool = False,
-            carriers: list[str] | None = None,
-        ):
-            self.statistics = TestFinalEnergyByCarrierCoal._CoalStatisticsAccessor(
-                raise_missing=raise_missing
-            )
-            self.buses = pd.DataFrame({"location": ["AT1", "AT2", "", None]})
-            self.snapshots = pd.date_range(
-                "2019-01-01", periods=4, freq="6h", name="snapshot"
-            )
-            self.carriers = pd.DataFrame(
-                index=pd.Index(["coal for industry"] if carriers is None else carriers)
-            )
-
-    def _coal_network(
-        self,
-        raise_missing: bool = False,
-        carriers: list[str] | None = None,
-    ):
-        return self._CoalNetwork(raise_missing=raise_missing, carriers=carriers)
-
-    def test_returns_series(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas Series."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network())
-        assert isinstance(result, pd.Series)
-
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network())
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_not_empty(self, mock_network: MockPyPSANetwork):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network())
-        assert len(result) > 0
-
-    def test_numeric_values(self, mock_network: MockPyPSANetwork):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network())
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
+    @staticmethod
+    def _values(n: pypsa.Network, shares: pd.DataFrame, **kwargs: object) -> pd.Series:
+        result = Final_Energy_by_Carrier__Coal(
+            n, industry_non_energy_shares=shares, **kwargs
         )
-
-    def test_contains_at1_location(self, mock_network: MockPyPSANetwork):
-        """Test that result contains AT1 locational data."""
-        result = Final_Energy_by_Carrier__Coal(self._coal_network())
-        assert "AT1" in result.index.get_level_values("location")
-
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for _ in mock_network_collection:
-            result = Final_Energy_by_Carrier__Coal(self._coal_network())
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-            assert len(result) > 0
-
-    def test_issues_expected_withdrawal_query(self):
-        """Function requests the expected coal carrier/component combination."""
-        network = self._coal_network()
-        _ = Final_Energy_by_Carrier__Coal(network)
-        calls = network.statistics.calls
-        assert len(calls) == 1
-        assert calls[0]["bus_carrier"] == "coal for industry"
-        assert calls[0]["carrier"] == "coal for industry"
-        assert calls[0]["components"] == "Load"
+        return result.droplevel("unit")
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
-    def test_returns_zeros_when_carrier_is_missing(self, aggregate_per_year: bool):
-        """Missing coal carrier: every location gets 0.0 without querying statistics (C6.13)."""
-        network = self._coal_network(carriers=[])
-        result = Final_Energy_by_Carrier__Coal(network, aggregate_per_year)
-        expected_type = pd.Series if aggregate_per_year else pd.DataFrame
-        assert isinstance(result, expected_type)
-        assert result.index.names == ["location", "unit"]
-        assert list(result.index) == [("AT1", "MWh"), ("AT2", "MWh")]
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format; AA2 (zero withdrawal) and EU kept with 0.0."""
+        n = self._network()
+        result = Final_Energy_by_Carrier__Coal(
+            n,
+            aggregate_per_year=aggregate_per_year,
+            industry_non_energy_shares=_shares(),
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        values = result.droplevel("unit")
+        assert set(values.index) == {"AA1", "AA2", "EU"}
+        assert (values.loc[["AA2", "EU"]] == 0.0).all(axis=None)
+
+    def test_ac3_without_non_energy_use(self):
+        """AC3: kappa = 0 and share 0 gives 20."""
+        assert self._values(self._network(), _shares())["AA1"] == pytest.approx(20.0)
+
+    def test_ac3a_non_energy_use_subtracted(self):
+        """AC3a / AC5: share 0.25 gives NE = 5 and 15; values >= 0."""
+        values = self._values(self._network(), _shares(Coal=0.25))
+        assert values["AA1"] == pytest.approx(15.0)
+        assert (values >= 0).all()
+
+    @pytest.mark.parametrize(
+        "non_energy_share, expected", [(0.0, 17.321), (0.25, 12.990)]
+    )
+    def test_ac3_coke_correction_injected(
+        self, monkeypatch, non_energy_share, expected
+    ):
+        """AC3 / AC3a: an injected kappa = 0.5 applies the coke factor 1.366."""
+        import pypsa_validation_processing.statistics_functions as sf
+
+        monkeypatch.setattr(
+            sf,
+            "apply_coke_correction",
+            lambda energy: apply_coke_correction(energy, kappa=0.5),
+        )
+        values = self._values(self._network(), _shares(Coal=non_energy_share))
+        assert values["AA1"] == pytest.approx(expected, abs=1e-3)
+
+    def test_ac3b_fallback_warns(self, caplog):
+        """AC3b: the Eurostat fallback logs one WARNING about the coke correction."""
+        with caplog.at_level(logging.WARNING):
+            self._values(self._network(), _shares())
+        coke = [r for r in caplog.records if "Coke correction" in r.getMessage()]
+        assert len(coke) == 1
+
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._network()
+        n.loads_t.p["AA1 coal for industry"] = [10.0, 4.0]
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(
+            Final_Energy_by_Carrier__Coal,
+            n,
+            industry_non_energy_shares=_shares(Coal=0.25),
+        )
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_coal_for_industry(self, aggregate_per_year):
+        """AC6 / C6.9: without the carrier, 0.0 for every location, never None."""
+        n = self._network(with_coal=False)
+        result = Final_Energy_by_Carrier__Coal(
+            n,
+            aggregate_per_year=aggregate_per_year,
+            industry_non_energy_shares=_shares(),
+        )
+        _check_c6_format(result, n, aggregate_per_year)
         assert (result == 0.0).all(axis=None)
-        if not aggregate_per_year:
-            pd.testing.assert_index_equal(result.columns, network.snapshots)
-        assert network.statistics.calls == []
 
 
 # ---------------------------------------------------------------------------
