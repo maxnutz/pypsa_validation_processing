@@ -27,7 +27,6 @@ based on the ``aggregation_level`` configuration by the name of the entries of `
 from __future__ import annotations
 import logging
 import re
-from functools import reduce
 import pandas as pd
 import numpy as np
 import pypsa
@@ -47,6 +46,7 @@ from pypsa_validation_processing.utils import (
     apply_coke_correction,
     attribute_locations,
     fossil_oil_share,
+    fossil_gas_share,
 )
 
 logger = logging.getLogger(__name__)
@@ -480,12 +480,15 @@ def Net_Imports__Oil(
 def Final_Energy_by_Carrier__Natural_Gas(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    industry_non_energy_shares: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extract natural-gas final energy from a PyPSA Network.
+    """Extract Final Energy [by Carrier]|Natural Gas from a PyPSA Network.
 
-    Returns the total final energy demand supplied by natural gas across
-    residential and commercial buildings and industry, while subtracting the
-    estimated non-fossil share of gas consumption.
+    ``FE(l) = f_gas · (W[gas, decentral gas boilers](l) + L[gas for
+    industry](l) − NE_gas(l))``: the fossil share (D3) of the gas withdrawn by
+    decentral boilers (location per D1) and of the energy part of the
+    ``gas for industry`` Load (non-energy use per D5). Central boilers, CHPs,
+    power plants and SMR are transformation, not final energy.
 
     Parameters
     ----------
@@ -495,116 +498,54 @@ def Final_Energy_by_Carrier__Natural_Gas(
         If ``True`` (default), aggregate over all snapshots and return a
         :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
+    industry_non_energy_shares : pd.DataFrame | None, optional
+        Eurostat non-energy shares, index (``country``, ``carrier``), column
+        ``non_energy_share`` (C2.5).
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex including
-        ``location`` and ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    The function combines residential and commercial gas withdrawals with
-    industry gas demand, then scales the total by the fossil fraction of gas.
-    The fossil fraction is estimated from the ratio of non-fossil gas
-    production to total gas usage, excluding pipeline flows and limiting the
-    non-fossil share to at most 1.
-    Industry gas demand is reduced by a fixed non-energy-use share for EU-27 based on
-    Eurostat energy balance data.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
     """
-    # get fraction fossil-gas non-fossil-gas
-    # non-fossil-gas-production per region
-    non_fossil_gas_prod = n.statistics.supply(
-        bus_carrier="gas",
-        carrier=[
-            "Sabatier",
-            "biogas to gas",
-            "biogas to gas CC",
-            "BioSNG",
-            "BioSNG CC",
-        ],
-        at_port="bus1",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs,
+    boiler_carriers = ["rural gas boiler", "urban decentral gas boiler"]
+    parts = []
+    if "gas" in set(n.buses["carrier"]) and set(boiler_carriers) & set(
+        n.links["carrier"]
+    ):
+        boilers = n.statistics.withdrawal(
+            bus_carrier="gas",
+            carrier=boiler_carriers,
+            components=["Link"],
+            groupby=["name", "location", "unit"],
+            groupby_time=aggregate_per_year,
+            nice_names=False,
+        ).fillna(0.0)
+        parts.append(attribute_locations(n, boilers))
+    if "gas for industry" in set(n.loads["carrier"]):
+        demand = n.statistics.withdrawal(
+            carrier="gas for industry",
+            components="Load",
+            groupby_time=aggregate_per_year,
+            **kwargs,
+        ).fillna(0.0)
+        shares = industry_non_energy_shares
+        parts.append(demand - non_energy_use(demand, shares, "Natural Gas"))
+    parts = [
+        part.groupby(level=statistics_grouping_index).sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        fossil_gas_share(n)
+        * pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-
-    # all gas-usage per region
-    all_gas = n.statistics.withdrawal(
-        bus_carrier="gas",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs_filtering,
-    )
-    all_gas.index.get_level_values("carrier").unique()
-    forbidden_parts = ["pipeline"]
-    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
-
-    total_gas_usage_carriers = all_gas.index.get_level_values("carrier").astype(str)
-    forbidden_mask = total_gas_usage_carriers.str.contains(
-        forbidden_pattern, case=False, regex=True
-    )
-    total_gas_usage = all_gas[~forbidden_mask]
-    total_gas_usage = total_gas_usage.groupby(kwargs["groupby"]).sum()
-
-    # fraction of usage and production values
-    non_fossil_fraction = non_fossil_gas_prod / total_gas_usage
-    non_fossil_fraction = non_fossil_fraction.replace([np.inf, -np.inf], np.nan)
-    non_fossil_fraction = non_fossil_fraction.clip(upper=1)
-    non_fossil_fraction = non_fossil_fraction.groupby(kwargs["groupby"]).mean()
-    non_fossil_fraction = non_fossil_fraction.rename(index=UNITS_MAPPING)
-
-    # Final Energy|Residential and Commercial|Natural Gas - urban decentral gas boiler
-    rescom_gas = n.statistics.energy_balance(
-        carrier=["urban decentral gas boiler", "rural gas boiler"],
-        components="Link",
-        at_port="bus0",  # count gas not heat
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # Final Energy|Industry|Natural Gas - gas for industry
-    industry = n.statistics.withdrawal(
-        bus_carrier="gas for industry",
-        carrier=["gas for industry", "gas for industry CC"],
-        components="Load",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # get fraction of non-energetic use in industry -> TODO: #61
-    # data from Eurostat energy balance for 2024 | EU27 | in TWh
-    # online available (used 2026-04-28): https://ec.europa.eu/eurostat/cache/visualisations/energy-balances/enbal.html?geo=EU27_2020&unit=KTOE&language=EN&year=&fuel=fuelMainFuel&siec=TOTAL&details=1&chartOptions=0&stacking=normal&chartBal=&chart=&full=0&chartBalText=&order=DESC&siecs=&dataset=nrg_bal_c&decimals=0&agregates=0&share=false&fuelList=fuelElectricity%2CfuelCombustible%2CfuelNonCombustible%2CfuelOtherPetroleum%2CfuelMainPetroleum%2CfuelOil%2CfuelOtherFossil%2CfuelFossil%2CfuelCoal%2CfuelMainFuel
-    # Final consumption - energy use: 7 217 049
-    # Final consumption - non-energy use (fuels not combusted): 458 572
-    fc_energy = 7217049
-    fc_noenergy = 458572
-    energy_fraction_industry_gas = fc_energy / (fc_energy + fc_noenergy)
-    industry = industry.mul(energy_fraction_industry_gas)
-
-    series_list = [rescom_gas, industry]
-    series_list = [series for series in series_list if not series.empty]
-
-    if not series_list:
-        result = pd.Series(
-            dtype=float,
-            index=pd.MultiIndex.from_tuples([], names=kwargs["groupby"]),
-        )
-        logger.debug(
-            f"Final Energy by Carrier|Natural Gas finished. Resulting shape: {result.shape}. "
-        )
-        return result
-
-    total = pd.concat(series_list)
-    total = total.rename(index=UNITS_MAPPING).groupby(kwargs["groupby"]).sum()
-    non_fossil_fraction = non_fossil_fraction.reindex_like(total).fillna(0)
-    result = total.mul(1 - non_fossil_fraction, axis=0)
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
     logger.debug(
-        f"Final Energy by Carrier|Natural Gas finished. Resulting shape: {result.shape}. "
+        f"Final Energy [by Carrier]|Natural Gas finished. Shape: {result.shape}."
     )
     return result
 
