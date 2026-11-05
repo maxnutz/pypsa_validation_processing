@@ -47,6 +47,7 @@ from pypsa_validation_processing.utils import (
     attribute_locations,
     fossil_oil_share,
     fossil_gas_share,
+    decentral_heat_split,
 )
 
 logger = logging.getLogger(__name__)
@@ -885,10 +886,13 @@ def Final_Energy_by_Sector__Agriculture(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract agriculture-sector final energy from a PyPSA Network.
+    """Extract Final Energy [by Sector]|Agriculture from a PyPSA Network.
 
-    Returns the total energy consumed by the transportation sector (excluding
-    transmission / distribution losses) across the pypsa-network.
+    ``FE(l) = L[agriculture electricity](l) + L[agriculture machinery
+    electric](l) + L[agriculture machinery oil](l) + D8_agr(l)``. The
+    ``agriculture heat`` Load on ``rural heat`` buses is not counted as heat;
+    its final energy is the agricultural share of the decentral heat input
+    (D8). Losses of the machinery oil supply Links are not final energy.
 
     Parameters
     ----------
@@ -896,70 +900,64 @@ def Final_Energy_by_Sector__Agriculture(
         PyPSA network to process.
     aggregate_per_year : bool, optional
         If ``True`` (default), aggregate over all snapshots and return a
-        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        (``MWh``) and every location of the network (C6.13).
 
-    Notes
-    -----
-    Includes carriers ['agriculture electricity','agriculture heat','agriculture machinery electric',
-    'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
-    of Links and Buses, as Demand is assumed fixed. _Time series of Agriculture demand are assumed
-    to be constant in PyPSA-EUR._
-    Theoretically, machinery oil is a single bus with load and links for energy flow. This bus could be
-    sourced by a bus representing oil usage with carbon capture in agriculture. Therefore the "efficiency
-    loss" of this link must be added.
+    Raises
+    ------
+    ValueError
+        If an ``agriculture heat`` Load sits on an ``urban central heat`` bus.
     """
-    carriers = [
+    heat_loads = n.loads[n.loads["carrier"] == "agriculture heat"]
+    central = heat_loads.index[
+        heat_loads["bus"].map(n.buses["carrier"]) == "urban central heat"
+    ]
+    if not central.empty:
+        raise ValueError(
+            "agriculture heat Load(s) on urban central heat buses are not "
+            f"covered by the spec: {list(central)}"
+        )
+    load_carriers = [
         "agriculture electricity",
-        "agriculture heat",
         "agriculture machinery electric",
         "agriculture machinery oil",
     ]
-    cc_carriers = ["agriculture machinery oil CC"]
-    res = (
-        n.statistics.energy_balance(
-            carrier=carriers,
-            groupby=["carrier", "unit", "location"],
+    split = decentral_heat_split(n, aggregate_per_year)
+    parts = (
+        [split.xs("agr", level="sector")]
+        if "agr" in split.index.get_level_values("sector")
+        else []
+    )
+    if set(load_carriers) & set(n.loads["carrier"]):
+        loads = n.statistics.withdrawal(
+            carrier=load_carriers,
             components="Load",
-            direction="withdrawal",  # for positive values
             groupby_time=aggregate_per_year,
-        )
-        .groupby(["location", "unit"])
-        .sum()
+            **kwargs,
+        ).fillna(0.0)
+        parts.append(remap_unit_index(loads))
+    parts = [
+        part.groupby(level=statistics_grouping_index).sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-    if any(carrier in n.carriers.index for carrier in cc_carriers):
-        cc_in = n.statistics.energy_balance(
-            carrier=cc_carriers,
-            groupby=["carrier", "location", "unit"],
-            components="Link",
-            at_port=["bus0"],
-            groupby_time=aggregate_per_year,
-        )
-        cc_out = n.statistics.energy_balance(
-            carrier=cc_carriers,
-            groupby=["carrier", "location", "unit"],
-            components="Link",
-            at_port=["bus1"],
-            groupby_time=aggregate_per_year,
-        )
-        eff_loss = abs(cc_in - cc_out)
-        eff_loss = eff_loss.groupby(["location", "unit"]).sum()
-        res = res.add(eff_loss, fill_value=0)
-
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
     logger.debug(
-        f"Final Energy by Sector|Agriculture finished. Resulting shape: {res.shape}. "
+        f"Final Energy [by Sector]|Agriculture finished. Shape: {result.shape}."
     )
-    return res
+    return result
 
 
 def Final_Energy_by_Sector__Residential_and_Commercial(

@@ -1436,68 +1436,162 @@ class TestFinalEnergyBySectorTransportation:
 
 
 class TestFinalEnergyBySectorAgriculture:
-    """Test suite for Final_Energy_by_Sector__Agriculture function."""
+    """Spec Final_Energy_by_Sector__Agriculture.md AC1-AC6."""
 
-    def test_returns_series(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas Series."""
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert isinstance(result, pd.Series)
+    @staticmethod
+    def _network(chp: bool = False, n_snapshots: int = 1) -> pypsa.Network:
+        """AC3 mock at A (sigma_rural,agr = 0.25, I_rural = 12); B is empty."""
+        n = _real_network(n_snapshots)
+        n.snapshot_weightings.loc[:, :] = 1.0
+        ones = [1.0] * n_snapshots
 
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
+        def dispatch(component, name, values, **attrs):
+            series = {k: [v * o for o in ones] for k, v in values.items()}
+            _add_dispatched(n, component, name, series, **attrs)
 
-    def test_not_empty(self, mock_network: MockPyPSANetwork):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert len(result) > 0
-
-    def test_numeric_values(self, mock_network: MockPyPSANetwork):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
+        for bus, carrier, unit in [
+            ("A", "AC", "MWh_el"),
+            ("A low voltage", "low voltage", "MWh_el"),
+            ("A rural heat", "rural heat", "MWh_th"),
+            ("A solid biomass", "solid biomass", "MWh_LHV"),
+            ("A biogas", "biogas", "MWh_LHV"),
+            ("A oil", "oil", "MWh_LHV"),
+            ("A agriculture machinery oil", "agriculture machinery oil", "MWh_LHV"),
+            ("B", "AC", "MWh_el"),
+        ]:
+            _add_bus(n, bus, carrier, unit, bus.split()[0])
+        lv, heat = "A low voltage", "A rural heat"
+        dispatch(
+            "Load",
+            "A agriculture electricity",
+            {"p": 2.0},
+            bus=lv,
+            carrier="agriculture electricity",
         )
-
-    def test_contains_multiple_locations(self, mock_network: MockPyPSANetwork):
-        """Test that result contains multiple locational data."""
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        locations = result.index.get_level_values("location").unique()
-        assert len(locations) > 1
-        assert all(r.startswith("AT") for r in locations)
-
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for network in mock_network_collection:
-            result = Final_Energy_by_Sector__Agriculture(network)
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-            assert len(result) > 0
-
-    def test_without_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
-        """Test that function works correctly when no CC carriers are present."""
-        # Ensure carriers index is empty (no CC carriers)
-        mock_network.carriers = pd.DataFrame(index=[])
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_with_carbon_capture_carriers(self, mock_network: MockPyPSANetwork):
-        """Test that efficiency loss from CC carriers is added to result."""
-        # Add carbon capture carriers to the network
-        mock_network.carriers = pd.DataFrame(
-            index=["agriculture machinery oil CC", "agriculture machinery oil"]
+        dispatch(
+            "Load",
+            "A agriculture machinery electric",
+            {"p": 1.0},
+            bus=lv,
+            carrier="agriculture machinery electric",
         )
-        result = Final_Energy_by_Sector__Agriculture(mock_network)
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        # Result should still have valid data
-        assert len(result) > 0
+        dispatch(
+            "Load",
+            "A agriculture machinery oil",
+            {"p": 4.0},
+            bus="A agriculture machinery oil",
+            carrier="agriculture machinery oil",
+        )
+        dispatch(
+            "Load",
+            "A agriculture heat",
+            {"p": 3.0},
+            bus=heat,
+            carrier="agriculture heat",
+        )
+        dispatch(
+            "Load",
+            "A rural heat",
+            {"p": 13.0 if chp else 9.0},
+            bus=heat,
+            carrier="rural heat",
+        )
+        dispatch(
+            "Link",
+            "A rural biomass boiler",
+            {"p0": 8.0, "p1": -7.2},
+            bus0="A solid biomass",
+            bus1=heat,
+            carrier="rural biomass boiler",
+        )
+        # heat pumps in PyPSA-AT: bus0 = heat bus, bus1 = low voltage
+        dispatch(
+            "Link",
+            "A rural ground heat pump",
+            {"p0": -4.8, "p1": 4.0},
+            bus0=heat,
+            bus1=lv,
+            carrier="rural ground heat pump",
+        )
+        dispatch(
+            "Link",
+            "A agriculture machinery oil CC",
+            {"p0": 5.0, "p1": -4.0},
+            bus0="A oil",
+            bus1="A agriculture machinery oil",
+            carrier="agriculture machinery oil CC",
+        )
+        if chp:
+            dispatch(
+                "Link",
+                "A biogas CHP",
+                {"p0": 10.0, "p1": -2.0, "p2": -4.0},
+                bus0="A biogas",
+                bus1="A",
+                bus2=heat,
+                carrier="biogas CHP",
+            )
+        return n
+
+    @staticmethod
+    def _values(n: pypsa.Network, **kwargs: object) -> pd.Series:
+        return Final_Energy_by_Sector__Agriculture(n, **kwargs).droplevel("unit")
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format, unit MWh; B without loads gets 0.0."""
+        n = self._network()
+        result = Final_Energy_by_Sector__Agriculture(
+            n, aggregate_per_year=aggregate_per_year
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert set(result.index.get_level_values("unit")) == {"MWh"}
+        values = result.droplevel("unit")
+        assert set(values.index) == {"A", "B"}
+        assert (values.loc[["B"]] == 0.0).all(axis=None)
+
+    def test_ac3_value(self):
+        """AC3 / AC5: 2 + 1 + 4 + 0.25 · 12 = 10; CC link losses excluded."""
+        values = self._values(self._network())
+        assert values["A"] == pytest.approx(10.0)
+        assert (values >= 0).all()
+
+    def test_ac3b_chp_heat(self):
+        """AC3b: CHP heat 4 enters I_rural; sigma = 3/16, result 10."""
+        assert self._values(self._network(chp=True))["A"] == pytest.approx(10.0)
+
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._network(chp=True, n_snapshots=2)
+        n.loads_t.p["A agriculture electricity"] = [2.0, 6.0]
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(Final_Energy_by_Sector__Agriculture, n)
+
+    def test_agriculture_heat_on_central_heat_raises(self):
+        """Edge case: an agriculture heat Load on urban central heat raises."""
+        n = self._network()
+        _add_bus(n, "A urban central heat", "urban central heat", "MWh_th", "A")
+        _add_dispatched(
+            n,
+            "Load",
+            "A central agriculture heat",
+            {"p": [1.0]},
+            bus="A urban central heat",
+            carrier="agriculture heat",
+        )
+        with pytest.raises(ValueError, match="A central agriculture heat"):
+            Final_Energy_by_Sector__Agriculture(n)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_agriculture(self, aggregate_per_year):
+        """AC6: a network without agriculture loads gives 0.0 everywhere."""
+        n = _real_network()
+        _add_bus(n, "A", "AC", "MWh_el", "A")
+        result = Final_Energy_by_Sector__Agriculture(
+            n, aggregate_per_year=aggregate_per_year
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------
@@ -1918,7 +2012,6 @@ class TestAggregatePerYearFalse:
     _FUNCTIONS = [
         Final_Energy_by_Carrier__Electricity,
         Final_Energy_by_Carrier__Coal,
-        Final_Energy_by_Sector__Agriculture,
     ]
 
     def test_transportation_returns_dataframe(
