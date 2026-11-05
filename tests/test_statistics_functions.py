@@ -1846,139 +1846,157 @@ class TestFinalEnergyBySectorResidentialAndCommercial:
 
 
 class TestFinalEnergyBySectorIndustry:
-    """Test suite for Final_Energy_by_Sector__Industry function."""
+    """Spec Final_Energy_by_Sector__Industry.md AC1-AC8."""
 
-    class _IndustryStatisticsAccessor:
-        """Minimal accessor for industry tests supporting link port queries."""
+    @staticmethod
+    def _network(n_snapshots: int = 1) -> pypsa.Network:
+        """AC3 mock at AA1 (sum 38) and AC8 decentral heat at AA2."""
+        n = _real_network(n_snapshots)
+        n.snapshot_weightings.loc[:, :] = 1.0
+        ones = [1.0] * n_snapshots
 
-        def __init__(self):
-            self.calls: list[dict] = []
+        def dispatch(component, name, values, **attrs):
+            series = {k: [v * o for o in ones] for k, v in values.items()}
+            _add_dispatched(n, component, name, series, **attrs)
 
-        def energy_balance(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby: list[str] | None = None,
-            direction: str = "withdrawal",
-            at_port: list[str] | None = None,
-            groupby_time: bool = True,
-        ) -> pd.Series | pd.DataFrame:
-            """Return deterministic Series matching the requested grouping."""
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby": groupby,
-                    "direction": direction,
-                    "at_port": at_port,
-                    "groupby_time": groupby_time,
-                }
+        _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
+        _add_bus(n, "AA3", "AC", "MWh_el", "AA3")
+        _add_bus(n, "AA1 low voltage", "low voltage", "MWh_el", "AA1")
+        _add_bus(n, "AA1 urban central heat", "urban central heat", "MWh_th", "AA1")
+        _add_bus(n, "AA1 gas", "gas", "MWh_LHV", "AA1")
+        dispatch(
+            "Load",
+            "AA1 industry electricity",
+            {"p": 10.0},
+            bus="AA1 low voltage",
+            carrier="industry electricity",
+        )
+        dispatch(
+            "Load",
+            "AA1 low-temperature heat for industry",
+            {"p": 5.0},
+            bus="AA1 urban central heat",
+            carrier="low-temperature heat for industry",
+        )
+        for carrier, bus_carrier, p in [
+            ("gas for industry", "gas for industry", 8.0),
+            ("H2 for industry", "H2", 2.0),
+            ("naphtha for industry", "naphtha for industry", 6.0),
+            ("solid biomass for industry", "solid biomass for industry", 3.0),
+            ("coal for industry", "coal for industry", 4.0),
+            ("industry methanol", "industry methanol", 7.0),
+        ]:
+            _add_bus(n, f"AA1 {bus_carrier}", bus_carrier, "MWh_LHV", "AA1")
+            dispatch(
+                "Load",
+                f"AA1 {carrier}",
+                {"p": p},
+                bus=f"AA1 {bus_carrier}",
+                carrier=carrier,
             )
+        dispatch(
+            "Link",
+            "AA1 gas for industry CC",
+            {"p0": 10.0, "p1": -9.0},
+            bus0="AA1 gas",
+            bus1="AA1 gas for industry",
+            carrier="gas for industry CC",
+        )
+        # AC8 at AA2: no urban central heat bus; sigma_urban decentral,ind = 0.25
+        _add_bus(n, "AA2 urban decentral heat", "urban decentral heat", "MWh_th", "AA2")
+        _add_bus(n, "AA2 gas", "gas", "MWh_LHV", "AA2")
+        dispatch(
+            "Load",
+            "AA2 low-temperature heat for industry",
+            {"p": 1.0},
+            bus="AA2 urban decentral heat",
+            carrier="low-temperature heat for industry",
+        )
+        dispatch(
+            "Load",
+            "AA2 urban decentral heat",
+            {"p": 3.0},
+            bus="AA2 urban decentral heat",
+            carrier="urban decentral heat",
+        )
+        dispatch(
+            "Link",
+            "AA2 urban decentral gas boiler",
+            {"p0": 6.0, "p1": -4.0},
+            bus0="AA2 gas",
+            bus1="AA2 urban decentral heat",
+            carrier="urban decentral gas boiler",
+        )
+        return n
 
-            if groupby is None:
-                groupby = ["carrier", "location", "unit"]
+    @staticmethod
+    def _values(n: pypsa.Network, shares: pd.DataFrame, **kwargs: object) -> pd.Series:
+        result = Final_Energy_by_Sector__Industry(
+            n, industry_non_energy_shares=shares, **kwargs
+        )
+        return result.droplevel("unit")
 
-            carriers = carrier if isinstance(carrier, list) else [carrier or "default"]
-            index_tuples = []
-            values = []
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format, unit MWh; AA3 without industry is 0.0."""
+        n = self._network()
+        result = Final_Energy_by_Sector__Industry(
+            n,
+            aggregate_per_year=aggregate_per_year,
+            industry_non_energy_shares=_shares(),
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert set(result.index.get_level_values("unit")) == {"MWh"}
+        values = result.droplevel("unit")
+        assert set(values.index) == {"AA1", "AA2", "AA3"}
+        assert (values.loc[["AA3"]] == 0.0).all(axis=None)
 
-            for c in carriers:
-                idx_dict = {
-                    "carrier": c,
-                    "location": "AT1",
-                    "unit": "MWh_th",
-                }
-                index_tuples.append(tuple(idx_dict[key] for key in groupby))
-                if components == "Load":
-                    values.append(100.0)
-                elif components == "Link" and at_port == ["bus0"]:
-                    values.append(10.0)
-                elif components == "Link" and at_port == ["bus1"]:
-                    values.append(7.0)
-                else:
-                    values.append(0.0)
+    def test_ac3_value(self):
+        """AC3 / AC5: 10 + 5 + 8 + 2 + 6 + 3 + 4 = 38; methanol and CC losses excluded."""
+        values = self._values(self._network(), _shares())
+        assert values["AA1"] == pytest.approx(38.0)
+        assert (values >= 0).all()
 
-            index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-            if groupby_time:
-                return pd.Series(values, index=index, dtype=float)
-            else:
-                timestamps = pd.date_range(
-                    "2019-01-01", periods=4, freq="6h", name="snapshot"
-                )
-                return pd.DataFrame(
-                    {ts: values for ts in timestamps},
-                    index=index,
-                    dtype=float,
-                )
+    def test_ac7_non_energy_use(self, caplog):
+        """AC7: NE_gas 2, NE_naphtha 3 → 33; with NE_coal 1 → 32; H2 and coke WARNINGs."""
+        n = self._network()
+        assert self._values(n, _shares(Natural_Gas=0.25, Oil=0.5))[
+            "AA1"
+        ] == pytest.approx(33.0)
+        with caplog.at_level(logging.WARNING):
+            values = self._values(n, _shares(Natural_Gas=0.25, Oil=0.5, Coal=0.25))
+        assert values["AA1"] == pytest.approx(32.0)
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("H2 non-energy use is skipped" in m for m in messages)
+        assert any("Coke correction is skipped" in m for m in messages)
 
-    class _IndustryNetwork:
-        """Minimal network object exposing an industry-specific statistics accessor."""
+    def test_ac8_decentral_heat_share(self):
+        """AC8: the decentral contribution at AA2 is 0.25 · 6 = 1.5, not the heat 1."""
+        assert self._values(self._network(), _shares())["AA2"] == pytest.approx(1.5)
 
-        def __init__(self):
-            self.statistics = (
-                TestFinalEnergyBySectorIndustry._IndustryStatisticsAccessor()
-            )
-
-    def _industry_network(self):
-        return self._IndustryNetwork()
-
-    def test_returns_series(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas Series."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert isinstance(result, pd.Series)
-
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_not_empty(self, mock_network: MockPyPSANetwork):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert len(result) > 0
-
-    def test_numeric_values(self, mock_network: MockPyPSANetwork):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._network(n_snapshots=2)
+        n.loads_t.p["AA1 industry electricity"] = [10.0, 2.0]
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(
+            Final_Energy_by_Sector__Industry,
+            n,
+            industry_non_energy_shares=_shares(Natural_Gas=0.25),
         )
 
-    def test_contains_at1_location(self, mock_network: MockPyPSANetwork):
-        """Test that result contains AT1 locational data."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        assert "AT1" in result.index.get_level_values("location")
-
-    def test_adds_cc_efficiency_losses(self):
-        """Test that CC link losses are added to load statistics."""
-        result = Final_Energy_by_Sector__Industry(self._industry_network())
-        # 8 load carriers at 100 each + 3 CC losses at (10-7) each = 809
-        assert result.loc[("AT1", "MWh_th")] == 809.0
-
-    def test_uses_both_link_ports_for_cc_losses(self):
-        """Test that CC losses are computed from bus0 and bus1 link balances."""
-        network = self._industry_network()
-        _ = Final_Energy_by_Sector__Industry(network)
-
-        link_calls = [
-            call
-            for call in network.statistics.calls
-            if call["components"] == "Link" and call["at_port"] in (["bus0"], ["bus1"])
-        ]
-        assert len(link_calls) == 2
-        assert {tuple(call["at_port"]) for call in link_calls} == {("bus0",), ("bus1",)}
-
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for _ in mock_network_collection:
-            result = Final_Energy_by_Sector__Industry(self._industry_network())
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-            assert len(result) > 0
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_industry(self, aggregate_per_year):
+        """AC6: a network without industry carriers gives 0.0 everywhere."""
+        n = _real_network()
+        _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
+        result = Final_Energy_by_Sector__Industry(
+            n,
+            aggregate_per_year=aggregate_per_year,
+            industry_non_energy_shares=_shares(),
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------
@@ -2034,44 +2052,3 @@ class TestAggregatePerYearFalse:
             assert result is None
             return
         assert not result.empty
-
-    def test_industry_returns_dataframe(self):
-        """Final_Energy_by_Sector__Industry returns DataFrame for aggregate_per_year=False."""
-
-        class _TS_IndustryStatisticsAccessor:
-            def energy_balance(self, **kwargs):
-                groupby = kwargs.get("groupby", ["carrier", "location", "unit"])
-                carriers = kwargs.get("carrier") or ["default"]
-                if isinstance(carriers, str):
-                    carriers = [carriers]
-                index_tuples = [
-                    tuple(
-                        {"carrier": c, "location": "AT1", "unit": "MWh_th"}[k]
-                        for k in groupby
-                    )
-                    for c in carriers
-                ]
-                values = [10.0] * len(index_tuples)
-                index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-                groupby_time = kwargs.get("groupby_time", True)
-                if groupby_time:
-                    return pd.Series(values, index=index, dtype=float)
-                timestamps = pd.date_range(
-                    "2019-01-01", periods=4, freq="6h", name="snapshot"
-                )
-                return pd.DataFrame(
-                    {ts: values for ts in timestamps}, index=index, dtype=float
-                )
-
-        class _TS_IndustryNetwork:
-            def __init__(self):
-                self.statistics = _TS_IndustryStatisticsAccessor()
-
-        result = Final_Energy_by_Sector__Industry(
-            _TS_IndustryNetwork(), aggregate_per_year=False
-        )
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert "location" in result.index.names
-        assert "unit" in result.index.names
-        assert isinstance(result.columns, pd.DatetimeIndex)
