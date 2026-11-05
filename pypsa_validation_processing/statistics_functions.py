@@ -53,11 +53,14 @@ def Final_Energy_by_Carrier__Electricity(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract electricity-carrier final energy from a PyPSA Network.
+    """Extract Final Energy [by Carrier]|Electricity from a PyPSA Network.
 
-    Returns the total final energy demand supplied by electricity across
-    agriculture, residential and commercial, transportation, and industry
-    and DAC.
+    Sum of the electricity withdrawn from ``low voltage`` buses by the sector
+    consumers (agriculture, residential and commercial incl. decentral heat
+    pumps and resistive heaters, ``BEV charger``, ``industry electricity``),
+    minus the ``V2G`` feed-in to ``low voltage`` (per snapshot, not clipped),
+    plus the ``DAC`` withdrawal from ``AC`` buses. Distribution grid, storage
+    chargers and district-heat suppliers (``urban central …``) are excluded.
 
     Parameters
     ----------
@@ -71,80 +74,62 @@ def Final_Energy_by_Carrier__Electricity(
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    Combines electricity withdrawals from the following contributions:
-    agriculture electricity loads, residential/commercial low-voltage loads
-    (excluding dedicated industry/agriculture/charger/distribution categories,
-    BEV charging) industry electricity loads, and DAC electricity demand
-    change in home battery is of magnitude 1e-9 compared to electricity demand.
-    Concerning heat: rural air heat pump, rural ground heat pump, rural resisive
-    heater and urban decentral heatings are included. Central heatings using
-    electricity as fuel are NOT included.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
     """
-    # get Final Energy|Agriculture|Electricity
-    agri = n.statistics.withdrawal(
-        carrier=["agriculture electricity", "agriculture machinery electric"],
-        components="Load",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # get Final Energy|Residential and Commercial|Electricity
-    lv = n.statistics.withdrawal(
-        bus_carrier="low voltage", groupby_time=aggregate_per_year, **kwargs_filtering
-    )
-    forbidden_parts = [
-        "urban central",
-        "industry",
-        "agriculture",
-        "charger",
-        "distribution",
+    sector_carriers = [
+        "agriculture electricity",
+        "agriculture machinery electric",
+        "industry electricity",
+        "BEV charger",
     ]
-    lv_carriers = lv.index.get_level_values("carrier").astype(str)
-    forbidden_pattern = "|".join(re.escape(part) for part in forbidden_parts)
-    forbidden_mask = lv_carriers.str.contains(forbidden_pattern, case=False, regex=True)
-    rescom = lv[~forbidden_mask].groupby(kwargs["groupby"]).sum()
-
-    # get Final Energy|Transportation|Electricity
-    transpo = n.statistics.withdrawal(
-        bus_carrier="low voltage",
-        carrier="BEV charger",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs,
+    excluded = r"urban central|industry|agriculture|charger|distribution"
+    stats = {"groupby_time": aggregate_per_year, "nice_names": False}
+    groupby = ["carrier", "location", "unit"]
+    bus_carriers = set(n.buses["carrier"])
+    # pypsa raises ValueError for a bus carrier that is not in the network
+    has_lv = "low voltage" in bus_carriers
+    lv_carriers = (
+        n.statistics.withdrawal(
+            bus_carrier="low voltage", groupby="carrier", nice_names=False
+        ).index.get_level_values("carrier")
+        if has_lv
+        else pd.Index([])
     )
+    included = [
+        c
+        for c in lv_carriers.unique()
+        if c in sector_carriers or not re.search(excluded, c)
+    ]
 
-    # get Final Energy|Industry|Electricity
-    industry = n.statistics.withdrawal(
-        carrier="industry electricity",
-        components="Load",
-        groupby_time=aggregate_per_year,
-        **kwargs,
+    parts = []
+    if included:
+        parts.append(
+            n.statistics.withdrawal(
+                bus_carrier="low voltage", carrier=included, groupby=groupby, **stats
+            )
+        )
+    if has_lv and "V2G" in set(n.links["carrier"]):
+        v2g = n.statistics.supply(
+            bus_carrier="low voltage", carrier="V2G", groupby=groupby, **stats
+        )
+        parts.append(-v2g)
+    if "DAC" in set(n.links["carrier"]) and "AC" in bus_carriers:
+        parts.append(
+            n.statistics.withdrawal(
+                bus_carrier="AC", carrier="DAC", groupby=groupby, **stats
+            )
+        )
+    parts = [part for part in parts if not part.empty]
+    result = (
+        pd.concat(parts).fillna(0.0).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-
-    # get electricity load from DAC
-    dac = n.statistics.withdrawal(
-        bus_carrier="AC",
-        carrier="DAC",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    series_list = [agri, rescom, transpo, industry, dac]
-    series_list = [series for series in series_list if not series.empty]
-
-    result = pd.concat(series_list)
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
     logger.debug(
-        f"Final Energy by Carrier|Electricity finished. Resulting shape: {result.shape}. "
+        f"Final Energy [by Carrier]|Electricity finished. Shape: {result.shape}."
     )
     return result
 
