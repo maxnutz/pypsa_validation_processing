@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -39,13 +39,14 @@ One PR per definition, each with unit tests; listed with the variables that need
 
 ## WP4 Statistics functions — each depends on WP1, WP2, SC-14 (WP3) and its D-helpers
 One PR per function. Order: few dependencies first, so the framework is exercised end-to-end early.
+Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run workflow_test` with the line `Net Imports|Oil: Net_Imports__Oil` of `configs/mapping.default.yaml` commented out locally; this change is never committed (owner 2026-11-05). The `Net Imports|Oil` PR runs it with the line active.
 - [x] Spec PR: test config setups in `specs/configuration.md` "Test configs" (#129; owner, PR #127 review 2026-11-03; location `pypsa_validation_processing/configs/test/`, not versioned because they refer to local data, owner 2026-11-04 and PR #141 review).
-- [ ] PR: test configs (#129): `pixi.toml` `workflow_test` runs the setups of `specs/configuration.md` "Test configs" on `resources/electricity_network_0p3`; `README.md` l.79, l.109 updated; the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` removed (SC-47, CT-AC5). The configs themselves are created locally (not versioned). `CLAUDE.md` "Full local check" on explicit owner request. Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data.
+- [x] PR #143: test configs (#129): `pixi.toml` `workflow_test` runs the setups of `specs/configuration.md` "Test configs" on `resources/electricity_network_0p3`; `README.md` l.79, l.109 updated; the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` removed (SC-47, CT-AC5). The configs themselves are created locally (not versioned). `CLAUDE.md` "Full local check" in PR #144 (owner request 2026-11-05). Result (PR #143, owner 2026-11-05): all six setups abort on `Net Imports|Oil` (location `co2`, C6.6; SC-31); with that variable commented out in the mapping, all six setups and `pytest` pass. The slow first run of `country-timeseries-AT` (~28 min) did not reproduce; no progress logging is added (owner 2026-11-05). Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data.
 - [ ] Net Imports|Electricity (none; SC-30; #70)
 - [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
 - [ ] Final Energy [by Carrier]|Electricity (D1; SC-38; #43)
 - [ ] Final Energy [by Carrier]|Coal (D5, D6; #44)
-- [ ] Net Imports|Oil (D1, D2; SC-31; #69)
+- [ ] Net Imports|Oil (D1, D2; SC-31; #69); fixes the C6.6 abort of `workflow_test` (location `co2`), so later PRs run `workflow_test` with the full mapping
 - [ ] Final Energy [by Carrier]|Natural Gas (D1, D3, D5; SC-23, SC-27; #45, #61, #97)
 - [ ] Final Energy [by Sector]|Agriculture (D8; SC-34; #13)
 - [ ] Final Energy [by Sector]|Residential and Commercial (D1, D8; SC-35; #14)

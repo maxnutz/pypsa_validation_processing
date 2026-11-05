@@ -17,7 +17,7 @@ The package MUST support Python `>=3.11` (`pixi.toml`). `docs/contributing.md` w
 - Pixi workspace `pypsa-validation-processing`, channel `conda-forge`, platforms `linux-64`, `osx-arm64`, `osx-64`, `win-64` (`pixi.toml` `[workspace]`).
 - Tasks (`pixi.toml` `[tasks]`):
   - `workflow`: `python workflow.py` (packaged default config).
-  - `workflow_test`: runs the test configs `configs/test/<setup>.yaml` (configuration.md, "Test configs"), then `pytest tests/ -v`. These configs are local files, not in the repository (`.gitignore` l.76). The `pixi.toml` task still runs the four earlier `config.{country,region}-{year,timeseries}.yaml` setups (SC-47).
+  - `workflow_test`: runs the test configs `configs/test/<setup>.yaml` (configuration.md, "Test configs"), then `pytest tests/ -v`. These configs are local files, not in the repository (`.gitignore` l.76).
   - `test`: `pytest tests/ -v --cov=pypsa_validation_processing --cov-report=term-missing --cov-fail-under=90`.
 - Package build: setuptools (`pyproject.toml` `[build-system]`); CLI entry point `pypsa-validation-processing = pypsa_validation_processing.workflow:main`.
 
