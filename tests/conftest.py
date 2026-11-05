@@ -272,17 +272,3 @@ network_results_path: /tmp/network_results
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_content)
     return config_file
-
-
-@pytest.fixture
-def energy_totals_df() -> pd.DataFrame:
-    """Fixture providing minimal one-year energy totals indexed by ``country`` (C2.4)."""
-    return pd.DataFrame(
-        {
-            "total domestic aviation": [30.0],
-            "total international aviation": [70.0],
-            "total domestic navigation": [20.0],
-            "total international navigation": [80.0],
-        },
-        index=pd.Index(["AT"], name="country"),
-    )

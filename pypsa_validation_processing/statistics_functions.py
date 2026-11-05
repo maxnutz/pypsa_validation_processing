@@ -38,7 +38,6 @@ from pypsa_validation_processing.utils import (
     remap_unit_index,
 )
 from pypsa_validation_processing.utils import (
-    get_energy_totals_domestic_share,
     create_location_index_from_copperplate,
     ensure_all_locations,
     MissingInputError,
@@ -49,6 +48,7 @@ from pypsa_validation_processing.utils import (
     fossil_gas_share,
     decentral_heat_split,
     DECENTRAL_HEAT_BUS_CARRIERS,
+    apply_domestic_share,
 )
 
 logger = logging.getLogger(__name__)
@@ -665,10 +665,16 @@ def Final_Energy_by_Sector__Transportation(
     aggregate_per_year: bool = True,
     energy_totals: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extract transportation-sector final energy from a PyPSA Network.
+    """Extract Final Energy [by Sector]|Transportation from a PyPSA Network.
 
-    Returns the total energy consumed by the Transportation sector
-    (excluding transmission / distribution losses) across the pypsa-network.
+    ``FE(l) = W[low voltage, BEV charger](l) − S[low voltage, V2G](l)
+    + L[electricity for rail](l) + L[land transport fuel cell](l)
+    + L[land transport oil](l) + d_aviation(c) · L[kerosene for aviation](l)
+    + d_navigation(c) · (L[shipping oil](l) + L[shipping methanol](l))``.
+    The ``BEV charger`` withdrawal already includes charging losses and is
+    not divided by an efficiency; the ``V2G`` feed-in is subtracted per
+    snapshot, without clipping. Units are returned as pypsa reports them
+    (incl. ``land transport``, D7); ``Network_Processor`` normalises them.
 
     Parameters
     ----------
@@ -679,122 +685,63 @@ def Final_Energy_by_Sector__Transportation(
         :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
     energy_totals : pd.DataFrame | None, optional
-        Energy totals of the investment year, indexed by ``country``
-        used to determine domestic shares for aviation and
-        navigation liquid fuels via :func:`get_energy_totals_domestic_share`.
-        Passed by ``Network_Processor``; the variable is skipped if no energy
-        totals are available.
+        Energy totals of one year, indexed by ``country`` (C2.4), for the
+        domestic shares of aviation and navigation (D4).
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex including ``location``
-        and ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    Sums transportation final energy from electricity, hydrogen, and liquid
-    fuels:
-    - Electricity demand from BEV charging loads.
-    - Additional EV charging losses computed from BEV charger link flows and
-      adjusted for V2G participation.
-    - Hydrogen demand from fuel-cell land transport.
-    - Liquid fuels for aviation and navigation scaled by domestic fractions,
-      plus land-transport oil.
-
-    Raises
-    ------
-    ValueError
-        If BEV charging flow sign conventions are violated.
-    TypeError
-        If intermediate statistics return mixed result types.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
     """
+    stats = {"groupby_time": aggregate_per_year, **kwargs}
+    loads = set(n.loads["carrier"])
+    links = set(n.links["carrier"])
+    has_lv = "low voltage" in set(n.buses["carrier"])
 
-    domestic_aviation_fraction = get_energy_totals_domestic_share(
-        energy_totals, "aviation"
-    )
-    domestic_navigation_fraction = get_energy_totals_domestic_share(
-        energy_totals, "navigation"
-    )
+    def load(carriers: list[str]) -> pd.Series | pd.DataFrame:
+        present = [c for c in carriers if c in loads]
+        if not present:
+            return pd.Series(dtype=float)
+        return n.statistics.withdrawal(
+            carrier=present, components="Load", **stats
+        ).fillna(0.0)
 
-    # get Final Energy [by Sector]|Transportation|Electricity
-    # get elec load losses from BEV-charger links
-    bev_charger_efficiencies = n.links.loc[
-        n.links.carrier == "BEV charger", "efficiency"
-    ].dropna()
-    if bev_charger_efficiencies.nunique() == 1:
-        eff = bev_charger_efficiencies.iloc[0]
-    else:
-        eff = bev_charger_efficiencies.mean()
-        logger.warning(
-            "Network includes different efficiencies for BEV chargers. "
-            "Using mean value for variable Final_Energy_by_Sector__Transportation"
-        )
-
-    elec = n.statistics.withdrawal(
-        bus_carrier="low voltage",
-        carrier="BEV charger",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    ).mul(
-        1 / eff
-    )  # ( 1 + ((1/eff)-1))
-
-    # get Final Energy [by Sector]|Transportation|Hydrogen
-    h2 = n.statistics.withdrawal(
-        carrier="land transport fuel cell",
-        components="Load",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # get Final Energy [by Sector]|Transportation|Liquids
-    aviation_liquids = (
-        n.statistics.withdrawal(
-            carrier="kerosene for aviation",
-            components="Load",
-            groupby_time=aggregate_per_year,
-            **kwargs,
-        )
-        * domestic_aviation_fraction
-    )
-
-    navigation_liquids = (
-        n.statistics.withdrawal(
-            carrier=["shipping oil", "shipping methanol"],
-            components="Load",
-            groupby_time=aggregate_per_year,
-            **kwargs,
-        )
-        * domestic_navigation_fraction
-    )
-
-    land_transport_liquids = n.statistics.withdrawal(
-        carrier="land transport oil",
-        components="Load",
-        groupby_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    series_list = [
-        elec,
-        h2,
-        aviation_liquids,
-        navigation_liquids,
-        land_transport_liquids,
+    parts = [
+        load(["electricity for rail", "land transport fuel cell", "land transport oil"])
     ]
-    series_list = [series for series in series_list if not series.empty]
-
-    total = pd.concat(series_list)
-    logger.debug(
-        f"Final Energy by Sector|Transportation finished. Resulting shape: {total.shape}. "
+    if has_lv and "BEV charger" in links:
+        parts.append(
+            n.statistics.withdrawal(
+                bus_carrier="low voltage", carrier="BEV charger", **stats
+            ).fillna(0.0)
+        )
+    if has_lv and "V2G" in links:
+        v2g = n.statistics.supply(bus_carrier="low voltage", carrier="V2G", **stats)
+        parts.append(-v2g.fillna(0.0))
+    for carriers, kind in [
+        (["kerosene for aviation"], "aviation"),
+        (["shipping oil", "shipping methanol"], "navigation"),
+    ]:
+        demand = load(carriers)
+        if not demand.empty:
+            parts.append(apply_domestic_share(demand, energy_totals, kind))
+    parts = [
+        part.groupby(level=statistics_grouping_index).sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-    return total
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
+    logger.debug(
+        f"Final Energy [by Sector]|Transportation finished. Shape: {result.shape}."
+    )
+    return result
 
 
 def Final_Energy_by_Sector__Industry(
