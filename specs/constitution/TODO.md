@@ -68,9 +68,9 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44; OQ-4 decided 2026-11-03 (SC-45).
 
 ## WP6 Infra-Enshure coupling variables (milestone 2) — independent, parallel to WP4
-- [ ] Spec PR (this): D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
+- [ ] Spec PR #148: D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
 - [ ] Before implementation: OQ-33 (definitions), OQ-34 (unit, currency year), OQ-35 (methanol, heat; scope of #76).
-- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable.
+- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) accepts only the levels `location` and `unit`, so it needs an extension or a D9-specific fill (value and weight `0.0`).
 - [ ] Code PR(s): the other five prices (#100–#104, low prio).
 - [ ] Spec PR: investments (#106, OQ-36).
 

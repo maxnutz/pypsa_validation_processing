@@ -52,6 +52,8 @@ Changes to the ported logic, only as far as needed for the function contract:
 - `price_load` returns NaN for a total load < 1 MWh; here a location with weight 0 gets value and weight `0.0` (A-5, C6.13). A location with a weight between 0 and 1 MWh is evaluated normally.
 - Snapshot weighting per C6.10/C6.12: `price_load` does not weight snapshots; identical for constant gₜ (C6.12).
 
+P6.4 (switch to `pypsa.statistics`): not proven. The `−revenue / withdrawal` check in D9 compares yearly totals over all locations for `gas for industry` only; P6.4 requires a per-location, per-snapshot comparison (`aggregate_per_year=False`) for this carrier and both code line counts. Until then rule 1 applies and the function ports `price_load` (D9). The implementing PR MAY record the proof here and switch.
+
 ## 5. Match type
 - Match type: `exact`
 - Reasoning: Same variable name and the same formula (`price_load` on the Load `H2 for industry`, D9). The issue title spells "Hydroghen"; the IAMC name uses `Hydrogen`.
@@ -59,10 +61,10 @@ Changes to the ported logic, only as far as needed for the function contract:
 ## 6. Components, carriers, bus carriers
 | Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
 |---|---|---|---|---|---|
-| `Load` | `H2 for industry` | `H2` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | `resources/carriers_bus_carriers_components.csv`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4086-4088 |
-| any other component at the `H2` bus | – | `H2` | – | no (they set the bus price, they are not priced demand) | D9 |
+| Load | `H2 for industry` | `H2 for industry` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4086-4088 |
+| any other component at the `H2 for industry` bus | – | `H2 for industry` | – | no (they set the bus price, they are not priced demand) | D9 |
 
-Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `H2 for industry` Loads, one per location, on regional buses with unit `MWh_LHV`; yearly Load-weighted price over all locations 72.06 EUR/MWh (D9).
+Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `H2 for industry` Loads, one per location, on regional buses with carrier `H2 for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 72.06 EUR/MWh (D9).
 
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = P[H2 for industry](l)`, `weight(l) = L[H2 for industry](l)` (D9).
@@ -110,5 +112,5 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - #101, #76, milestone "Implement Infra-Enshure Coupling Variables"
 - `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.3378-3402 (`price_load`), l.4086-4088 (commit `a5baa7e9`)
 - PyPSA statistics accessor (`revenue`, `withdrawal`): https://docs.pypsa.org/latest/api/networks/statistics/
-- `resources/carriers_bus_carriers_components.csv`; measurement on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` (D9)
+- measurement on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` (D9); `resources/carriers_bus_carriers_components.csv` is outdated (no `coal for industry` Load, `H2 for industry` on bus carrier `H2`) and not used as a source
 - D1, D9 in [shared_definitions.md](shared_definitions.md); C4.5, C6.12, C6.13, C8 in [../contracts.md](../contracts.md); A-5, A-8 in [../open_questions.md](../open_questions.md)

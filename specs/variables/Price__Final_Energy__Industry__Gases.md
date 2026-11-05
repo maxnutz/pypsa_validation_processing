@@ -41,16 +41,15 @@ Issue and IAMC name differ (`Prices` → `Price`, added level `Industry`, carrie
 | Item | Value |
 |---|---|
 | Source | `export_ariadne_variables.py` |
-| pypsa-de function | `get_prices` (helper `price_load`, l.3378-3402) |
+| pypsa-de function | `get_prices` (helpers `get_weighted_costs_links` l.3502-3516, `costs_gen_links` l.3442-3500) |
 | pypsa-de line range | `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py:L4072-L4074` |
 | pypsa-de variable name | `Price\|Final Energy\|Industry\|Gases`, computed as `get_weighted_costs_links(["gas for industry", "gas for industry CC"], n, region)` |
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, only as far as needed for the function contract:
-- Region = location (D1.1) instead of `n.loads.bus.str.contains(region)`; per-location values are aggregated to the country by C8 (weighted mean).
-- Returns `value` and `weight` rows (C6.12) instead of the tuple `(price, load)`.
-- `price_load` returns NaN for a total load < 1 MWh; here a location with weight 0 gets value and weight `0.0` (A-5, C6.13). A location with a weight between 0 and 1 MWh is evaluated normally.
-- Snapshot weighting per C6.10/C6.12: `price_load` does not weight snapshots; identical for constant gₜ (C6.12).
+- Region = location (D1.1) instead of `n.links.index.str.contains(region)`; per-location values are aggregated to the country by C8 (weighted mean).
+- Returns `value` and `weight` rows (C6.12) instead of a single price.
+- `costs_gen_links` returns NaN for a Link output < 1 MWh and `get_weighted_costs_links` NaN for a zero denominator; here a location with weight 0 gets value and weight `0.0` (A-5, C6.13).
 - Formula: D9 (Load-weighted marginal price at the `gas for industry` bus) instead of `get_weighted_costs_links` over the Links `gas for industry` and `gas for industry CC` (owner decision 2026-11-05, D9).
 - No upper cut-off: pypsa-de sets results ≥ 1e4 to NaN (l.3513); not ported, because D9 has no division by a near-zero Link output.
 
@@ -61,10 +60,10 @@ Changes to the ported logic, only as far as needed for the function contract:
 ## 6. Components, carriers, bus carriers
 | Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
 |---|---|---|---|---|---|
-| `Load` | `gas for industry` | `gas for industry` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | `resources/carriers_bus_carriers_components.csv`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4072-4074 |
+| Load | `gas for industry` | `gas for industry` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4072-4074 |
 | any other component at the `gas for industry` bus | – | `gas for industry` | – | no (they set the bus price, they are not priced demand) | D9 |
 
-Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `gas for industry` Loads, one per location, on regional buses with unit `MWh_LHV`; yearly Load-weighted price over all locations 85.08 EUR/MWh (D9).
+Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `gas for industry` Loads, one per location, on regional buses with carrier `gas for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 85.08 EUR/MWh (D9).
 
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = P[gas for industry](l)`, `weight(l) = L[gas for industry](l)` (D9).
@@ -112,5 +111,5 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - #100, #76, milestone "Implement Infra-Enshure Coupling Variables"
 - `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.3378-3402 (`price_load`), l.4072-4074 (commit `a5baa7e9`)
 - PyPSA statistics accessor (`revenue`, `withdrawal`): https://docs.pypsa.org/latest/api/networks/statistics/
-- `resources/carriers_bus_carriers_components.csv`; measurement on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` (D9)
+- measurement on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` (D9); `resources/carriers_bus_carriers_components.csv` is outdated (no `coal for industry` Load, `H2 for industry` on bus carrier `H2`) and not used as a source
 - D1, D9 in [shared_definitions.md](shared_definitions.md); C4.5, C6.12, C6.13, C8 in [../contracts.md](../contracts.md); A-5, A-8 in [../open_questions.md](../open_questions.md)
