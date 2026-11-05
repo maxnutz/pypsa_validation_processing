@@ -63,7 +63,17 @@ Per [principles.md](../constitution/principles.md) P6.
 Changes to the ported logic, only as far as needed for the function contract (one bullet each, with reason):
 - <e.g. country aggregation removed; returns locations (C6.5)>
 
-If the source is `pypsa.statistics`: state that `export_ariadne_variables.py` was searched and no exact or semantic match exists (search terms, functions checked).
+If the source is `pypsa.statistics`, either
+- (no match, P6.3) state that `export_ariadne_variables.py` was searched and no exact or semantic match exists (search terms, functions checked), or
+- (exact match, P6.4) record the equivalence proof:
+
+| Item | Value |
+|---|---|
+| pypsa-de evaluation compared | `<price_load(n, "…", region)>`, ported per this spec |
+| `pypsa.statistics` evaluation | `<n.statistics.withdrawal(components=[…], carrier=…, groupby=["location", "unit"], nice_names=False, round=False)>` |
+| Network, pypsa version, date | `<resources/…/networks/….nc>`, `<1.1.2>`, `<YYYY-MM-DD>` |
+| Result | `<equal at all N locations, max. relative difference …>` (tolerance `1e-9`) |
+| Code lines (port / `pypsa.statistics`) | `<n> / <m>` (without docstrings, comments, blank lines) |
 
 ## 5. Match type
 - Match type: `<exact | semantic | none>`

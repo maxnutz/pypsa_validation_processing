@@ -1,6 +1,6 @@
 # Principles
 
-Status: reviewed
+Status: reviewed; draft (P6 rule 4)
 
 Hard rules for all specs and code changes. Contracts in [contracts.md](../contracts.md) refine them.
 
@@ -33,6 +33,11 @@ For every statistics function the implementation source is chosen in this order:
 1. **Exact match.** If `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` evaluates the same IAMC variable, the statistics function MUST port that pypsa-de logic as-is: same components, carriers, bus carriers, sign conventions and special cases.
 2. **Semantic match.** If the pypsa-de variable name differs (naming or hierarchy) but the meaning is the same, rule 1 applies. The variable spec MUST name the pypsa-de variable and function (with line range) and justify why they match.
 3. **No match.** Only if no matching variable exists in `export_ariadne_variables.py` is the function built with the `pypsa.statistics` accessor (https://docs.pypsa.org/latest/api/networks/statistics/).
+4. **Switch to `pypsa.statistics` for exact matches.** For an exact match (rule 1), the function SHOULD be built with the `pypsa.statistics` accessor instead of the ported pypsa-de logic, but only if both conditions hold (owner decision 2026-11-05):
+   - **Same result, proven.** The `pypsa.statistics` evaluation and the pypsa-de logic (with the changes allowed below) give the same result for every location, on at least one solved PyPSA-AT network in `resources/` and with `aggregate_per_year=True`. "Same" means equal within a relative tolerance of `1e-9`, with pypsa rounding switched off (`round=False`). The variable spec MUST record the proof in section 4: network file, pypsa version, date, the two evaluations compared and the result. A proof on a network without any of the evaluated carriers does not count.
+   - **Shorter code.** The `pypsa.statistics` implementation has fewer code lines than the port: lines of the statistics function plus helpers in `utils.py` that only this function uses, without docstrings, comments and blank lines. The variable spec MUST name both counts (an estimate from a draft implementation is enough).
+
+   If either condition fails or is not proven, rule 1 applies unchanged. The match type stays `exact`; the spec states the source as "`pypsa.statistics`, equivalent to pypsa-de (P6.4)". Semantic matches (rule 2) are not covered: they keep the ported logic.
 
 The ported logic is changed only as far as needed to fit the function contract: stand-alone function, shared helpers only in `utils.py` (P4), return format of C6, no country aggregation inside the function. Every such change MUST be listed in the variable spec.
 
