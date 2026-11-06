@@ -1334,100 +1334,227 @@ class TestFinalEnergyByCarrierCoal:
 
 
 class TestFinalEnergyBySectorTransportation:
-    """Test suite for Final_Energy_by_Sector__Transportation function."""
+    """Spec Final_Energy_by_Sector__Transportation.md AC1-AC8."""
 
-    def test_returns_series(self, mock_network: MockPyPSANetwork, energy_totals_df):
-        """Test that the function returns a pandas Series."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_df
-        )
-        assert isinstance(result, pd.Series)
+    # d_aviation(AA) = 0.5, d_navigation(AA) = 0.2
+    ENERGY_TOTALS = pd.DataFrame(
+        {
+            "total domestic aviation": [50.0],
+            "total international aviation": [50.0],
+            "total domestic navigation": [20.0],
+            "total international navigation": [80.0],
+        },
+        index=pd.Index(["AA"], name="country"),
+    )
 
-    def test_has_location_and_unit_multiindex(
-        self, mock_network: MockPyPSANetwork, energy_totals_df
-    ):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_df
-        )
-        assert isinstance(result.index, pd.MultiIndex)
-        assert "location" in result.index.names
-        assert "unit" in result.index.names
+    @staticmethod
+    def _base_network(n_snapshots: int = 1) -> pypsa.Network:
+        n = _real_network(n_snapshots)
+        n.snapshot_weightings.loc[:, :] = 1.0
+        _add_bus(n, "AA1 low voltage", "low voltage", "MWh_el", "AA1")
+        _add_bus(n, "AA1 EV battery", "EV battery", "MWh_el", "AA1")
+        _add_bus(n, "AA2", "AC", "MWh_el", "AA2")
+        return n
 
-    def test_not_empty(self, mock_network: MockPyPSANetwork, energy_totals_df):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_df
+    def _network(self, rail_road: bool = False, v2g: bool = False) -> pypsa.Network:
+        """AC3 mock at AA1; AA2 has no transport."""
+        n = self._base_network()
+        lv = "AA1 low voltage"
+        _add_dispatched(
+            n,
+            "Link",
+            "AA1 BEV charger",
+            {"p0": [10.0], "p1": [-9.0]},
+            bus0=lv,
+            bus1="AA1 EV battery",
+            carrier="BEV charger",
+            efficiency=0.9,
         )
-        assert len(result) > 0
-
-    def test_numeric_values(self, mock_network: MockPyPSANetwork, energy_totals_df):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_df
-        )
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
-        )
-
-    def test_contains_multiple_locations(
-        self, mock_network: MockPyPSANetwork, energy_totals_df
-    ):
-        """Test that result contains multiple locational data."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network, energy_totals=energy_totals_df
-        )
-        locations = result.index.get_level_values("location").unique()
-        assert len(locations) > 1
-        assert all(r.startswith("AT") for r in locations)
-
-    def test_multiple_networks(
-        self, mock_network_collection: MockNetworkCollection, energy_totals_df
-    ):
-        """Test processing multiple networks from collection."""
-        for network in mock_network_collection:
-            result = Final_Energy_by_Sector__Transportation(
-                network, energy_totals=energy_totals_df
+        for carrier, unit, p in [
+            ("land transport fuel cell", "MWh_LHV", 5.0),
+            ("land transport oil", "land transport", 40.0),
+            ("kerosene for aviation", "MWh_LHV", 20.0),
+            ("shipping oil", "MWh_LHV", 10.0),
+            ("shipping methanol", "MWh_LHV", 5.0),
+        ]:
+            bus_carrier = "H2" if carrier == "land transport fuel cell" else carrier
+            _add_bus(n, f"AA1 {bus_carrier}", bus_carrier, unit, "AA1")
+            _add_dispatched(
+                n,
+                "Load",
+                f"AA1 {carrier}",
+                {"p": [p]},
+                bus=f"AA1 {bus_carrier}",
+                carrier=carrier,
             )
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert "location" in result.index.names
-            assert "unit" in result.index.names
-            assert len(result) > 0
-
-    def test_raises_without_energy_totals(self, mock_network: MockPyPSANetwork):
-        """Current implementation requires energy_totals to compute domestic shares."""
-        with pytest.raises(ValueError):
-            Final_Energy_by_Sector__Transportation(mock_network)
-
-    def test_uses_mean_efficiency_and_warns_for_differing_bev_chargers(
-        self, energy_totals_df, caplog
-    ):
-        """Multiple distinct BEV charger efficiencies fall back to mean with WARNING."""
-        network = MockPyPSANetwork(
-            links=pd.DataFrame(
-                {
-                    "carrier": ["BEV charger", "BEV charger", "other link"],
-                    "efficiency": [0.8, 0.9, 1.0],
-                },
-                index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
+        _add_dispatched(
+            n,
+            "Load",
+            "AA1 land transport EV",
+            {"p": [8.0]},
+            bus="AA1 EV battery",
+            carrier="land transport EV",
+        )
+        if rail_road:
+            _add_dispatched(
+                n,
+                "Load",
+                "AA1 electricity for rail",
+                {"p": [2.0]},
+                bus=lv,
+                carrier="electricity for rail",
             )
+            _add_dispatched(
+                n,
+                "Load",
+                "AA1 electricity for road",
+                {"p": [4.0]},
+                bus=lv,
+                carrier="electricity for road",
+            )
+        if v2g:
+            _add_dispatched(
+                n,
+                "Link",
+                "AA1 V2G",
+                {"p0": [3.0], "p1": [-3.0]},
+                bus0="AA1 EV battery",
+                bus1=lv,
+                carrier="V2G",
+            )
+        return n
+
+    def _normalised(self, n: pypsa.Network, **kwargs: object) -> pd.Series:
+        result = Final_Energy_by_Sector__Transportation(
+            n, energy_totals=self.ENERGY_TOTALS, **kwargs
+        )
+        return remap_unit_index(result).groupby("location").sum()
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC5 / AC6: C6 format incl. unit `land transport`; AA2 is 0.0."""
+        n = self._network()
+        result = Final_Energy_by_Sector__Transportation(
+            n, aggregate_per_year=aggregate_per_year, energy_totals=self.ENERGY_TOTALS
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert "land transport" in set(result.index.get_level_values("unit"))
+        aa2 = result.xs("AA2", level="location")
+        assert (aa2 == 0.0).all(axis=None)
+
+    def test_ac3_value(self):
+        """AC3: 10 + 5 + 40 + 0.5·20 + 0.2·(10 + 5) = 68; no charger efficiency."""
+        values = self._normalised(self._network())
+        assert values["AA1"] == pytest.approx(68.0)
+        assert (values >= 0).all()
+
+    def test_ac3_rail_counted_road_not(self):
+        """AC3: electricity for rail 2 counts, electricity for road 4 does not: 70."""
+        assert self._normalised(self._network(rail_road=True))["AA1"] == pytest.approx(
+            70.0
         )
 
-        with caplog.at_level(logging.WARNING):
-            result = Final_Energy_by_Sector__Transportation(
-                network, energy_totals=energy_totals_df
-            )
+    def test_ac3_v2g_subtracted(self):
+        """AC3: a V2G feed-in of 3 gives 67."""
+        assert self._normalised(self._network(rail_road=True, v2g=True))[
+            "AA1"
+        ] == pytest.approx(67.0)
 
-        assert any(
-            "Network includes different efficiencies for BEV chargers" in record.message
-            for record in caplog.records
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._base_network(n_snapshots=2)
+        lv = "AA1 low voltage"
+        _add_dispatched(
+            n,
+            "Link",
+            "AA1 BEV charger",
+            {"p0": [4.0, 1.0], "p1": [-3.6, -0.9]},
+            bus0=lv,
+            bus1="AA1 EV battery",
+            carrier="BEV charger",
         )
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert "location" in result.index.names
-        assert "unit" in result.index.names
-        assert len(result) > 0
+        _add_dispatched(
+            n,
+            "Link",
+            "AA1 V2G",
+            {"p0": [0.0, 3.0], "p1": [0.0, -3.0]},
+            bus0="AA1 EV battery",
+            bus1=lv,
+            carrier="V2G",
+        )
+        _add_bus(
+            n, "AA1 kerosene for aviation", "kerosene for aviation", "MWh_LHV", "AA1"
+        )
+        _add_dispatched(
+            n,
+            "Load",
+            "AA1 kerosene for aviation",
+            {"p": [20.0, 10.0]},
+            bus="AA1 kerosene for aviation",
+            carrier="kerosene for aviation",
+        )
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(
+            Final_Energy_by_Sector__Transportation, n, energy_totals=self.ENERGY_TOTALS
+        )
+
+    def test_ac8_v2g_not_clipped(self):
+        """AC8: BEV 4 / 0 and V2G 0 / 3 give snapshot values 4 / −3, yearly 1."""
+        n = self._base_network(n_snapshots=2)
+        lv = "AA1 low voltage"
+        _add_dispatched(
+            n,
+            "Link",
+            "AA1 BEV charger",
+            {"p0": [4.0, 0.0], "p1": [-3.6, 0.0]},
+            bus0=lv,
+            bus1="AA1 EV battery",
+            carrier="BEV charger",
+        )
+        _add_dispatched(
+            n,
+            "Link",
+            "AA1 V2G",
+            {"p0": [0.0, 3.0], "p1": [0.0, -3.0]},
+            bus0="AA1 EV battery",
+            bus1=lv,
+            carrier="V2G",
+        )
+        series = Final_Energy_by_Sector__Transportation(
+            n, aggregate_per_year=False, energy_totals=self.ENERGY_TOTALS
+        )
+        assert series.droplevel("unit").loc["AA1"].tolist() == pytest.approx(
+            [4.0, -3.0]
+        )
+        assert self._normalised(n)["AA1"] == pytest.approx(1.0)
+
+    def test_missing_country_in_energy_totals_raises(self):
+        """D4: non-zero aviation demand in a country without energy totals raises."""
+        n = self._network()
+        _add_bus(
+            n, "BB1 kerosene for aviation", "kerosene for aviation", "MWh_LHV", "BB1"
+        )
+        _add_dispatched(
+            n,
+            "Load",
+            "BB1 kerosene for aviation",
+            {"p": [1.0]},
+            bus="BB1 kerosene for aviation",
+            carrier="kerosene for aviation",
+        )
+        with pytest.raises(ValueError, match="BB"):
+            Final_Energy_by_Sector__Transportation(n, energy_totals=self.ENERGY_TOTALS)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_transport(self, aggregate_per_year):
+        """AC6: a network without transport carriers gives 0.0 everywhere."""
+        n = _real_network()
+        _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
+        result = Final_Energy_by_Sector__Transportation(
+            n, aggregate_per_year=aggregate_per_year, energy_totals=self.ENERGY_TOTALS
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------
@@ -1918,22 +2045,6 @@ class TestAggregatePerYearFalse:
         Final_Energy_by_Carrier__Electricity,
         Final_Energy_by_Carrier__Coal,
     ]
-
-    def test_transportation_returns_dataframe(
-        self, mock_network: MockPyPSANetwork, energy_totals_df
-    ):
-        """Transportation returns a DataFrame when aggregate_per_year=False."""
-        result = Final_Energy_by_Sector__Transportation(
-            mock_network,
-            aggregate_per_year=False,
-            energy_totals=energy_totals_df,
-        )
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert "location" in result.index.names
-        assert "unit" in result.index.names
-        assert isinstance(result.columns, pd.DatetimeIndex)
-        assert len(result) > 0
 
     @pytest.mark.parametrize("func", _FUNCTIONS, ids=lambda f: f.__name__)
     def test_returns_dataframe(self, mock_network: MockPyPSANetwork, func):

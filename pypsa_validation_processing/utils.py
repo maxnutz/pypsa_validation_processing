@@ -281,34 +281,6 @@ class MissingInputError(Exception):
     """
 
 
-def get_energy_totals_domestic_share(
-    energy_totals: pd.DataFrame | None,
-    kind: str,
-) -> float:
-    """
-    Return the domestic share of energy totals for a given kind.
-
-    Parameters
-    ----------
-    energy_totals
-        Energy totals of one year, indexed by ``country``.
-    kind: {'aviation', 'navigation'}
-        The kind of energy totals to calculate the factor for.
-
-    Returns
-    -------
-    :
-        The share of national aviation or navigation per country.
-    """
-    # TODO generalize energy totals for all countries
-    if energy_totals is None:
-        raise ValueError("energy_totals is required to compute domestic shares.")
-    energy_totals = energy_totals.loc["AT"]
-    domestic = energy_totals[f"total domestic {kind}"]
-    international = energy_totals[f"total international {kind}"]
-    return domestic / (domestic + international)
-
-
 def create_location_index_from_copperplate(
     raw_input: pd.Series | pd.DataFrame,
     usage_location_list: list,
