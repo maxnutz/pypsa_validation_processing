@@ -1,6 +1,6 @@
 # `Final Energy [by Sector]|Industry`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -48,7 +48,7 @@ Owner statement (2026-10-28): the variable includes only the energy use of carri
 | pypsa-de commit | `a5baa7e9` |
 
 Changes to the ported logic, only as needed for the function contract:
-- `NE_x` and `κ` cannot be computed from the pypsa-de inputs yet (D5, D6). OQ-18 resolved: physical method once the networks carry industry production data; until then Eurostat shares for gas, naphtha and coal (OQ-28), `NE_H2 = 0` and `κ = 0`, each skipped correction with a `WARNING` (C2.5).
+- `NE_x` and `κ` cannot be computed from the pypsa-de inputs yet (D5, D6). OQ-18 resolved: physical method once the networks carry industry production data; until then Eurostat shares for gas, naphtha and coal (OQ-28) and `NE_H2 = 0`, with a `WARNING` for each skipped correction (C2.5). The coke correction applies per location as in D6 (owner decision 2026-11-06). Locations with Eurostat-valid `industrial_demand_overrides` (AT) get no correction and no `WARNING`. All other locations get `κ = 0` with a `WARNING`: a known limitation, because their Industry result contains the blast-furnace input (OQ-37).
 - Decentral `low-temperature heat for industry` (on `urban decentral heat`) is not counted as heat. Instead, the industrial share of the decentral heat input is counted (D8, owner decision 2026-10-22, OQ-22 resolved). The Load on `urban central heat` stays counted as delivered heat (district heat is a final energy carrier).
 - Per location; no `MWh2TWh`; zero-fill (C6.13).
 
@@ -98,11 +98,12 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6.
-- AC7: In the mock of AC3 (country `AA`), with `S[AA, Natural Gas] = 0.25` and `S[AA, Oil] = 0.5`: `NE_gas = 2`, `NE_naphtha = 3`, `NE_H2 = 0`, `κ = 0`; the result is `38 − 5 = 33`; with additionally `S[AA, Coal] = 0.25`: `NE_coal = 1`, result `38 − 6 = 32`; and `WARNING`s naming the skipped H2 and coke corrections are logged. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
+- AC7: In the mock of AC3 (country `AA`), with `S[AA, Natural Gas] = 0.25` and `S[AA, Oil] = 0.5`: `NE_gas = 2`, `NE_naphtha = 3`, `NE_H2 = 0`, `κ = 0`; the result is `38 − 5 = 33`; with additionally `S[AA, Coal] = 0.25`: `NE_coal = 1`, result `38 − 6 = 32`; and `WARNING`s naming the skipped H2 and coke corrections are logged (the mock carries no `industrial_demand_overrides`, D6). The per-location coke rule is tested as in `Final_Energy_by_Carrier__Coal` AC3b/AC3c. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
 - AC8: Mock at `B` without `urban central heat` bus: `low-temperature heat for industry` 1 and `urban decentral heat` Load 3 on `urban decentral heat` (`σ = 0.25`), `urban decentral gas boiler` gas input 6. The decentral heat contribution to the result is `0.25·6 = 1.5`, not 1.
 
 ## 12. Open questions
 - OQ-18 resolved (D5, D6, C2.5). OQ-25 resolved (D8).
+- OQ-37 open: coke/blast-furnace correction for locations without `industrial_demand_overrides` (known limitation, D6). Eurostat check 2026-11-06 (PR #158 description): AT 2025 with overrides −7.8 %, without overrides (`electricity_network_0p3`) +16.9 %.
 
 ## 13. Sources
 - #12, #74, #2; definitions as in section 2

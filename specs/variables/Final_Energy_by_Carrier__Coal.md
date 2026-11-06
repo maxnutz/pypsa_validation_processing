@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|Coal`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -48,7 +48,9 @@ Implementing PR: –
 Changes to the ported logic, only as needed for the function contract:
 - Per location instead of `.filter(like=region)`; no `MWh2TWh` scaling; zero-fill (C6.13).
 - Deviation from pypsa-de (owner decision 2026-10-29, OQ-28): the Eurostat non-energy use `NE_coal` (D5) is subtracted; pypsa-de assumes none (l.2234).
-- The coke fraction `κ` cannot be read from `industrial_energy_demand` (not an available input). Per D6 (OQ-18 resolved): physical method once the networks carry industry production data, otherwise `κ = 0` with a `WARNING` (C2.5).
+- The coke correction depends on the location (D6, owner decision 2026-11-06):
+  - At locations with Eurostat-valid `industrial_demand_overrides` (AT), the Load already excludes blast-furnace use, so the coke correction is not applied (deviation from pypsa-de).
+  - At all other locations the correction is skipped (`κ = 0`, `WARNING`). This is a known limitation, since the result there contains the blast-furnace input; work item OQ-37.
 
 ## 5. Match type
 - Match type: `semantic`.
@@ -61,10 +63,10 @@ Changes to the ported logic, only as needed for the function contract:
 | Link | `coal`, `lignite` (power plants), `urban central coal CHP` | `coal` / `AC` | – | **no** (transformation, not final energy) | l.2629-2631 |
 
 ## 7. Accounting rule and sign convention
-- Formula: `FE_coal(l) = (L[coal for industry](l) − NE_coal(l)) · (1 − κ(l)) + (L[coal for industry](l) − NE_coal(l)) · κ(l) / 1.366` (D5, D6)
+- Formula: `FE_coal(l) = (L[coal for industry](l) − NE_coal(l)) · (1 − κ(l)) + (L[coal for industry](l) − NE_coal(l)) · κ(l) / 1.366` (D5, D6), with `κ(l) = 0` at every location: by definition at locations with `industrial_demand_overrides`, as fallback (known limitation, OQ-37) at all others. So today `FE_coal(l) = L[coal for industry](l) − NE_coal(l)`.
 - Sign convention: withdrawal positive; result MUST be ≥ 0.
 - Weighting: per C6.10.
-- Special cases: coke correction (D6); `0 ≤ NE_coal ≤ L` (D5), so the result stays ≥ 0 (G2).
+- Special cases: coke correction per location (D6); `0 ≤ NE_coal ≤ L` (D5), so the result stays ≥ 0 (G2).
 
 ## 8. Optional kwargs
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
@@ -72,7 +74,7 @@ Changes to the ported logic, only as needed for the function contract:
 | `aggregate_per_year` | always | Series / DataFrame (C6) | – |
 | `config` | no | – | – |
 | `energy_totals` | no | – | – |
-| `industry_non_energy_shares` | yes | `NE_coal` (D5, Eurostat fallback, C2.5); Eurostat has no coke share, fallback `κ = 0` (D6) | variable skipped with `WARNING` (C2.5, A-7) |
+| `industry_non_energy_shares` | yes | `NE_coal` (D5, Eurostat fallback, C2.5); Eurostat has no coke share; `κ = 0` (D6) | variable skipped with `WARNING` (C2.5, A-7) |
 
 ## 9. Return format
 Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
@@ -82,20 +84,25 @@ Per C6, MultiIndex `[location, unit]`, unit `MWh_LHV` (or `MWh`).
 |---|---|
 | carrier `coal for industry` not present in `n` | `0.0` for every location (C6.13). The function MUST NOT return `None` (C6.9, SC-25) |
 | location with zero yearly coal withdrawal (e.g. `AT13` in 2040) | row kept with `0.0` for both values of `aggregate_per_year` (C6.13, SC-26) |
+| no `industrial_demand_overrides` in `n.meta["resources"]` (e.g. `electricity_network_0p3`) | every location counts as "without overrides" (D6): `κ = 0`, `WARNING` naming every country with a non-zero Load |
+| location with overrides but zero coal and coke rows | counts as covered (D6); no `WARNING` for it |
 
 ## 11. Acceptance criteria
 - AC1 / AC2: C6-AC1 / C6-AC2.
 - AC3: Mock network with `coal for industry` Load of 10 MW at `A` over 2 snapshots (weighting 1), `κ = 0`: the result is `(A, …): 20`. With `κ = 0.5` (injected, as from the physical method of D6): `20·0.5 + 20·0.5/1.366 ≈ 17.321`.
 - AC3a: As AC3 with `S[AA, Coal] = 0.25` for location `A` (country `AA`), `κ = 0`: `NE_coal = 5`, result `20 − 5 = 15`. With `κ = 0.5` (injected): `15·0.5 + 15·0.5/1.366 ≈ 12.990`. Without `industry_non_energy_shares` the variable is skipped (C2-AC8).
-- AC3b: With the fallback (network without industry production data), `κ = 0` and one `WARNING` naming the skipped coke correction is logged (`caplog`).
+- AC3b: Mock with `coal for industry` Loads of 10 MW at `A` (country `AA`) and at `B` (country `BB`), 2 snapshots, `NE_coal = 0`. `n.meta["resources"]["industrial_demand_overrides"]` holds the row `region = A`, `sector = industry`, `carrier = coal`. Result: `(A, …): 20`, `(B, …): 20`. Exactly one `WARNING` naming the skipped coke correction is logged (`caplog`); it names `BB` and not `AA`.
+- AC3c: As AC3b with an override row for `B` as well: same values, no coke-correction `WARNING`. Without the `industrial_demand_overrides` entry: same values, one `WARNING` naming `AA` and `BB`.
 - AC4: C6-AC3 (`flow`).
 - AC5: Values ≥ 0.
 - AC6: C6-AC6. A network without the `coal for industry` carrier returns a Series/DataFrame with `0.0` for every location, not `None`.
 
 ## 12. Open questions
 - OQ-18 resolved (D6, C2.5). OQ-28 resolved (D5: Eurostat non-energy use of coal subtracted).
+- OQ-37 open: coke/blast-furnace correction for locations without `industrial_demand_overrides` (known limitation, D6).
 
 ## 13. Sources
 - #44, #2; definitions as in section 2
 - `export_ariadne_variables.py` l.2208-2228, 2394-2396, 2629-2631 (commit `a5baa7e9`)
+- Eurostat check 2026-11-06 (AT, 2025 networks vs. Eurostat 2024, `IAMC_eurostat_eb_2026.xlsx`; PR #151 description): with overrides 9.5 PJ vs. 9.4 PJ, without overrides (`electricity_network_0p3`) 59.1 PJ
 - Current implementation: `statistics_functions.py::Final_Energy_by_Carrier__Coal` l.238-281 (commit `16bf37f`): returns `None` if the carrier is missing, no coke correction

@@ -125,13 +125,25 @@ FE_coal_industry = (L[coal for industry] − NE_coal)·(1 − κ) + (L[coal for 
 κ = coke·1.366 / (coke·1.366 + coal)      from industrial_energy_demand
 ```
 
-(`get_final_energy` l.2208-2225; pypsa-de has no `NE_coal`, added by owner decision 2026-10-29, OQ-28: non-energy use first, the coke correction applies to the energy part only.) Owner decision 2026-10-28 (OQ-18 resolved, option C):
+(`get_final_energy` l.2208-2225; pypsa-de has no `NE_coal`, added by owner decision 2026-10-29, OQ-28: non-energy use first, the coke correction applies to the energy part only.)
 
-- **Physical method.** `κ` from the industry production data, once the networks carry it (C2.5, follow-up spec).
-- **Eurostat fallback.** `κ(l) = 0`, with one `WARNING` per call (C2.5). Eurostat gives no usable value: it books blast-furnace coke as transformation, not as industrial final consumption, and reports no non-energy coke for AT (`FC_IND_NE` `C0311`: `: m`). `n.meta["resources"]["industrial_demand_overrides"]` splits `coal` and `coke` per region, but only for 2025 (measured in `20261020_carbon_accounting_run`), so it is not used.
-- `κ = 0` overestimates coal final energy by at most the factor `1.366` on the coke part.
+`κ(l)` depends on the source of the `coal for industry` Load at the location (owner decision 2026-11-06, after the Eurostat check of the WP4 PRs #151 and #158):
 
-Implemented by `utils.apply_coke_correction(coal_energy, kappa=None)` (PR #137, 2026-11-04): `κ` is one scalar per call; `None` = Eurostat fallback `κ = 0` with one `WARNING`; `κ` outside `[0, 1]` → `ValueError`. The physical method needs `κ(l)` per location; the follow-up spec (C2.5) decides whether the helper then takes a per-location `κ`. The factor `1.366` (`MWH_COAL_PER_MWH_COKE`) is checked against the PyPSA industry preprocessing in the spec review after WP4 (owner, PR #137 review 2026-11-04; `TODO.md` WP4).
+- **Locations with overrides (AT).** A location `l` is covered if `n.meta["resources"]["industrial_demand_overrides"]` has a row with `region == l`, `sector == "industry"` and `carrier` `coal` or `coke`. The entry is a dict of columns (`year`, `region`, `sector`, `carrier`, `value_TWh`) that `pd.DataFrame(...)` reads. The overrides are Eurostat-valid (owner 2026-11-06): blast-furnace use is booked as transformation and is not part of the Load. So `κ(l) = 0`, with no coke correction and no `WARNING`: `FE_coal_industry(l) = L[coal for industry](l) − NE_coal(l)`.
+  - Measured 2026-11-06: `20261020_carbon_accounting_run` (10 AT regions) and `wind-buildout-sensitivities/WIND_150_aut` (35 AT regions) carry overrides for every AT location in every network 2025–2050, always with `year` 2025.
+  - AT `coal for industry` Load: 11.0 PJ in 2025, equal to the overrides (coal 3.95 + coke 7.06 PJ); 7.4 / 6.7 PJ in 2040.
+  - Result AT 2025: 9.5 PJ in both runs, vs. Eurostat 2024 `FC_E` of solid fossil fuels 9.4 PJ (+1.9 %).
+  - The pypsa-de formula MUST NOT be applied here: it would scale the already Eurostat-valid coke of the overrides down by `1/1.366` (7.06 → 5.17 PJ) and undercount.
+- **Locations without overrides: known limitation.** This covers every non-AT country, and AT in networks without overrides. The Load follows the pypsa-eur industry data. It contains the coal and coke input of blast furnaces, which Eurostat books as transformation (`TI_BF_E`), not as final energy.
+  - No correction is specified yet: `κ(l) = 0` (fallback). At these locations `Final Energy [by Carrier]|Coal` and `Final Energy [by Sector]|Industry` are overestimated by the blast-furnace input.
+  - One `WARNING` per call names the countries (C1.6 code of the location) of the locations without overrides that have a non-zero `coal for industry` Load, and states that their coke correction is skipped.
+  - Measured 2026-11-06 on `electricity_network_0p3` (no overrides), AT 2025: Load 68.2 PJ, 51.3 PJ of it at `AT312`; result 59.1 PJ vs. Eurostat 9.4 PJ (+532 %). Eurostat AT 2024 `TI_BF_E` of solid fossil fuels: 71.1 PJ.
+  - The pypsa-de formula does not remove this part either. It only rescales the coke part by `1/1.366`, so even `κ = 1` would leave the AT result at about 43 PJ.
+  - **Work item:** a correction for these locations (OQ-37, `TODO.md` WP4). The physical method (C2.5) and the pypsa-de formula above are candidates, not decisions.
+
+`κ = 0` overestimates coal final energy at locations without overrides; at locations with overrides it is exact by definition.
+
+Implemented by `utils.apply_coke_correction(coal_energy, kappa=None)` (PR #137, 2026-11-04). `κ` is one scalar per call. `None` means the fallback `κ = 0` with one `WARNING`; `κ` outside `[0, 1]` raises `ValueError`. The split by overrides needs a per-location decision and a `WARNING` limited to the locations without overrides (SC-49). The factor `1.366` (`MWH_COAL_PER_MWH_COKE`) is checked as part of OQ-37 (owner, PR #137 review 2026-11-04).
 
 ## D7 Unit of `land transport oil`
 `land transport oil` Loads sit on buses with `unit = "land transport"` (measured: `AT11 land transport oil`, unit `land transport`). This is the bus unit label that pypsa-eur assigns (`add_ice_cars` l.2751-2757: `unit="land transport"`); it is a unit of the network, not the name of a physical unit. It is a permanent key of `UNITS_MAPPING` (→ `MWh`; owner, PR #123 review 2026-11-02; C9.1), so it passes result validation. The Load is fuel energy (LHV): pypsa-eur builds it as `profile = ice_share * p_set.div(efficiency)` (`sister_packages/pypsa-de/scripts/prepare_sector_network.py::add_ice_cars`, l.2730-2765). Measured for AT 2020: 65.39 TWh = 235 PJ, of the same order as the Austrian transport final energy of 314 PJ in #2.

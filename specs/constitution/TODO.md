@@ -55,7 +55,8 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [ ] Final Energy [by Sector]|Industry (D5, D6, D8; SC-33; #12, #74)
 - [ ] All functions return every location (C6.13; SC-26) — checked in each PR above.
 - [ ] Deep review of the WP3 helpers after WP4, together with the statistics functions that use them, on workflow data (`pixi run workflow_test` and the test configs of #129); covers `attribute_locations` on real networks (owner, PR #132 and PR #138 reviews 2026-11-04).
-- [ ] Spec review after WP4: research the D6 coke factor `1.366` MWh coal per MWh coke (`MWH_COAL_PER_MWH_COKE` in `utils.py`, taken from pypsa-de `get_final_energy` l.2208–2225) in more depth and check it against the PyPSA code that preprocesses the industry data (owner, PR #137 review 2026-11-04).
+- [ ] Code: SC-49, D6 per location. No coke correction and no `WARNING` at locations with `industrial_demand_overrides`; the `WARNING` names only countries without overrides. In the Coal (#151) and Industry (#158) PRs or right after them (owner decision 2026-11-06).
+- [ ] Work item OQ-37 (known limitation, owner decision 2026-11-06): blast-furnace/coke correction for locations without `industrial_demand_overrides` (all non-AT countries). Today `Final Energy|Coal` and `Final Energy|Industry` there contain the blast-furnace input. Includes the check of the D6 factor `1.366` (`MWH_COAL_PER_MWH_COKE`, pypsa-de `get_final_energy` l.2208–2225) against the PyPSA industry preprocessing (owner, PR #137 review 2026-11-04).
 - [ ] Spec review after WP4: D8 tells CHP heat and solar thermal heat on decentral heat buses apart; the result carrier is `b` for both today (owner, PR #141 review 2026-11-04).
 
 ## WP5 Config, units and output (C1, C9, C10) — independent, parallel to WP3/WP4
