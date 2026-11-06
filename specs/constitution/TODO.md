@@ -69,9 +69,10 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 
 ## WP6 Infra-Enshure coupling variables (milestone 2) — independent, parallel to WP4
 - [ ] Spec PR #148: D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
-- [ ] Before implementation: OQ-33 (definitions), OQ-34 (unit, currency year), OQ-35 (methanol, heat; scope of #76).
-- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) accepts only the levels `location` and `unit`, so it needs an extension or a D9-specific fill (value and weight `0.0`).
+- [ ] Before implementation: OQ-33 (definitions, made in another repository and imported later; discussed in parallel), OQ-34 (unit label, currency year), OQ-35 (heat; scope of #76). `industry methanol` needs a separate variable (owner, PR #148 review 2026-11-06), no issue yet.
+- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) accepts only the levels `location` and `unit`, so it needs an extension or a D9-specific fill (value and weight NaN, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR.
 - [ ] Code PR(s): the other five prices (#100–#104, low prio).
+- [ ] Validation of the price variables against pypsa-de results: pypsa-de sets prices ≥ 1e4 EUR/MWh to NaN in `get_weighted_costs_links` (`export_ariadne_variables.py` l.3515, used for `…|Liquids|Oil` and `…|Gases`); D9 has no cut-off (owner, PR #148 review 2026-11-06).
 - [ ] Spec PR: investments (#106, OQ-36).
 
 ## Later (need specs first)

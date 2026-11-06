@@ -25,4 +25,4 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | draft |
 | `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | draft |
 
-Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76 (`industry methanol`, `low-temperature heat for industry`, OQ-35).
+Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76 (`industry methanol`, a separate variable per owner decision 2026-11-06; `low-temperature heat for industry`; OQ-35).
