@@ -48,25 +48,24 @@ Issue title and IAMC name are identical: #99 was renamed from `Prices|Final Ener
 
 Changes to the ported logic, only as far as needed for the function contract:
 - Region = location (D1.1) instead of `n.loads.bus.str.contains(region)`; per-location values are aggregated to the country by C8 (weighted mean).
-- Without CO2 price: `λ_b − γ(b)` instead of the bus marginal price `λ_b` (D9 item 2; owner, PR #148 review 2026-11-06: a CO2 price MAY be added in post-processing). No Link with `bus1` on a `low voltage` bus has a CO2 port (measured, D9), so `γ = 0` and the value equals `price_load`.
+- CO2 price included: the bus marginal price `λ_b` as in `price_load`, nothing subtracted (D9; owner decision 2026-11-06 after PR #148, reversing its review decision; removing the CO2 price is #163).
 - Returns `value` and `weight` rows (C6.12) instead of the tuple `(price, load)`.
-- `price_load` returns NaN for a total load < 1 MWh; here the value is NaN only for a weight of `0.0` or NaN (D9 item 4, A-5); a location with a weight between 0 and 1 MWh is evaluated normally.
+- `price_load` returns NaN for a total load < 1 MWh; here the value is NaN only for a weight of `0.0` or NaN (D9 item 3, A-5); a location with a weight between 0 and 1 MWh is evaluated normally.
 - Snapshot weighting per C6.10/C6.12: `price_load` does not weight snapshots; identical for constant gₜ (C6.12).
 
-P6.4 (switch to `pypsa.statistics`): not proven. The `−revenue / withdrawal` check in D9 compares yearly totals over all locations for `gas for industry` only; P6.4 requires a per-location, per-snapshot comparison (`aggregate_per_year=False`) for this carrier and both code line counts. `γ` (D9 item 2) has no `pypsa.statistics` equivalent in any case. Until then rule 1 applies and the function ports `price_load` with the CO2 correction (D9). The implementing PR MAY record the proof here and switch.
+P6.4 (switch to `pypsa.statistics`): not proven. The `−revenue / withdrawal` check in D9 compares yearly totals over all locations for `gas for industry` only; P6.4 requires a per-location, per-snapshot comparison (`aggregate_per_year=False`) for this carrier and both code line counts. Until then rule 1 applies and the function ports `price_load` (D9). The implementing PR MAY record the proof here and switch.
 
 ## 5. Match type
 - Match type: `exact`
-- Reasoning: Same variable name and the same formula (`price_load` on the Load `industry electricity`, D9), minus the CO2 cost of the supplying Links (section 4).
+- Reasoning: Same variable name and the same formula (`price_load` on the Load `industry electricity`, D9).
 
 ## 6. Components, carriers, bus carriers
 | Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `industry electricity` | `low voltage` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4064-4066 |
-| Links with `bus1` at the Load's bus (supplying Links) | all | `low voltage` (`bus1`), CO2 ports per D9 item 2 | `p0`, efficiencies and marginal prices of the CO2 port buses, for `γ` only | yes, for `γ` only | D9; measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` |
 | any other component at the `low voltage` bus | – | `low voltage` | – | no (they set the bus price, they are not priced demand) | D9 |
 
-Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `industry electricity` Loads, one per location, on regional buses with carrier `low voltage` and unit `MWh_el`; yearly Load-weighted price over all locations 100.61 EUR/MWh including and without CO2 (D9).
+Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `industry electricity` Loads, one per location, on regional buses with carrier `low voltage` and unit `MWh_el`; yearly Load-weighted price over all locations 100.61 EUR/MWh, including the CO2 price (D9).
 
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = P[industry electricity](l)`, `weight(l) = L[industry electricity](l)` (D9).
@@ -92,8 +91,7 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 |---|---|
 | location without a `industry electricity` Load | value and weight NaN (every snapshot with `aggregate_per_year=False`); the location is not dropped (C6.12, C6.13, A-5) |
 | carrier `industry electricity` not present in `n` | value and weight NaN for every location of `n.buses.location` (C6.13). The function MUST NOT return `None` or zero rows (C6.7) |
-| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 4) |
-| supplying Link without CO2 port, or no supply in a snapshot | contributes no CO2 cost; `γ_t = 0` without supply (D9 item 2) |
+| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 3) |
 | country or region without any `industry electricity` Load | value NaN after region aggregation (C8.2); `pyam` drops NaN rows (OQ-12) |
 | negative marginal price | negative value, weight unchanged (section 7) |
 | network without `n.buses_t.marginal_price` (not solved) | out of scope: C2 requires solved networks |
@@ -106,8 +104,8 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - AC4: The `True` and `False` results are consistent per C6-AC3 (`intensive`).
 - AC5: As AC3 with `λ = [−20, 100]`: yearly value `(−200 + 3000) / 40 = 70.0`; snapshot value `−20` for the first snapshot (negative prices pass).
 - AC6: C6-AC6: a mock network without the carrier `industry electricity` returns value and weight NaN for every location, not `None` and not zero rows. A Load with `p = [0, 0]` at `A` gives value NaN and weight `0.0` at `A` (both values of `aggregate_per_year`); with `p = [10, 0]` the snapshot values are `[50, NaN]` and the yearly value is `50`.
-- AC7: Other components at the same bus change the result only through `λ_b` and, as supplying Links with a CO2 port, through `γ` (D9); e.g. `capital_cost > 0` of a Link with carrier `industry electricity` does not change it.
-- AC8 (CO2 price removed): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: `γ = 20`, snapshot values `[30, 80]`, yearly value `(300 + 2400) / 40 = 67.5`. A second supplying Link without CO2 port and the same `p0` halves `γ` to `10`. A port with bus carrier `AC` does not count as CO2 port.
+- AC7: Other components at the same bus change the result only through `λ_b` (D9); e.g. `capital_cost > 0` of a Link with carrier `industry electricity` does not change it.
+- AC8 (CO2 price included): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: the result equals AC3 (snapshot values `[50, 100]`, yearly value `87.5`); the CO2 port of the supplying Link is not evaluated (D9).
 
 ## 12. Open questions
 - OQ-33: the variable is not in the definitions; it is evaluated only with `definitions_path: false` until it is added there. The definitions of the Infra-Enshure coupling variables are made in another repository and imported later (owner, PR #148 review 2026-11-06).
