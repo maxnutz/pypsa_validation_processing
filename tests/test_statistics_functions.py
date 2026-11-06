@@ -96,202 +96,154 @@ def _check_flow_consistency(func, n: pypsa.Network, **kwargs: object) -> None:
 
 
 class TestFinalEnergyByCarrierElectricity:
-    """Test suite for Final_Energy_by_Carrier__Electricity function."""
+    """Spec Final_Energy_by_Carrier__Electricity.md AC1-AC7."""
 
-    class _ElectricityStatisticsAccessor:
-        """Minimal accessor to verify electricity-carrier extraction behavior."""
+    @staticmethod
+    def _base_network() -> pypsa.Network:
+        """Two snapshots of weighting 1; buses at A, an empty location B."""
+        n = _real_network()
+        n.snapshot_weightings.loc[:, :] = 1.0
+        _add_bus(n, "A", "AC", "MWh_el", "A")
+        _add_bus(n, "B", "AC", "MWh_el", "B")
+        _add_bus(n, "A low voltage", "low voltage", "MWh_el", "A")
+        _add_bus(n, "A EV battery", "EV battery", "MWh_el", "A")
+        return n
 
-        def __init__(self, empty_dac: bool = False):
-            self.empty_dac = empty_dac
-            self.calls: list[dict] = []
-
-        @staticmethod
-        def _series_from_groupby(
-            groupby: list[str],
-            values: list[float],
-            location: str = "AT1",
-            unit: str = "MWh_el",
-        ) -> pd.Series:
-            index = pd.MultiIndex.from_tuples(
-                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
-                names=groupby,
-            )
-            return pd.Series(values, index=index, dtype=float)
-
-        def withdrawal(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby_time: bool = False,
-            groupby: list[str] | None = None,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby_time": groupby_time,
-                    "groupby": groupby,
-                    "nice_names": nice_names,
-                }
-            )
-
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            if carrier == ["agriculture electricity", "agriculture machinery electric"]:
-                return self._series_from_groupby(groupby, [10.0])
-
-            if bus_carrier == "low voltage" and components is None:
-                index = pd.MultiIndex.from_tuples(
-                    [
-                        ("n1", "AT1 bus", "household demand", "AT1", "MWh_el"),
-                        ("n2", "AT1 bus", "rural air heat pump", "AT1", "MWh_el"),
-                        ("n3", "AT1 bus", "industry electricity", "AT1", "MWh_el"),
-                        ("n4", "AT1 bus", "agriculture electricity", "AT1", "MWh_el"),
-                        ("n5", "AT1 bus", "BEV charger", "AT1", "MWh_el"),
-                        ("n6", "AT1 bus", "distribution losses", "AT1", "MWh_el"),
-                        (
-                            "n7",
-                            "AT1 bus",
-                            "urban central resistive heater",
-                            "AT1",
-                            "MWh_el",
-                        ),
-                    ],
-                    names=["name", "bus", "carrier", "location", "unit"],
-                )
-                return pd.Series(
-                    [7.0, 8.0, 100.0, 200.0, 300.0, 400.0, 500.0], index=index
-                )
-
-            if (
-                bus_carrier == "low voltage"
-                and carrier == "BEV charger"
-                and components == "Link"
-            ):
-                return self._series_from_groupby(groupby, [40.0])
-
-            if carrier == "industry electricity" and components == "Load":
-                return self._series_from_groupby(groupby, [50.0])
-
-            if bus_carrier == "AC" and carrier == "DAC" and components == "Link":
-                if self.empty_dac:
-                    return pd.Series(
-                        dtype=float,
-                        index=pd.MultiIndex.from_tuples([], names=groupby),
-                    )
-                return self._series_from_groupby(groupby, [60.0])
-
-            return pd.Series(
-                dtype=float,
-                index=pd.MultiIndex.from_tuples([], names=groupby),
-            )
-
-    class _ElectricityNetwork:
-        """Minimal network exposing the custom electricity statistics accessor."""
-
-        def __init__(self, empty_dac: bool = False):
-            self.statistics = (
-                TestFinalEnergyByCarrierElectricity._ElectricityStatisticsAccessor(
-                    empty_dac=empty_dac
-                )
-            )
-
-    def _electricity_network(self, empty_dac: bool = False):
-        return self._ElectricityNetwork(empty_dac=empty_dac)
-
-    def test_returns_series(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas Series."""
-        result = Final_Energy_by_Carrier__Electricity(mock_network)
-        assert isinstance(result, pd.Series)
-
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Carrier__Electricity(mock_network)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_not_empty(self, mock_network: MockPyPSANetwork):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Carrier__Electricity(mock_network)
-        assert len(result) > 0
-
-    def test_numeric_values(self, mock_network: MockPyPSANetwork):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Carrier__Electricity(mock_network)
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
+    @staticmethod
+    def _link(n, name, carrier, bus0, bus1, p0, p1) -> None:
+        _add_dispatched(
+            n, "Link", name, {"p0": p0, "p1": p1}, bus0=bus0, bus1=bus1, carrier=carrier
         )
 
-    def test_contains_multiple_locations(self, mock_network: MockPyPSANetwork):
-        """Test that result contains multiple locational data."""
-        result = Final_Energy_by_Carrier__Electricity(mock_network)
-        locations = result.index.get_level_values("location").unique()
-        assert len(locations) > 1
-        assert all(r.startswith("AT") for r in locations)
+    def _ac3_network(self, v2g: bool = False) -> pypsa.Network:
+        n = self._base_network()
+        lv = "A low voltage"
+        for bus, carrier in [
+            ("A rural heat", "rural heat"),
+            ("A home battery", "home battery"),
+            ("A urban central heat", "urban central heat"),
+        ]:
+            _add_bus(n, bus, carrier, "MWh_th", "A")
+        for name, p in [
+            ("electricity", 10.0),
+            ("industry electricity", 5.0),
+            ("agriculture electricity", 1.0),
+            ("agriculture machinery electric", 1.0),
+        ]:
+            _add_dispatched(n, "Load", f"A {name}", {"p": [p, p]}, bus=lv, carrier=name)
+        self._link(
+            n,
+            "A BEV charger",
+            "BEV charger",
+            lv,
+            "A EV battery",
+            [2.0, 2.0],
+            [-2.0, -2.0],
+        )
+        # heat pumps in PyPSA-AT: bus0 = heat bus, bus1 = low voltage
+        self._link(
+            n,
+            "A rural air heat pump",
+            "rural air heat pump",
+            "A rural heat",
+            lv,
+            [-9.0, -9.0],
+            [3.0, 3.0],
+        )
+        self._link(
+            n, "A DAC", "DAC", "A", "A urban central heat", [1.0, 1.0], [0.0, 0.0]
+        )
+        self._link(
+            n,
+            "A distribution",
+            "electricity distribution grid",
+            lv,
+            "A",
+            [4.0, 4.0],
+            [-4.0, -4.0],
+        )
+        self._link(
+            n,
+            "A home battery charger",
+            "home battery charger",
+            lv,
+            "A home battery",
+            [2.0, 2.0],
+            [-2.0, -2.0],
+        )
+        self._link(
+            n,
+            "A urban central resistive heater",
+            "urban central resistive heater",
+            lv,
+            "A urban central heat",
+            [2.0, 2.0],
+            [-2.0, -2.0],
+        )
+        if v2g:
+            self._link(n, "A V2G", "V2G", "A EV battery", lv, [1.0, 1.0], [-1.0, -1.0])
+        return n
 
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for network in mock_network_collection:
-            result = Final_Energy_by_Carrier__Electricity(network)
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-            assert len(result) > 0
-
-    def test_filters_forbidden_low_voltage_carriers(self):
-        """Residential/commercial low-voltage sum excludes forbidden carrier patterns."""
-        result = Final_Energy_by_Carrier__Electricity(self._electricity_network())
-        # Only household demand (7) and rural air heat pump (8) must remain from LV.
-        assert 15.0 in result.values
-        assert 100.0 not in result.values
-        assert 200.0 not in result.values
-        assert 300.0 not in result.values
-        assert 400.0 not in result.values
-        assert 500.0 not in result.values
-
-    def test_includes_all_non_empty_contributions_in_order(self):
-        """Result concatenates agriculture, res/com, transport, industry, and DAC."""
-        result = Final_Energy_by_Carrier__Electricity(self._electricity_network())
-        assert list(result.values) == [10.0, 15.0, 40.0, 50.0, 60.0]
-
-    def test_ignores_empty_contributions_before_concat(self):
-        """Empty contribution series are removed before concatenation."""
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_zero_fill(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format; empty location B gets 0.0."""
+        n = self._ac3_network()
         result = Final_Energy_by_Carrier__Electricity(
-            self._electricity_network(empty_dac=True)
+            n, aggregate_per_year=aggregate_per_year
         )
-        assert list(result.values) == [10.0, 15.0, 40.0, 50.0]
+        _check_c6_format(result, n, aggregate_per_year)
+        values = result.droplevel("unit")
+        assert set(values.index) == {"A", "B"}
+        assert (values.loc[["B"]] == 0.0).all(axis=None)
 
-    def test_issues_expected_withdrawal_queries(self):
-        """Function requests the expected carrier/component combinations."""
-        network = self._electricity_network()
-        _ = Final_Energy_by_Carrier__Electricity(network)
-        calls = network.statistics.calls
-        assert len(calls) == 5
+    def test_ac3_value(self):
+        """AC3 / AC5: 46 at A; grid, home battery, central heater excluded."""
+        result = Final_Energy_by_Carrier__Electricity(self._ac3_network())
+        assert result.droplevel("unit")["A"] == pytest.approx(46.0)
+        assert (result >= 0).all()
 
-        assert calls[0]["carrier"] == [
-            "agriculture electricity",
-            "agriculture machinery electric",
-        ]
-        assert calls[0]["components"] == "Load"
+    def test_ac3_with_v2g(self):
+        """AC3: a V2G feed-in of 1 per snapshot is subtracted: 44."""
+        result = Final_Energy_by_Carrier__Electricity(self._ac3_network(v2g=True))
+        assert result.droplevel("unit")["A"] == pytest.approx(44.0)
 
-        assert calls[1]["bus_carrier"] == "low voltage"
-        assert calls[1]["components"] is None
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._ac3_network(v2g=True)
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(Final_Energy_by_Carrier__Electricity, n)
 
-        assert calls[2]["bus_carrier"] == "low voltage"
-        assert calls[2]["carrier"] == "BEV charger"
-        assert calls[2]["components"] == "Link"
+    def test_v2g_not_clipped(self):
+        """AC7: BEV 4 / 0 and V2G 0 / 3 give snapshot values 4 / −3, yearly 1."""
+        n = self._base_network()
+        lv = "A low voltage"
+        self._link(
+            n,
+            "A BEV charger",
+            "BEV charger",
+            lv,
+            "A EV battery",
+            [4.0, 0.0],
+            [-4.0, 0.0],
+        )
+        self._link(n, "A V2G", "V2G", "A EV battery", lv, [0.0, 3.0], [0.0, -3.0])
+        series = Final_Energy_by_Carrier__Electricity(n, aggregate_per_year=False)
+        yearly = Final_Energy_by_Carrier__Electricity(n)
+        assert series.droplevel("unit").loc["A"].tolist() == pytest.approx([4.0, -3.0])
+        assert yearly.droplevel("unit")["A"] == pytest.approx(1.0)
 
-        assert calls[3]["carrier"] == "industry electricity"
-        assert calls[3]["components"] == "Load"
-
-        assert calls[4]["bus_carrier"] == "AC"
-        assert calls[4]["carrier"] == "DAC"
-        assert calls[4]["components"] == "Link"
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_network_without_carriers(self, aggregate_per_year):
+        """AC6: no low voltage bus and no DAC → 0.0 for every location."""
+        n = _real_network()
+        _add_bus(n, "A", "AC", "MWh_el", "A")
+        _add_bus(n, "EU gas", "gas", "MWh_LHV", "EU")
+        result = Final_Energy_by_Carrier__Electricity(
+            n, aggregate_per_year=aggregate_per_year
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert set(result.index.get_level_values("location")) == {"A", "EU"}
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------
