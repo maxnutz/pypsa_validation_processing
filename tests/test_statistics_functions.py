@@ -423,188 +423,115 @@ class TestNetImportsElectricity:
 
 
 class TestNetImportsOil:
-    """Test suite for Net_Imports__Oil function."""
+    """Spec Net_Imports__Oil.md AC1-AC7."""
 
-    class _OilTradeStatisticsAccessor:
-        """Minimal accessor for oil net-import tests.
+    @staticmethod
+    def _network(
+        boiler: float = 40.0, store: float = 0.0, n_snapshots: int = 1
+    ) -> pypsa.Network:
+        """AC3 mock: EU oil copperplate, refining 80 at EU, Fischer-Tropsch 20 at A."""
+        n = _real_network(n_snapshots)
+        n.snapshot_weightings.loc[:, :] = 1.0
+        ones = [1.0] * n_snapshots
+        _add_bus(n, "EU oil", "oil", "MWh_th", "EU")
+        _add_bus(n, "EU oil primary", "oil primary", "MWh_th", "EU")
+        for loc in ("A", "B", "C"):
+            _add_bus(n, loc, "AC", "MWh_el", loc)
+        _add_bus(n, "A land transport oil", "land transport oil", "MWh_th", "A")
+        _add_bus(n, "B rural heat", "rural heat", "MWh_th", "B")
 
-        Rows are given as pre-``mul(-1)`` ``(bus0, bus1, unit, values)``
-        tuples using full PyPSA-style bus names (``"<location> oil"``), so
-        the copperplate-splitting logic in the function under test is
-        exercised the same way it would be against a real network.
-        """
-
-        def __init__(self, rows: list[tuple[str, str, str, list[float]]]):
-            self.rows = rows
-            self.calls: list[dict[str, object]] = []
-
-        def _energy_balance_rows(self, groupby_time: bool) -> pd.Series | pd.DataFrame:
-            index = pd.MultiIndex.from_tuples(
-                [(bus0, bus1, unit) for bus0, bus1, unit, _ in self.rows],
-                names=["bus0", "bus1", "unit"],
+        def link(name, carrier, bus0, bus1, p0, p1):
+            _add_dispatched(
+                n,
+                "Link",
+                name,
+                {"p0": [p0 * v for v in ones], "p1": [p1 * v for v in ones]},
+                bus0=bus0,
+                bus1=bus1,
+                carrier=carrier,
             )
-            if groupby_time:
-                values = [sum(values) for _, _, _, values in self.rows]
-                return pd.Series(values, index=index, dtype=float)
 
-            n_snapshots = len(self.rows[0][3])
-            timestamps = pd.date_range(
-                "2019-01-01", periods=n_snapshots, freq="6h", name="snapshot"
+        link("EU oil refining", "oil refining", "EU oil primary", "EU oil", 80.0, -80.0)
+        link("A Fischer-Tropsch", "Fischer-Tropsch", "A", "EU oil", 30.0, -20.0)
+        link(
+            "A land transport oil",
+            "land transport oil",
+            "EU oil",
+            "A land transport oil",
+            60.0,
+            -60.0,
+        )
+        link(
+            "B rural oil boiler",
+            "rural oil boiler",
+            "EU oil",
+            "B rural heat",
+            boiler,
+            -0.9 * boiler,
+        )
+        if store:
+            # Store p > 0 discharges to the bus; charging is negative p
+            _add_dispatched(
+                n,
+                "Store",
+                "EU oil Store",
+                {"p": [-store * v for v in ones]},
+                bus="EU oil",
+                carrier="oil",
             )
-            data = [values for _, _, _, values in self.rows]
-            return pd.DataFrame(data, index=index, columns=timestamps, dtype=float)
+        return n
 
-        def energy_balance(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby: list[str] | None = None,
-            groupby_time: bool = True,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby": groupby,
-                    "groupby_time": groupby_time,
-                    "nice_names": nice_names,
-                }
-            )
-            return self._energy_balance_rows(groupby_time)
+    @staticmethod
+    def _values(n: pypsa.Network, **kwargs: object) -> pd.Series:
+        return Net_Imports__Oil(n, **kwargs).droplevel("unit")
 
-    class _OilTradeNetwork:
-        """Minimal network exposing the custom oil trade accessor."""
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format; C without oil consumers gets 0.0."""
+        n = self._network()
+        result = Net_Imports__Oil(n, aggregate_per_year=aggregate_per_year)
+        _check_c6_format(result, n, aggregate_per_year)
+        values = result.droplevel("unit")
+        assert set(values.index) == {"A", "B", "C", "EU"}
+        assert (values.loc[["C"]] == 0.0).all(axis=None)
 
-        def __init__(self, rows: list[tuple[str, str, str, list[float]]]):
-            self.statistics = TestNetImportsOil._OilTradeStatisticsAccessor(rows)
+    def test_ac3_values(self):
+        """AC3: f_oil = 0.8; A 48, B 32, EU −80, consumers attributed per D1."""
+        values = self._values(self._network())
+        assert values["A"] == pytest.approx(48.0)
+        assert values["B"] == pytest.approx(32.0)
+        assert values["EU"] == pytest.approx(-80.0)
 
-    def _oil_trade_network(self, rows: list[tuple[str, str, str, list[float]]]):
-        return self._OilTradeNetwork(rows)
+    def test_ac7_store_charging(self):
+        """AC5 / AC7: Store charging 10 at EU: A 48, B 24, EU −72; sum 0."""
+        values = self._values(self._network(boiler=30.0, store=10.0))
+        assert values["A"] == pytest.approx(48.0)
+        assert values["B"] == pytest.approx(24.0)
+        assert values["EU"] == pytest.approx(-72.0)
+        assert values.sum() == pytest.approx(0.0)
 
-    def test_returns_net_imports_with_copperplate_regionalization(self):
-        """Locations are derived from bus0/bus1 names split at the copperplate 'EU oil' bus."""
-        network = self._oil_trade_network(
-            [
-                ("EU oil", "AT1 oil", "MWh_LHV", [30.0]),
-                ("AT1 oil", "EU oil", "MWh_LHV", [6.0]),
-            ]
-        )
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._network(boiler=30.0, store=10.0, n_snapshots=2)
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(Net_Imports__Oil, n)
 
-        result = Net_Imports__Oil(network)
+    def test_no_fossil_supply(self):
+        """Edge case: f_oil = 0 gives 0.0 for every regional location."""
+        n = self._network()
+        n.links_t.p0["EU oil refining"] = [0.0]
+        n.links_t.p1["EU oil refining"] = [0.0]
+        values = self._values(n)
+        assert (values.loc[["A", "B", "C"]] == 0.0).all()
 
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(-24.0)
-        assert result.loc[("EU", "MWh_LHV")] == pytest.approx(24.0)
-
-    def test_issues_expected_energy_balance_query(self):
-        """Function requests oil energy_balance grouped by bus0/bus1/unit."""
-        network = self._oil_trade_network([("EU oil", "AT1 oil", "MWh_LHV", [10.0])])
-        _ = Net_Imports__Oil(network)
-
-        calls = network.statistics.calls
-        assert len(calls) == 1
-        assert calls[0]["bus_carrier"] == "oil"
-        assert calls[0]["components"] == "Link"
-        assert calls[0]["groupby"] == ["bus0", "bus1", "unit"]
-        assert calls[0]["nice_names"] is False
-        assert calls[0]["groupby_time"] is True
-
-    def test_applies_sign_flip_from_energy_balance(self):
-        """The raw energy_balance result is multiplied by -1 before netting."""
-        network = self._oil_trade_network([("EU oil", "AT1 oil", "MWh_LHV", [10.0])])
-        result = Net_Imports__Oil(network)
-        # raw=10 -> *-1 = -10 assigned to AT1 (location_to), +10 to EU (location_from)
-        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(-10.0)
-        assert result.loc[("EU", "MWh_LHV")] == pytest.approx(10.0)
-
-    def test_splits_multi_word_bus_names_to_first_token(self):
-        """Locations are derived from the first whitespace-separated bus token."""
-        network = self._oil_trade_network([("EU oil", "AT1 0 oil", "MWh_LHV", [5.0])])
-        result = Net_Imports__Oil(network)
-        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(-5.0)
-        assert result.loc[("EU", "MWh_LHV")] == pytest.approx(5.0)
-
-    def test_nets_multiple_regions_against_copperplate(self):
-        """Net imports sum correctly across more than two trading regions."""
-        network = self._oil_trade_network(
-            [
-                ("EU oil", "AT1 oil", "MWh_LHV", [12.0]),
-                ("AT1 oil", "EU oil", "MWh_LHV", [3.0]),
-                ("AT2 oil", "EU oil", "MWh_LHV", [7.0]),
-            ]
-        )
-        result = Net_Imports__Oil(network)
-
-        assert result.loc[("AT1", "MWh_LHV")] == pytest.approx(-9.0)
-        assert result.loc[("AT2", "MWh_LHV")] == pytest.approx(7.0)
-        assert result.loc[("EU", "MWh_LHV")] == pytest.approx(2.0)
-        # closed copperplate system: net imports across all locations sum to zero
-        assert result.sum() == pytest.approx(0.0)
-
-    def test_returns_dataframe_for_aggregate_per_year_false(self):
-        """aggregate_per_year=False returns a timeseries DataFrame consistent with the aggregate."""
-        network = self._oil_trade_network(
-            [
-                ("EU oil", "AT1 oil", "MWh_LHV", [20.0, 10.0]),
-                ("AT1 oil", "EU oil", "MWh_LHV", [4.0, 2.0]),
-            ]
-        )
-
-        result = Net_Imports__Oil(network, aggregate_per_year=False)
-        aggregated = Net_Imports__Oil(network)
-
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert any(isinstance(column, pd.Timestamp) for column in result.columns)
-        assert result.shape[1] == 2
-        pd.testing.assert_series_equal(
-            result.sum(axis=1), aggregated, check_names=False
-        )
-
-        timestamps = list(result.columns)
-        ts0, ts1 = timestamps[0], timestamps[1]
-
-        assert result.loc[("AT1", "MWh_LHV"), ts0] == pytest.approx(-16.0)
-        assert result.loc[("EU", "MWh_LHV"), ts0] == pytest.approx(16.0)
-        assert result.loc[("AT1", "MWh_LHV"), ts1] == pytest.approx(-8.0)
-        assert result.loc[("EU", "MWh_LHV"), ts1] == pytest.approx(8.0)
-
-    def test_returns_series(self, mock_network: MockPyPSANetwork):
-        """Test that the function returns a pandas Series against the shared network fixture."""
-        result = Net_Imports__Oil(mock_network)
-        assert isinstance(result, pd.Series)
-
-    def test_has_location_and_unit_multiindex(self, mock_network: MockPyPSANetwork):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Net_Imports__Oil(mock_network)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for network in mock_network_collection:
-            result = Net_Imports__Oil(network)
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-
-    def test_empty_network_returns_empty_series(self):
-        """Net_Imports__Oil should handle a network without oil trade links gracefully."""
-        # No rows at all, emulating a network without oil trade links.
-        empty_network = self._oil_trade_network([])
-
-        result = Net_Imports__Oil(empty_network)
-
-        # The function should not raise and should return an empty Series.
-        assert isinstance(result, pd.Series)
-        assert result.empty
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_oil_bus(self, aggregate_per_year):
+        """Edge case / AC6: no oil bus gives 0.0 for every location."""
+        n = _real_network()
+        _add_bus(n, "A", "AC", "MWh_el", "A")
+        result = Net_Imports__Oil(n, aggregate_per_year=aggregate_per_year)
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------

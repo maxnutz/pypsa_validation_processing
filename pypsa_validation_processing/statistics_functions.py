@@ -35,7 +35,6 @@ from pypsa_validation_processing.utils import (
     statistics_kwargs_for_filtering as kwargs_filtering,
     statistics_kwargs as kwargs,
     statistics_grouping_index,
-    statistics_kwargs_for_imports as kwargs_imports,
     UNITS_MAPPING,
     remap_unit_index,
 )
@@ -46,6 +45,8 @@ from pypsa_validation_processing.utils import (
     MissingInputError,
     non_energy_use,
     apply_coke_correction,
+    attribute_locations,
+    fossil_oil_share,
 )
 
 logger = logging.getLogger(__name__)
@@ -418,10 +419,13 @@ def Net_Imports__Oil(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
 ) -> pd.Series | pd.DataFrame:
-    """Extract net oil imports from a PyPSA Network.
+    """Extract net imports of oil from a PyPSA Network.
 
-    Calculates the net imports of oil by computing the difference between
-    imports to and exports from each location based on Link components.
+    ``NI(l) = f_oil · (Σ_c W[oil, c](l) + ΔE_store(l)) − S[oil, oil refining](l)``:
+    the fossil part of the oil withdrawn by Links (location per D1) and of the
+    net withdrawal of ``oil`` Stores, minus the fossil production of the
+    location (D2). Positive = net import. The copperplate ``EU``, which holds
+    the refining, is negative; the yearly sum over all locations is 0.
 
     Parameters
     ----------
@@ -435,85 +439,41 @@ def Net_Imports__Oil(
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with net oil imports indexed by location
-        and unit.
-
-
-    Notes
-    -----
-    All oil is distributed from cupperplate at "EU oil" bus. Oil link know both
-    direction and multiple carriers are covered by these links, as these links are
-    not just representing transmission, but also technologies with efficiencies.
-
-    Locations are derived from bus names and assigned to the respective bus columns.
-
-    The evaluation pathway in this function strongly depends on the input of the
-    parameter ``aggregate_per_year``. Non-aggregated data (with ``aggregate_per_year`` is ``False``)
-    are processed as :class:`pandas.DataFrame` in long-format, aggregated data
-    (with ``aggregate_per_year`` is ``True``) are processed as they come.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
     """
-    # this is not transmission!
-    raw_stat = n.statistics.energy_balance(
-        bus_carrier="oil",
-        components="Link",
-        groupby_time=aggregate_per_year,
-        **kwargs_imports,
-    ).mul(-1)
-
-    # address locations to respective buses
-    home_location = [
-        bus.split(" ")[0] for bus in list(raw_stat.index.get_level_values("bus1"))
-    ]
-    imports_raw = create_location_index_from_copperplate(
-        raw_stat, home_location, "bus1"
-    )
-    home_location = [
-        bus.split(" ")[0] for bus in list(imports_raw.index.get_level_values("bus0"))
-    ]
-    imports_raw = create_location_index_from_copperplate(
-        imports_raw, home_location, "bus0"
-    )
-
-    # process non-aggregated data - stack to long format with single column
-    if isinstance(imports_raw, pd.DataFrame):
-        imports_long = (
-            imports_raw.stack(future_stack=True)
-            .rename("value")
-            .rename_axis(index=["location_from", "location_to", "unit", "snapshot"])
-            .reset_index()
+    if "oil" not in set(n.buses["carrier"]):
+        return ensure_all_locations(
+            pd.Series(dtype=float), n, "MWh", aggregate_per_year
         )
-        groupby_columns = ["location", "unit", "snapshot"]
-    # process aggregated data - process single column as is
-    else:
-        imports_long = (
-            imports_raw.rename("value")
-            .rename_axis(index=["location_from", "location_to", "unit"])
-            .reset_index()
-        )
-        groupby_columns = ["location", "unit"]
-
-    net_imports = pd.concat(
-        [
-            imports_long.assign(
-                location=imports_long["location_to"], value=imports_long["value"]
-            ),
-            imports_long.assign(
-                location=imports_long["location_from"], value=-imports_long["value"]
-            ),
-        ],
-        ignore_index=True,
+    f_oil = fossil_oil_share(n)
+    stats = {"bus_carrier": "oil", "groupby_time": aggregate_per_year}
+    withdrawal = n.statistics.withdrawal(
+        components=["Link"],
+        groupby=["name", "location", "unit"],
+        nice_names=False,
+        **stats,
+    ).fillna(0.0)
+    store = n.statistics.energy_balance(components=["Store"], **stats, **kwargs)
+    refining = n.statistics.supply(carrier="oil refining", **stats, **kwargs)
+    parts = [
+        f_oil * attribute_locations(n, withdrawal),
+        -f_oil * store,  # energy balance > 0 is supply, i.e. discharging
+        -refining,
+    ]
+    parts = [
+        part.groupby(level=statistics_grouping_index).sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        pd.concat(parts).fillna(0.0).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-    net_imports_grouped = net_imports.groupby(groupby_columns, sort=False)[
-        "value"
-    ].sum()
-
-    if isinstance(imports_raw, pd.DataFrame):
-        result = net_imports_grouped.unstack("snapshot")
-    else:
-        result = net_imports_grouped
-
-    logger.debug(f"Net Imports|Oil finished. Resulting shape: {result.shape}. ")
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
+    logger.debug(f"Net Imports|Oil finished. Shape: {result.shape}.")
     return result
 
 
