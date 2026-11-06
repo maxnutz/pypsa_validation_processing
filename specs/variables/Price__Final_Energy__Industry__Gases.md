@@ -48,9 +48,9 @@ Issue title and IAMC name are identical: #100 was renamed from `Prices|Final Ene
 
 Changes to the ported logic, only as far as needed for the function contract:
 - Region = location (D1.1) instead of `n.links.index.str.contains(region)`; per-location values are aggregated to the country by C8 (weighted mean).
-- Without CO2 price: `λ_b − γ(b)` instead of the bus marginal price `λ_b` (D9 item 2; owner, PR #148 review 2026-11-06: a CO2 price MAY be added in post-processing). The supplying Links `gas for industry` (`co2`) and `gas for industry CC` (`co2`, `co2 stored`) have CO2 ports; yearly mean over all locations 85.08 EUR/MWh including, 23.23 EUR/MWh without CO2 (D9).
+- CO2 price included: the bus marginal price `λ_b` as in `price_load`, nothing subtracted (D9; owner decision 2026-11-06 after PR #148, reversing its review decision; removing the CO2 price is #163). Yearly mean over all locations 85.08 EUR/MWh (D9).
 - Returns `value` and `weight` rows (C6.12) instead of a single price.
-- `costs_gen_links` returns NaN for a Link output < 1 MWh and `get_weighted_costs_links` NaN for a zero denominator; here the value is NaN for a weight of `0.0` or NaN (D9 item 4, A-5).
+- `costs_gen_links` returns NaN for a Link output < 1 MWh and `get_weighted_costs_links` NaN for a zero denominator; here the value is NaN for a weight of `0.0` or NaN (D9 item 3, A-5).
 - Formula: D9 (Load-weighted marginal price at the `gas for industry` bus) instead of `get_weighted_costs_links` over the Links `gas for industry` and `gas for industry CC` (owner decision 2026-11-05, D9).
 - No upper cut-off: pypsa-de sets results ≥ 1e4 to NaN (l.3515); not ported, because D9 has no division by a near-zero Link output.
 
@@ -62,10 +62,9 @@ Changes to the ported logic, only as far as needed for the function contract:
 | Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `gas for industry` | `gas for industry` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.4072-4074 |
-| Links with `bus1` at the Load's bus (supplying Links) | all | `gas for industry` (`bus1`), CO2 ports per D9 item 2 | `p0`, efficiencies and marginal prices of the CO2 port buses, for `γ` only | yes, for `γ` only | D9; measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` |
 | any other component at the `gas for industry` bus | – | `gas for industry` | – | no (they set the bus price, they are not priced demand) | D9 |
 
-Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `gas for industry` Loads, one per location, on regional buses with carrier `gas for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 85.08 EUR/MWh including, 23.23 EUR/MWh without CO2 (D9).
+Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `gas for industry` Loads, one per location, on regional buses with carrier `gas for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 85.08 EUR/MWh, including the CO2 price (D9).
 
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = P[gas for industry](l)`, `weight(l) = L[gas for industry](l)` (D9).
@@ -91,8 +90,7 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 |---|---|
 | location without a `gas for industry` Load | value and weight NaN (every snapshot with `aggregate_per_year=False`); the location is not dropped (C6.12, C6.13, A-5) |
 | carrier `gas for industry` not present in `n` | value and weight NaN for every location of `n.buses.location` (C6.13). The function MUST NOT return `None` or zero rows (C6.7) |
-| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 4) |
-| supplying Link without CO2 port, or no supply in a snapshot | contributes no CO2 cost; `γ_t = 0` without supply (D9 item 2) |
+| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 3) |
 | country or region without any `gas for industry` Load | value NaN after region aggregation (C8.2); `pyam` drops NaN rows (OQ-12) |
 | negative marginal price | negative value, weight unchanged (section 7) |
 | network without `n.buses_t.marginal_price` (not solved) | out of scope: C2 requires solved networks |
@@ -105,8 +103,8 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - AC4: The `True` and `False` results are consistent per C6-AC3 (`intensive`).
 - AC5: As AC3 with `λ = [−20, 100]`: yearly value `(−200 + 3000) / 40 = 70.0`; snapshot value `−20` for the first snapshot (negative prices pass).
 - AC6: C6-AC6: a mock network without the carrier `gas for industry` returns value and weight NaN for every location, not `None` and not zero rows. A Load with `p = [0, 0]` at `A` gives value NaN and weight `0.0` at `A` (both values of `aggregate_per_year`); with `p = [10, 0]` the snapshot values are `[50, NaN]` and the yearly value is `50`.
-- AC7: Other components at the same bus change the result only through `λ_b` and, as supplying Links with a CO2 port, through `γ` (D9); e.g. `capital_cost > 0` of a Link with carrier `gas for industry` does not change it.
-- AC8 (CO2 price removed): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: `γ = 20`, snapshot values `[30, 80]`, yearly value `(300 + 2400) / 40 = 67.5`. A second supplying Link without CO2 port and the same `p0` halves `γ` to `10`. A port with bus carrier `AC` does not count as CO2 port.
+- AC7: Other components at the same bus change the result only through `λ_b` (D9); e.g. `capital_cost > 0` of a Link with carrier `gas for industry` does not change it.
+- AC8 (CO2 price included): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: the result equals AC3 (snapshot values `[50, 100]`, yearly value `87.5`); the CO2 port of the supplying Link is not evaluated (D9).
 
 ## 12. Open questions
 - OQ-33: the variable is not in the definitions; it is evaluated only with `definitions_path: false` until it is added there. The definitions of the Infra-Enshure coupling variables are made in another repository and imported later (owner, PR #148 review 2026-11-06).

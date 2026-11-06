@@ -48,25 +48,24 @@ Issue title and IAMC name are identical: #104 was renamed from `Prices|Final Ene
 
 Changes to the ported logic, only as far as needed for the function contract:
 - Region = location (D1.1) instead of `n.links.index.str.contains(region)`; per-location values are aggregated to the country by C8 (weighted mean).
-- Without CO2 price: `λ_b − γ(b)` instead of the bus marginal price `λ_b` (D9 item 2; owner, PR #148 review 2026-11-06: a CO2 price MAY be added in post-processing). The supplying Link `naphtha for industry` emits to `process emissions`; yearly mean over all locations 53.99 EUR/MWh including, 44.71 EUR/MWh without CO2 (D9).
+- CO2 price included: the bus marginal price `λ_b` as in `price_load`, nothing subtracted (D9; owner decision 2026-11-06 after PR #148, reversing its review decision; removing the CO2 price is #163). Yearly mean over all locations 53.99 EUR/MWh (D9).
 - Returns `value` and `weight` rows (C6.12) instead of a single price.
-- `costs_gen_links` returns NaN for a Link output < 1 MWh and `get_weighted_costs_links` NaN for a zero denominator; here the value is NaN for a weight of `0.0` or NaN (D9 item 4, A-5).
+- `costs_gen_links` returns NaN for a Link output < 1 MWh and `get_weighted_costs_links` NaN for a zero denominator; here the value is NaN for a weight of `0.0` or NaN (D9 item 3, A-5).
 - Formula: D9 (Load-weighted marginal price at the `naphtha for industry` bus) instead of `get_weighted_costs_links(["naphtha for industry"])` (owner decision 2026-11-05, D9). This is pypsa-de's formula for `Liquids|Efuel` (l.4037-4039).
 - No upper cut-off: pypsa-de sets results ≥ 1e4 to NaN (l.3515); not ported, because D9 has no division by a near-zero Link output. Comparisons of this variable with pypsa-de results MUST take the cut-off into account (owner, PR #148 review 2026-11-06; TODO.md WP6).
 
 ## 5. Match type
 - Match type: `semantic`
 - Reasoning: Same variable name, different formula. pypsa-de reports the levelised cost of the `naphtha for industry` Links for `Liquids|Oil` and uses `price_load(n, "naphtha for industry", region)` (the D9 formula) for `Price|Final Energy|Industry|Liquids|Efuel` (l.4037-4039). Per #104 the price covers naphtha from fossil and non-fossil oil, i.e. the whole Load; the marginal price at the `naphtha for industry` bus is that mix price.
-- Applicability to PyPSA-AT (owner question, PR #148 review 2026-11-06): pypsa-de moves the German oil consumers to a `DE oil` bus and adds `DE renewable oil` / `EU renewable oil` buses (`sister_packages/pypsa-de/scripts/pypsa-de/modify_prenetwork.py::unravel_carbonaceous_fuels`, l.314-425), so its naphtha price is a German market price and its label `Efuel` refers to that setup. PyPSA-AT keeps the pypsa-eur setup: every `naphtha for industry` Link takes its oil from the copperplate `EU oil` bus, which is supplied by `oil refining` (1668.1 TWh), `import oil` (502.9), `electrobiofuels` (218.2) and `Fischer-Tropsch` (4.5 TWh) (measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-06). D9 therefore applies unchanged: the `EU oil` price is the mix price of fossil and non-fossil oil asked for in #104. Without CO2 price (D9 item 2) the snapshot value is `(λ_EU oil + marginal_cost) / efficiency`, the same at every location with identical Link parameters; yearly values differ between locations only through the Load profile.
+- Applicability to PyPSA-AT (owner question, PR #148 review 2026-11-06): pypsa-de moves the German oil consumers to a `DE oil` bus and adds `DE renewable oil` / `EU renewable oil` buses (`sister_packages/pypsa-de/scripts/pypsa-de/modify_prenetwork.py::unravel_carbonaceous_fuels`, l.314-425), so its naphtha price is a German market price and its label `Efuel` refers to that setup. PyPSA-AT keeps the pypsa-eur setup: every `naphtha for industry` Link takes its oil from the copperplate `EU oil` bus, which is supplied by `oil refining` (1668.1 TWh), `import oil` (502.9), `electrobiofuels` (218.2) and `Fischer-Tropsch` (4.5 TWh) (measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-06). D9 therefore applies unchanged: the `EU oil` price is the mix price of fossil and non-fossil oil asked for in #104. By the nodal balance of the supplying Link (D9), the snapshot value is `(λ_EU oil + marginal_cost − efficiency2 · λ_process emissions) / efficiency`, i.e. the oil mix price plus the CO2 price of the process emissions; yearly values differ between locations through the Link parameters, the `process emissions` bus price and the Load profile.
 
 ## 6. Components, carriers, bus carriers
 | Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
 |---|---|---|---|---|---|
 | Load | `naphtha for industry` | `naphtha for industry` | withdrawal (weight), withdrawal × bus marginal price (cost) | yes | measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc`; sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py l.3988-3990 |
-| Links with `bus1` at the Load's bus (supplying Links) | all | `naphtha for industry` (`bus1`), CO2 ports per D9 item 2 | `p0`, efficiencies and marginal prices of the CO2 port buses, for `γ` only | yes, for `γ` only | D9; measured on `resources/20261020_carbon_accounting_run/networks/solved_2040.nc` |
 | any other component at the `naphtha for industry` bus | – | `naphtha for industry` | – | no (they set the bus price, they are not priced demand) | D9 |
 
-Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `naphtha for industry` Loads, one per location, on regional buses with carrier `naphtha for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 53.99 EUR/MWh including, 44.71 EUR/MWh without CO2 (D9).
+Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 2026-11-05): 51 `naphtha for industry` Loads, one per location, on regional buses with carrier `naphtha for industry` and unit `MWh_LHV`; yearly Load-weighted price over all locations 53.99 EUR/MWh, including the CO2 price (D9).
 
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = P[naphtha for industry](l)`, `weight(l) = L[naphtha for industry](l)` (D9).
@@ -92,8 +91,7 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 |---|---|
 | location without a `naphtha for industry` Load | value and weight NaN (every snapshot with `aggregate_per_year=False`); the location is not dropped (C6.12, C6.13, A-5) |
 | carrier `naphtha for industry` not present in `n` | value and weight NaN for every location of `n.buses.location` (C6.13). The function MUST NOT return `None` or zero rows (C6.7) |
-| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 4) |
-| supplying Link without CO2 port, or no supply in a snapshot | contributes no CO2 cost; `γ_t = 0` without supply (D9 item 2) |
+| Load present, withdrawal 0 in a snapshot / all year | value NaN, weight `0.0` for that snapshot / location (D9 items 1 and 3) |
 | country or region without any `naphtha for industry` Load | value NaN after region aggregation (C8.2); `pyam` drops NaN rows (OQ-12) |
 | negative marginal price | negative value, weight unchanged (section 7) |
 | network without `n.buses_t.marginal_price` (not solved) | out of scope: C2 requires solved networks |
@@ -106,8 +104,8 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - AC4: The `True` and `False` results are consistent per C6-AC3 (`intensive`).
 - AC5: As AC3 with `λ = [−20, 100]`: yearly value `(−200 + 3000) / 40 = 70.0`; snapshot value `−20` for the first snapshot (negative prices pass).
 - AC6: C6-AC6: a mock network without the carrier `naphtha for industry` returns value and weight NaN for every location, not `None` and not zero rows. A Load with `p = [0, 0]` at `A` gives value NaN and weight `0.0` at `A` (both values of `aggregate_per_year`); with `p = [10, 0]` the snapshot values are `[50, NaN]` and the yearly value is `50`.
-- AC7: Other components at the same bus change the result only through `λ_b` and, as supplying Links with a CO2 port, through `γ` (D9); e.g. `capital_cost > 0` of a Link with carrier `naphtha for industry` does not change it.
-- AC8 (CO2 price removed): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: `γ = 20`, snapshot values `[30, 80]`, yearly value `(300 + 2400) / 40 = 67.5`. A second supplying Link without CO2 port and the same `p0` halves `γ` to `10`. A port with bus carrier `AC` does not count as CO2 port.
+- AC7: Other components at the same bus change the result only through `λ_b` (D9); e.g. `capital_cost > 0` of a Link with carrier `naphtha for industry` does not change it.
+- AC8 (CO2 price included): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: the result equals AC3 (snapshot values `[50, 100]`, yearly value `87.5`); the CO2 port of the supplying Link is not evaluated (D9).
 
 ## 12. Open questions
 - OQ-33: the variable is not in the definitions; it is evaluated only with `definitions_path: false` until it is added there. The definitions of the Infra-Enshure coupling variables are made in another repository and imported later (owner, PR #148 review 2026-11-06).
