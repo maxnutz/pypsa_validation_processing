@@ -688,11 +688,17 @@ def Final_Energy_by_Sector__Transportation(
 def Final_Energy_by_Sector__Industry(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    industry_non_energy_shares: pd.DataFrame | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extract Industry-sector final energy from a PyPSA Network.
+    """Extract Final Energy [by Sector]|Industry from a PyPSA Network.
 
-    Returns the total energy consumed by the Industry sector (excluding
-    transmission / distribution losses)
+    Industry excluding non-energy use: ``industry electricity``,
+    ``low-temperature heat for industry`` on ``urban central heat`` buses,
+    the industrial share of the decentral heat input (D8), ``solid biomass
+    for industry`` and the ``gas``, ``H2``, ``naphtha`` and ``coal for
+    industry`` Loads minus their non-energy use (D5); coal with the coke
+    correction (D6). ``industry methanol`` and supply-link losses are not
+    counted.
 
     Parameters
     ----------
@@ -700,75 +706,69 @@ def Final_Energy_by_Sector__Industry(
         PyPSA network to process.
     aggregate_per_year : bool, optional
         If ``True`` (default), aggregate over all snapshots and return a
-        :class:`pandas.Series`.  If ``False``, return a
+        :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
+    industry_non_energy_shares : pd.DataFrame | None, optional
+        Eurostat non-energy shares, index (``country``, ``carrier``), column
+        ``non_energy_share`` (C2.5).
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex of ``location`` and
-        ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
-
-    Notes
-    -----
-    Includes all carriers directly connected to loads in the industry sector. Same Carrier
-    names are also attached to some links, so components-grouping is needed!
-    efficiency losses directly supplying industry loads for gas, biomass and coal carbon capture
-    are included extra.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        (``MWh``) and every location of the network (C6.13).
     """
-    carriers = [
-        "coal for industry",
-        "industry electricity",
-        "gas for industry",
-        "H2 for industry",
-        "solid biomass for industry",
-        "industry methanol",
-        "naphtha for industry",
-        "low-temperature heat for industry",
-    ]
-    cc_carriers = [
-        "coal for industry CC",
-        "gas for industry CC",
-        "solid biomass for industry CC",
-    ]
+    stats = {"groupby_time": aggregate_per_year, **kwargs}
+    loads = set(n.loads["carrier"])
+    shares = industry_non_energy_shares
 
-    load_statistics = (
-        n.statistics.energy_balance(
-            carrier=carriers,
-            groupby=["carrier", "unit", "location"],
-            components="Load",
-            direction="withdrawal",  # for positive values
-            groupby_time=aggregate_per_year,
+    def load(carrier: str, **filters: str) -> pd.Series | pd.DataFrame:
+        if carrier not in loads:
+            return pd.Series(dtype=float)
+        return n.statistics.withdrawal(
+            carrier=carrier, components="Load", **filters, **stats
+        ).fillna(0.0)
+
+    def energy_part(carrier: str, eurostat_carrier: str) -> pd.Series | pd.DataFrame:
+        demand = load(carrier)
+        if demand.empty:
+            return demand
+        return demand - non_energy_use(demand, shares, eurostat_carrier)
+
+    split = decentral_heat_split(n, aggregate_per_year)
+    parts = [
+        (
+            split.xs("ind", level="sector")
+            if "ind" in split.index.get_level_values("sector")
+            else pd.Series(dtype=float)
+        ),
+        load("industry electricity"),
+        load("solid biomass for industry"),
+        energy_part("gas for industry", "Natural Gas"),
+        energy_part("H2 for industry", "H2"),
+        energy_part("naphtha for industry", "Oil"),
+    ]
+    if "urban central heat" in set(n.buses["carrier"]):
+        parts.append(
+            load("low-temperature heat for industry", bus_carrier="urban central heat")
         )
-        .groupby(["location", "unit"])
-        .sum()
+    coal = energy_part("coal for industry", "Coal")
+    if not coal.empty:
+        parts.append(apply_coke_correction(coal))
+    parts = [
+        remap_unit_index(part).groupby(level=statistics_grouping_index).sum()
+        for part in parts
+        if not part.empty
+    ]
+    result = (
+        pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        if parts
+        else pd.Series(dtype=float)
     )
-    # calculate efficiency losses for links with eff < 1
-    cc_in = n.statistics.energy_balance(
-        carrier=cc_carriers,
-        groupby=["carrier", "location", "unit"],
-        components="Link",
-        at_port=["bus0"],
-        groupby_time=aggregate_per_year,
-    )
-    cc_out = n.statistics.energy_balance(
-        carrier=cc_carriers,
-        groupby=["carrier", "location", "unit"],
-        components="Link",
-        at_port=["bus1"],
-        groupby_time=aggregate_per_year,
-    )
-    eff_loss = abs(cc_in) - abs(cc_out)
-    eff_loss = eff_loss.groupby(["location", "unit"]).sum()
-    res = load_statistics.add(eff_loss, fill_value=0)
-    logger.debug(
-        f"Final Energy by Sector|Industry finished. Resulting shape: {res.shape}. "
-    )
-    return res
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
+    logger.debug(f"Final Energy [by Sector]|Industry finished. Shape: {result.shape}.")
+    return result
 
 
 def Final_Energy_by_Sector__Agriculture(
