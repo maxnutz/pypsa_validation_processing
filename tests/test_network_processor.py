@@ -3074,8 +3074,15 @@ network_results_path: {tmp_path}
     def test_no_init_warning_if_no_function_declares_shares(
         self, tmp_path: Path, caplog
     ):
+        mapping = tmp_path / "mapping.yaml"
+        mapping.write_text(
+            "Final Energy [by Carrier]|Electricity: "
+            "Final_Energy_by_Carrier__Electricity\n"
+        )
         with caplog.at_level(logging.WARNING):
-            processor = self._make_processor(tmp_path)
+            processor = self._make_processor(
+                tmp_path, extra=f"mapping_path: {mapping}"
+            )
         assert not processor._selected_functions_declare("industry_non_energy_shares")
         assert not any(
             "No industry non-energy shares" in r.message for r in caplog.records
