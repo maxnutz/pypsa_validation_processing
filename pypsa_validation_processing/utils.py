@@ -261,10 +261,6 @@ statistics_kwargs = {
     "groupby": ["location", "unit"],
     "nice_names": False,
 }
-statistics_kwargs_for_filtering = {
-    "groupby": ["name", "bus", "carrier", "location", "unit"],
-    "nice_names": False,
-}
 # standardize MultiIndex
 statistics_grouping_index = ["location", "unit"]
 
