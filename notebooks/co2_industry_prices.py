@@ -1,7 +1,10 @@
 import marimo
 
 __generated_with = "0.25.1"
-app = marimo.App(width="medium", app_title="CO2 price in industry carrier prices")
+app = marimo.App(
+    width="medium",
+    app_title="CO2 price in industry carrier prices",
+)
 
 
 @app.cell
@@ -326,8 +329,18 @@ def _(aggregate, carriers, location_mask, year, year_tables):
     return by_carrier, sel_tab
 
 
-@app.cell
-def _(COLOR_CO2, COLOR_MUTED, COLOR_WITHOUT, by_carrier, location_mode, mo, np, plt, year):
+@app.cell(expand_output=True)
+def _(
+    COLOR_CO2,
+    COLOR_MUTED,
+    COLOR_WITHOUT,
+    by_carrier,
+    location_mode,
+    mo,
+    np,
+    plt,
+    year,
+):
     _fig, (_a, _b) = plt.subplots(1, 2, figsize=(12, 4.2), sharey=True)
     _x = np.arange(len(by_carrier))
     _labels = [c.replace(" for industry", "").replace("industry ", "") for c in by_carrier.index]
@@ -449,7 +462,17 @@ def _(ALL_CARRIERS, carriers, mo, networks, year):
 
 
 @app.cell
-def _(COLOR_CO2, COLOR_MUTED, COLOR_WITHOUT, aggregate, carrier_one, mo, n, plt, sel_tab):
+def _(
+    COLOR_CO2,
+    COLOR_MUTED,
+    COLOR_WITHOUT,
+    aggregate,
+    carrier_one,
+    mo,
+    n,
+    plt,
+    sel_tab,
+):
     _t = aggregate(sel_tab[sel_tab.carrier == carrier_one.value], "location").sort_values("with CO2")
     mo.stop(_t.empty, mo.md(f"_`{carrier_one.value}` has no Load in the selected locations._"))
     _is_at = _t.index.str.startswith("AT")
@@ -491,7 +514,17 @@ def _(COLOR_CO2, COLOR_MUTED, COLOR_WITHOUT, aggregate, carrier_one, mo, n, plt,
 
 
 @app.cell
-def _(COLOR_CO2, COLOR_WITHOUT, carrier_one, load_frames, location_mask, mo, n, np, plt):
+def _(
+    COLOR_CO2,
+    COLOR_WITHOUT,
+    carrier_one,
+    load_frames,
+    location_mask,
+    mo,
+    n,
+    np,
+    plt,
+):
     _meta, _p, _lam, _gam = load_frames(n, [carrier_one.value])
     _sel = location_mask(_meta.location)
     _p, _lam, _gam = _p.loc[:, _sel], _lam.loc[:, _sel], _gam.loc[:, _sel]
@@ -523,7 +556,17 @@ def _(COLOR_CO2, COLOR_WITHOUT, carrier_one, load_frames, location_mask, mo, n, 
 
 
 @app.cell
-def _(CARRIER_COLORS, aggregate, carriers, location_mask, location_mode, mo, pd, plt, year_tables):
+def _(
+    CARRIER_COLORS,
+    aggregate,
+    carriers,
+    location_mask,
+    location_mode,
+    mo,
+    pd,
+    plt,
+    year_tables,
+):
     _rows = {}
     for _y, _tab in year_tables.items():
         _t = _tab[_tab.carrier.isin(carriers.value) & location_mask(_tab.location)]
@@ -615,7 +658,15 @@ def _(carriers, mo, port_table):
 
 
 @app.cell
-def _(carrier_one, efficiency, is_co2_carrier, link_ports, location_one, mo, n):
+def _(
+    carrier_one,
+    efficiency,
+    is_co2_carrier,
+    link_ports,
+    location_one,
+    mo,
+    n,
+):
     def schematic(n, load_carrier, location):
         loads = n.loads[(n.loads.carrier == load_carrier) & (n.loads.bus.map(n.buses.location) == location)]
         if loads.empty:
@@ -696,7 +747,7 @@ def _(mo, n, pd):
     return
 
 
-@app.cell
+@app.cell(expand_output=True)
 def _(mo, n):
     def oil_schematic_at(n):
         """Copperplate EU oil bus in pypsa-at, summarised by carrier."""
@@ -807,7 +858,19 @@ def _(mo):
 
 
 @app.cell
-def _(COLOR_CO2, COLOR_MUTED, COLOR_WITHOUT, carriers, efficiency, mo, n, national_co2_term, np, pd, plt, port_terms):
+def _(
+    COLOR_CO2,
+    COLOR_WITHOUT,
+    carriers,
+    efficiency,
+    mo,
+    n,
+    national_co2_term,
+    np,
+    pd,
+    plt,
+    port_terms,
+):
     def nodal_residual(n, links):
         """η1·λ1 − (λ0 + mc − Σ_{k≥2} η_k λ_k), the national CO2 term, and the mask of non-binding bounds."""
         lam = n.buses_t.marginal_price
@@ -942,8 +1005,21 @@ def _(
     return
 
 
-@app.cell
-def _(COLOR_CO2, COLOR_WITHOUT, aggregate, carriers, mo, national_co2_duals, networks, np, pd, plt, year, year_tables):
+@app.cell(expand_output=True)
+def _(
+    COLOR_CO2,
+    COLOR_WITHOUT,
+    aggregate,
+    carriers,
+    mo,
+    national_co2_duals,
+    networks,
+    np,
+    pd,
+    plt,
+    year,
+    year_tables,
+):
     _mu = {_y: national_co2_duals(_n) for _y, _n in networks.items()}
     _tab = year_tables[year.value]
     _at = aggregate(_tab[_tab.location.str.startswith("AT") & _tab.carrier.isin(carriers.value)], "carrier")
@@ -1105,7 +1181,17 @@ def _(band_el, band_gas, hist_geo, hist_raw, hist_years, pd):
 
 
 @app.cell
-def _(COLOR_CO2, COLOR_WITHOUT, aggregate, hist, mo, np, plt, year, year_tables):
+def _(
+    COLOR_CO2,
+    COLOR_WITHOUT,
+    aggregate,
+    hist,
+    mo,
+    np,
+    plt,
+    year,
+    year_tables,
+):
     _tab = year_tables[year.value]
     _model = aggregate(_tab[_tab.location.str.startswith("AT")], "carrier")
     _cars = ["industry electricity", "gas for industry"]
