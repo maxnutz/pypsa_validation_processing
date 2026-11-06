@@ -14,3 +14,4 @@
         - non_energy_use
         - apply_coke_correction
         - decentral_heat_split
+        - ensure_all_locations

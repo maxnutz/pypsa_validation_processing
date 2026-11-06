@@ -13,6 +13,7 @@ from pypsa_validation_processing.utils import (
     apply_domestic_share,
     attribute_locations,
     decentral_heat_split,
+    ensure_all_locations,
     fossil_gas_share,
     fossil_oil_share,
     non_energy_use,
@@ -761,3 +762,70 @@ class TestDecentralHeatSplit:
         n.set_snapshots(pd.date_range("2025-01-01", periods=2, freq="3h"))
         assert decentral_heat_split(n).empty
         assert decentral_heat_split(n, aggregate_per_year=False).empty
+
+
+class TestEnsureAllLocations:
+    """Tests for ensure_all_locations (C6.13)."""
+
+    @staticmethod
+    def _index(locations: list[str], unit: str = "MWh_el") -> pd.MultiIndex:
+        return pd.MultiIndex.from_arrays(
+            [locations, [unit] * len(locations)], names=["location", "unit"]
+        )
+
+    def test_adds_missing_locations_series(self):
+        n = _network(["AT1", "AT2", "EU"])
+        n.add("Bus", "no location", carrier="AC")
+        result = pd.Series([5.0], index=self._index(["AT1"]))
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=True)
+
+        assert isinstance(out, pd.Series)
+        assert out[("AT1", "MWh_el")] == 5.0
+        assert out[("AT2", "MWh")] == 0.0
+        assert out[("EU", "MWh")] == 0.0
+        assert len(out) == 3
+
+    def test_adds_missing_locations_dataframe(self):
+        n = _network(["AT1", "AT2"])
+        result = pd.DataFrame(
+            [[1.0, 2.0]], index=self._index(["AT1"]), columns=n.snapshots
+        )
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=False)
+
+        assert isinstance(out, pd.DataFrame)
+        assert list(out.columns) == list(n.snapshots)
+        assert (out.loc[("AT2", "MWh")] == 0.0).all()
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_empty_result_gives_every_location(self, aggregate_per_year):
+        n = _network(["AT1", "AT2"])
+
+        out = ensure_all_locations(
+            pd.Series(dtype=float), n, unit="MWh", aggregate_per_year=aggregate_per_year
+        )
+
+        expected_type = pd.Series if aggregate_per_year else pd.DataFrame
+        assert isinstance(out, expected_type)
+        assert set(out.index) == {("AT1", "MWh"), ("AT2", "MWh")}
+        assert (out == 0.0).all(axis=None)
+
+    def test_complete_result_is_unchanged(self):
+        n = _network(["AT1"])
+        result = pd.Series([0.0], index=self._index(["AT1"]))
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=True)
+
+        pd.testing.assert_series_equal(out, result)
+
+    def test_other_index_levels_raise(self):
+        n = _network(["AT1"])
+        index = pd.MultiIndex.from_tuples(
+            [("Link", "AT1", "MWh")], names=["component", "location", "unit"]
+        )
+
+        with pytest.raises(ValueError, match="Index levels"):
+            ensure_all_locations(
+                pd.Series([1.0], index=index), n, unit="MWh", aggregate_per_year=True
+            )
