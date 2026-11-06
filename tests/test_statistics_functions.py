@@ -1600,263 +1600,168 @@ class TestFinalEnergyBySectorAgriculture:
 
 
 class TestFinalEnergyBySectorResidentialAndCommercial:
-    """Test suite for Final_Energy_by_Sector__Residential_and_Commercial function."""
+    """Spec Final_Energy_by_Sector__Residential_and_Commercial.md AC1-AC7."""
 
-    class _ResidentialAndCommercialStatisticsAccessor:
-        """Minimal accessor for residential and commercial sector tests."""
+    CONFIG = {"sector": {"district_heating": {"district_heating_loss": 0.15}}}
 
-        def __init__(self, rescom_oil_empty: bool = False):
-            self.calls: list[dict] = []
-            self.rescom_oil_empty = rescom_oil_empty
+    @staticmethod
+    def _network(n_snapshots: int = 1) -> pypsa.Network:
+        """AC3 mock at A (I_rural = 11, sigma_rural,rc = 0.75); B is empty."""
+        n = _real_network(n_snapshots)
+        n.snapshot_weightings.loc[:, :] = 1.0
+        ones = [1.0] * n_snapshots
 
-        @staticmethod
-        def _series_or_frame(
-            groupby: list[str],
-            locations: list[str],
-            values: list[float],
-            unit: str,
-            groupby_time: bool,
-        ) -> pd.Series | pd.DataFrame:
-            index_tuples = []
-            for location in locations:
-                idx_dict = {
-                    "name": f"{location} demand",
-                    "carrier": "mock carrier",
-                    "bus1": f"{location} bus",
-                    "bus0": f"{location} bus",
-                    "location": location,
-                    "unit": unit,
-                }
-                index_tuples.append(
-                    tuple(idx_dict.get(key, f"mock_{key}") for key in groupby)
-                )
+        def dispatch(component, name, values, **attrs):
+            series = {k: [v * o for o in ones] for k, v in values.items()}
+            _add_dispatched(n, component, name, series, **attrs)
 
-            index = pd.MultiIndex.from_tuples(index_tuples, names=groupby)
-            timestamps = pd.date_range(
-                "2019-01-01", periods=4, freq="6h", name="snapshot"
-            )
-            if groupby_time:
-                return pd.Series(values, index=index, dtype=float)
+        for bus, carrier, unit, loc in [
+            ("A", "AC", "MWh_el", "A"),
+            ("B", "AC", "MWh_el", "B"),
+            ("A low voltage", "low voltage", "MWh_el", "A"),
+            ("A rural heat", "rural heat", "MWh_th", "A"),
+            ("A urban central heat", "urban central heat", "MWh_th", "A"),
+            ("A gas", "gas", "MWh_LHV", "A"),
+            ("EU oil", "oil", "MWh_LHV", "EU"),
+            ("A solid biomass", "solid biomass", "MWh_LHV", "A"),
+            ("A EV battery", "EV battery", "MWh_el", "A"),
+            ("A home battery", "home battery", "MWh_el", "A"),
+        ]:
+            _add_bus(n, bus, carrier, unit, loc)
+        lv, heat = "A low voltage", "A rural heat"
+        dispatch("Load", "A electricity", {"p": 10.0}, bus=lv, carrier="electricity")
+        dispatch(
+            "Load",
+            "A urban central heat",
+            {"p": 23.0},
+            bus="A urban central heat",
+            carrier="urban central heat",
+        )
+        dispatch("Load", "A rural heat", {"p": 6.0}, bus=heat, carrier="rural heat")
+        dispatch(
+            "Load",
+            "A agriculture heat",
+            {"p": 2.0},
+            bus=heat,
+            carrier="agriculture heat",
+        )
+        dispatch(
+            "Link",
+            "A home battery charger",
+            {"p0": 1.0, "p1": -1.0},
+            bus0=lv,
+            bus1="A home battery",
+            carrier="home battery charger",
+        )
+        dispatch(
+            "Link",
+            "A BEV charger",
+            {"p0": 3.0, "p1": -3.0},
+            bus0=lv,
+            bus1="A EV battery",
+            carrier="BEV charger",
+        )
+        # heat pumps in PyPSA-AT: bus0 = heat bus, bus1 = low voltage
+        dispatch(
+            "Link",
+            "A rural air heat pump",
+            {"p0": -6.0, "p1": 2.0},
+            bus0=heat,
+            bus1=lv,
+            carrier="rural air heat pump",
+        )
+        dispatch(
+            "Link",
+            "A rural gas boiler",
+            {"p0": 4.0, "p1": -3.6},
+            bus0="A gas",
+            bus1=heat,
+            carrier="rural gas boiler",
+        )
+        dispatch(
+            "Link",
+            "A rural oil boiler",
+            {"p0": 2.0, "p1": -1.8},
+            bus0="EU oil",
+            bus1=heat,
+            carrier="rural oil boiler",
+        )
+        dispatch(
+            "Link",
+            "A rural biomass boiler",
+            {"p0": 1.0, "p1": -0.9},
+            bus0="A solid biomass",
+            bus1=heat,
+            carrier="rural biomass boiler",
+        )
+        dispatch(
+            "Generator",
+            "A rural solar thermal",
+            {"p": 2.0},
+            bus=heat,
+            carrier="rural solar thermal",
+        )
+        return n
 
-            per_snapshot_values = [value / len(timestamps) for value in values]
-            return pd.DataFrame(
-                {ts: per_snapshot_values for ts in timestamps},
-                index=index,
-                dtype=float,
-            )
-
-        def energy_balance(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby: list[str] | None = None,
-            direction: str = "withdrawal",
-            at_port: str | list[str] | None = None,
-            groupby_time: bool = True,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "groupby": groupby,
-                    "direction": direction,
-                    "at_port": at_port,
-                    "groupby_time": groupby_time,
-                    "nice_names": nice_names,
-                }
-            )
-
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            if components == "Link" and at_port not in ("bus0", ["bus0"]):
-                return self._series_or_frame(groupby, [], [], "MWh_th", groupby_time)
-
-            if bus_carrier == "oil" and self.rescom_oil_empty:
-                return self._series_or_frame(groupby, [], [], "MWh_th", groupby_time)
-
-            if carrier == ["rural biomass boiler", "urban decentral biomass boiler"]:
-                return self._series_or_frame(
-                    groupby, ["AT1", "AT2"], [21.0, 22.0], "MWh_th", groupby_time
-                )
-
-            if bus_carrier == "low voltage":
-                return self._series_or_frame(
-                    groupby, ["AT1", "AT2"], [11.0, 12.0], "MWh_el", groupby_time
-                )
-
-            if bus_carrier == "urban central heat":
-                return self._series_or_frame(
-                    groupby, ["AT1", "AT2"], [13.0, 14.0], "MWh_th", groupby_time
-                )
-
-            if carrier == ["urban decentral gas boiler", "rural gas boiler"]:
-                return self._series_or_frame(
-                    groupby, ["AT1", "AT2"], [15.0, 16.0], "MWh_th", groupby_time
-                )
-
-            return self._series_or_frame(
-                groupby, ["AT1", "AT2"], [1.0, 2.0], "MWh_th", groupby_time
-            )
-
-        def withdrawal(
-            self,
-            bus_carrier: str | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            groupby_time: bool = True,
-            groupby: list[str] | None = None,
-            **kwargs: object,
-        ) -> pd.Series | pd.DataFrame:
-            kwargs.pop("groupby_time", None)
-            return self.energy_balance(
-                bus_carrier=bus_carrier,
-                carrier=carrier,
-                components=components,
-                groupby=groupby,
-                direction="withdrawal",
-                groupby_time=groupby_time,
-                **kwargs,
-            )
-
-    class _ResidentialAndCommercialNetwork:
-        """Minimal network object exposing a residential/commercial statistics accessor."""
-
-        def __init__(self, rescom_oil_empty: bool = False):
-            accessor_cls = (
-                TestFinalEnergyBySectorResidentialAndCommercial._ResidentialAndCommercialStatisticsAccessor
-            )
-            self.statistics = accessor_cls(rescom_oil_empty=rescom_oil_empty)
-
-    def _residential_and_commercial_network(self, rescom_oil_empty: bool = False):
-        return self._ResidentialAndCommercialNetwork(rescom_oil_empty=rescom_oil_empty)
-
-    def test_returns_series(self):
-        """Test that the function returns a pandas Series."""
+    def _values(self, n: pypsa.Network, **kwargs: object) -> pd.Series:
         result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
+            n, config=self.CONFIG, **kwargs
         )
-        assert isinstance(result, pd.Series)
+        return result.droplevel("unit")
 
-    def test_uses_bus0_for_gas_and_biomass(self):
-        """Test that gas and biomass are queried on bus0."""
-        network = self._residential_and_commercial_network()
-
-        _ = Final_Energy_by_Sector__Residential_and_Commercial(network)
-
-        gas_calls = [
-            call
-            for call in network.statistics.calls
-            if call["carrier"] == ["urban decentral gas boiler", "rural gas boiler"]
-        ]
-        biomass_calls = [
-            call
-            for call in network.statistics.calls
-            if call["bus_carrier"] == "solid biomass"
-        ]
-
-        assert gas_calls
-        assert biomass_calls
-        assert all(call["at_port"] == "bus0" for call in gas_calls)
-        assert all(call["at_port"] == "bus0" for call in biomass_calls)
-
-    def test_aggregates_all_fuel_types_per_location(self):
-        """Test that all fuel types are combined correctly per location."""
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format_and_every_location(self, aggregate_per_year):
+        """AC1 / AC2 / AC6: C6 format, unit MWh; B and EU present with 0.0."""
+        n = self._network()
         result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
+            n, aggregate_per_year=aggregate_per_year, config=self.CONFIG
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert set(result.index.get_level_values("unit")) == {"MWh"}
+        values = result.droplevel("unit")
+        assert set(values.index) == {"A", "B", "EU"}
+        assert (values.loc[["B", "EU"]] == 0.0).all(axis=None)
+
+    def test_ac3_value(self):
+        """AC3 / AC5: 10 + 23/1.15 + 0.75 · 11 = 38.25; heat pump only via D8."""
+        values = self._values(self._network())
+        assert values["A"] == pytest.approx(38.25)
+        assert (values >= 0).all()
+
+    def test_flow_consistency(self):
+        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        n = self._network(n_snapshots=2)
+        n.loads_t.p["A electricity"] = [10.0, 4.0]
+        n.snapshot_weightings.loc[:, :] = WEIGHT
+        _check_flow_consistency(
+            Final_Energy_by_Sector__Residential_and_Commercial, n, config=self.CONFIG
         )
 
-        grouped_result = result.groupby(level=["location", "unit"]).sum().sort_index()
-        expected = pd.Series(
-            [11.0, 12.0, -24.0, -26.0],
-            index=pd.MultiIndex.from_tuples(
-                [
-                    ("AT1", "MWh_el"),
-                    ("AT2", "MWh_el"),
-                    ("AT1", "MWh_th"),
-                    ("AT2", "MWh_th"),
-                ],
-                names=["location", "unit"],
-            ),
-            dtype=float,
-        ).sort_index()
+    def test_ac7_d8_consistency_with_agriculture(self):
+        """AC7: decentral parts of R&C and Agriculture add up to I_rural = 11."""
+        n = self._network()
+        rc_decentral = self._values(n)["A"] - 10.0 - 23.0 / 1.15
+        agriculture = Final_Energy_by_Sector__Agriculture(n).droplevel("unit")["A"]
+        assert rc_decentral + agriculture == pytest.approx(11.0)
 
-        pd.testing.assert_series_equal(grouped_result, expected)
-
-    def test_has_location_and_unit_multiindex(self):
-        """Test that result has MultiIndex with location and unit levels."""
-        result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
-        )
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_not_empty(self):
-        """Test that result is not empty."""
-        result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
-        )
-        assert len(result) > 0
-
-    def test_numeric_values(self):
-        """Test that result values are numeric."""
-        result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
-        )
-        assert result.dtype in [float, int] or pd.api.types.is_numeric_dtype(
-            result.dtype
-        )
-
-    def test_contains_multiple_locations(self):
-        """Test that result contains multiple locational data."""
-        result = Final_Energy_by_Sector__Residential_and_Commercial(
-            self._residential_and_commercial_network()
-        )
-        locations = result.index.get_level_values("location").unique()
-        assert len(locations) > 1
-        assert all(r.startswith("AT") for r in locations)
-
-    def test_multiple_networks(self, mock_network_collection: MockNetworkCollection):
-        """Test processing multiple networks from collection."""
-        for _ in mock_network_collection:
-            result = Final_Energy_by_Sector__Residential_and_Commercial(
-                self._residential_and_commercial_network()
+    @pytest.mark.parametrize("config", [None, {}, {"sector": {"district_heating": {}}}])
+    def test_missing_loss_raises_missing_input(self, config):
+        """Section 8: missing district_heating_loss raises MissingInputError."""
+        with pytest.raises(MissingInputError, match="district_heating_loss"):
+            Final_Energy_by_Sector__Residential_and_Commercial(
+                self._network(), config=config
             )
-            assert isinstance(result, pd.Series)
-            assert isinstance(result.index, pd.MultiIndex)
-            assert result.index.names == ["location", "unit"]
-            assert len(result) > 0
 
-    def test_returns_dataframe_when_not_aggregated(self):
-        """aggregate_per_year=False returns a DataFrame with snapshot columns."""
-        network = self._residential_and_commercial_network()
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_carriers(self, aggregate_per_year):
+        """AC6: a network without any of the carriers gives 0.0 everywhere."""
+        n = _real_network()
+        _add_bus(n, "A", "AC", "MWh_el", "A")
         result = Final_Energy_by_Sector__Residential_and_Commercial(
-            network, aggregate_per_year=False
+            n, aggregate_per_year=aggregate_per_year, config=self.CONFIG
         )
-        aggregated_result = Final_Energy_by_Sector__Residential_and_Commercial(network)
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert any(isinstance(column, pd.Timestamp) for column in result.columns)
-        assert len(result.columns) == 4
-        assert not result.empty
-        pd.testing.assert_series_equal(result.sum(axis=1), aggregated_result)
-
-    def test_handles_empty_rescom_oil_without_failing(self):
-        """Function should work when residential/commercial oil demand is empty."""
-        network = self._residential_and_commercial_network(rescom_oil_empty=True)
-
-        result = Final_Energy_by_Sector__Residential_and_Commercial(network)
-
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert not result.isna().any()
-        assert len(result) > 0
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------
