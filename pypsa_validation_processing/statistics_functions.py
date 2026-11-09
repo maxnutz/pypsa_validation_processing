@@ -79,6 +79,17 @@ def Final_Energy_by_Carrier__Electricity(
         Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network (C6.13).
+
+    Notes
+    -----
+    ``home battery charger`` (withdrawal) and ``home battery discharger``
+    (supply) are both excluded. Measured on the networks in ``resources/``
+    (``20261020_carbon_accounting_run``, ``AT_KN2040``, ``AT_KN2040_1H``,
+    ``electricity_network_0p3``): the ``home battery`` stores are cyclic, so
+    charger minus discharger equals the round-trip loss, charger
+    ``· (1 − η²)`` with ``η = 0.98``. The largest loss is 3.05 TWh
+    (``AT_KN2040_1H`` 2040, 0.06 % of the ``low voltage`` withdrawal);
+    it is not counted.
     """
     sector_carriers = [
         "agriculture electricity",
@@ -90,7 +101,8 @@ def Final_Energy_by_Carrier__Electricity(
     stats = {"groupby_time": aggregate_per_year, "nice_names": False}
     groupby = ["carrier", "location", "unit"]
     bus_carriers = set(n.buses["carrier"])
-    # pypsa raises ValueError for a bus carrier that is not in the network
+    # pypsa raises ValueError for a bus carrier that is not in the network,
+    # but returns an empty result for an absent carrier (filtered below)
     has_lv = "low voltage" in bus_carriers
     lv_carriers = (
         n.statistics.withdrawal(
@@ -112,12 +124,12 @@ def Final_Energy_by_Carrier__Electricity(
                 bus_carrier="low voltage", carrier=included, groupby=groupby, **stats
             )
         )
-    if has_lv and "V2G" in set(n.links["carrier"]):
+    if has_lv:
         v2g = n.statistics.supply(
             bus_carrier="low voltage", carrier="V2G", groupby=groupby, **stats
         )
         parts.append(-v2g)
-    if "DAC" in set(n.links["carrier"]) and "AC" in bus_carriers:
+    if "AC" in bus_carriers:
         parts.append(
             n.statistics.withdrawal(
                 bus_carrier="AC", carrier="DAC", groupby=groupby, **stats
