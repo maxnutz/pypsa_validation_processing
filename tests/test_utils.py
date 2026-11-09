@@ -824,14 +824,49 @@ class TestEnsureAllLocations:
 
         pd.testing.assert_series_equal(out, result)
 
-    def test_other_index_levels_raise(self):
-        """Index levels beyond (location, unit) raise a ValueError."""
+    def test_missing_index_level_raises(self):
+        """A result without a ``unit`` level raises a ValueError (C6.1)."""
         n = _network(["AT1"])
         index = pd.MultiIndex.from_tuples(
-            [("Link", "AT1", "MWh")], names=["component", "location", "unit"]
+            [("Link", "AT1")], names=["component", "location"]
         )
 
         with pytest.raises(ValueError, match="Index levels"):
             ensure_all_locations(
                 pd.Series([1.0], index=index), n, unit="MWh", aggregate_per_year=True
             )
+
+    def test_extra_index_levels_are_kept(self):
+        """Extra levels are allowed (C6.3); added rows get NaN there."""
+        n = _network(["AT1", "AT2"])
+        index = pd.MultiIndex.from_tuples(
+            [("Link", "AT1", "MWh_el")], names=["component", "location", "unit"]
+        )
+
+        out = ensure_all_locations(
+            pd.Series([1.0], index=index), n, unit="MWh", aggregate_per_year=True
+        )
+
+        assert list(out.index.names) == ["component", "location", "unit"]
+        added = out.xs("AT2", level="location")
+        assert len(added) == 1 and (added == 0.0).all()
+        assert added.index.get_level_values("component").isna().all()
+
+    def test_quantity_level_adds_value_and_weight(self):
+        """Intensive results get a ``value`` and a ``weight`` row (C6.12, C6.13)."""
+        n = _network(["AT1", "AT2"])
+        index = pd.MultiIndex.from_tuples(
+            [("AT1", "EUR/MWh", "value"), ("AT1", "MWh_el", "weight")],
+            names=["location", "unit", "quantity"],
+        )
+
+        out = ensure_all_locations(
+            pd.Series([50.0, 2.0], index=index),
+            n,
+            unit="EUR/MWh",
+            aggregate_per_year=True,
+        )
+
+        added = out.xs("AT2", level="location")
+        assert set(added.index.get_level_values("quantity")) == {"value", "weight"}
+        assert (added == 0.0).all()
