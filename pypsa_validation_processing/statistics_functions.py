@@ -747,7 +747,7 @@ def Final_Energy_by_Carrier__District_Heat(
         supplying = at_heat[positive | (p < 0).any().to_numpy()]
         if not supplying.empty:
             raise ValueError(
-                f"DAC Link(s) supply heat to '{bus_carrier}' buses: {list(supplying)}"
+                f"DAC Link(s) supply heat to '{bus_carrier}' buses: {list(supplying)}. This evaluation assumes DAC only withdraws heat from such buses, not supply it."
             )
 
     withdrawal = n.statistics.withdrawal(
