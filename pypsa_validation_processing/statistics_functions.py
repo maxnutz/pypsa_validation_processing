@@ -889,10 +889,8 @@ def Final_Energy_by_Sector__Agriculture(
     """Extract Final Energy [by Sector]|Agriculture from a PyPSA Network.
 
     ``FE(l) = L[agriculture electricity](l) + L[agriculture machinery
-    electric](l) + L[agriculture machinery oil](l) + D8_agr(l)``. The
-    ``agriculture heat`` Load on ``rural heat`` buses is not counted as heat;
-    its final energy is the agricultural share of the decentral heat input
-    (D8). Losses of the machinery oil supply Links are not final energy.
+    electric](l) + L[agriculture machinery oil](l) + D8_agr(l)``. Losses of
+    the machinery oil supply Links are not final energy.
 
     Parameters
     ----------
@@ -914,6 +912,15 @@ def Final_Energy_by_Sector__Agriculture(
     ------
     ValueError
         If an ``agriculture heat`` Load sits on an ``urban central heat`` bus.
+
+    Notes
+    -----
+    Agricultural heat is produced decentrally on the ``rural heat`` bus, so
+    it is not reported as heat in final energy. Instead, the final energy is
+    the input carriers of the decentral heat supply (e.g. biomass, electricity
+    of heat pumps, CHP heat output), allocated to agriculture by its share of
+    the ``rural heat`` demand (D8, ``decentral_heat_split``). The
+    ``agriculture heat`` Load itself is therefore not counted.
     """
     heat_loads = n.loads[n.loads["carrier"] == "agriculture heat"]
     central = heat_loads.index[
@@ -922,7 +929,7 @@ def Final_Energy_by_Sector__Agriculture(
     if not central.empty:
         raise ValueError(
             "agriculture heat Load(s) on urban central heat buses are not "
-            f"covered by the spec: {list(central)}"
+            f"covered by the evaluation: {list(central)}"
         )
     load_carriers = [
         "agriculture electricity",

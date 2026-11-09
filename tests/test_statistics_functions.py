@@ -81,7 +81,7 @@ def _check_c6_format(
     if aggregate_per_year:
         assert pd.api.types.is_numeric_dtype(result)
     else:
-        assert set(result.columns) <= set(n.snapshots)
+        assert set(result.columns) == set(n.snapshots)
         assert all(pd.api.types.is_numeric_dtype(d) for d in result.dtypes)
 
 
@@ -1539,7 +1539,11 @@ class TestFinalEnergyBySectorAgriculture:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_format_and_every_location(self, aggregate_per_year):
-        """AC1 / AC2 / AC6: C6 format, unit MWh; B without loads gets 0.0."""
+        """AC1 / AC2 (C6 output format) and AC6 (every location present).
+
+        Result has the C6 format with unit MWh; location B holds no
+        agriculture loads and gets 0.0.
+        """
         n = self._network()
         result = Final_Energy_by_Sector__Agriculture(
             n, aggregate_per_year=aggregate_per_year
@@ -1551,17 +1555,30 @@ class TestFinalEnergyBySectorAgriculture:
         assert (values.loc[["B"]] == 0.0).all(axis=None)
 
     def test_ac3_value(self):
-        """AC3 / AC5: 2 + 1 + 4 + 0.25 · 12 = 10; CC link losses excluded."""
+        """AC3 (reference value) and AC5 (values >= 0).
+
+        Loads agriculture electricity 2, machinery electric 1, machinery
+        oil 4; decentral heat input I_rural = 12 with agriculture share
+        sigma_rural,agr = 0.25: 2 + 1 + 4 + 0.25 · 12 = 10. Losses of the
+        machinery oil CC link (5 in, 4 out) are not counted.
+        """
         values = self._values(self._network())
         assert values["A"] == pytest.approx(10.0)
         assert (values >= 0).all()
 
     def test_ac3b_chp_heat(self):
-        """AC3b: CHP heat 4 enters I_rural; sigma = 3/16, result 10."""
+        """AC3b (CHP heat output counts as decentral heat input).
+
+        As AC3 plus a biogas CHP with heat output 4 to rural heat: I_rural =
+        12 + 4 = 16, sigma_rural,agr = 3/16, result 2 + 1 + 4 + 3 = 10.
+        """
         assert self._values(self._network(chp=True))["A"] == pytest.approx(10.0)
 
     def test_flow_consistency(self):
-        """AC4: C6-AC3 on a network with snapshot weighting 3."""
+        """AC4 (C6-AC3, class flow): yearly value = weighted sum of snapshots.
+
+        Checked on a two-snapshot network with snapshot weighting 3.
+        """
         n = self._network(chp=True, n_snapshots=2)
         n.loads_t.p["A agriculture electricity"] = [2.0, 6.0]
         n.snapshot_weightings.loc[:, :] = WEIGHT
@@ -1584,7 +1601,10 @@ class TestFinalEnergyBySectorAgriculture:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_no_agriculture(self, aggregate_per_year):
-        """AC6: a network without agriculture loads gives 0.0 everywhere."""
+        """AC6 (C6-AC6, every location present): without agriculture loads.
+
+        A network without any agriculture load gives 0.0 at every location.
+        """
         n = _real_network()
         _add_bus(n, "A", "AC", "MWh_el", "A")
         result = Final_Energy_by_Sector__Agriculture(
