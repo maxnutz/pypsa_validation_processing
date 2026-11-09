@@ -22,7 +22,11 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Oil,
 )
 
-from pypsa_validation_processing.utils import MissingInputError, UNITS_MAPPING
+from pypsa_validation_processing.utils import (
+    COPPERPLATE_LOCATION,
+    MissingInputError,
+    UNITS_MAPPING,
+)
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
 
@@ -1321,6 +1325,17 @@ class TestFinalEnergyByCarrierDistrictHeat:
         assert set(values.index) == {"A", "B", "EU"}
         assert (values.loc[["B", "EU"]] == 0.0).all(axis=None)
         assert (values >= 0).all(axis=None)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_copperplate_location_is_zero(self, aggregate_per_year):
+        """AC10: fuel withdrawn at copperplate EU by a heat-supplying CHP is not
+        counted; the copperplate location has no district heat."""
+        n = self._ac3_network(n_snapshots=2)
+        assert (n.links_t.p0["A urban central coal CHP"] != 0).all()
+        assert n.buses.loc["EU coal", "location"] == COPPERPLATE_LOCATION
+        values = self._values(n, aggregate_per_year=aggregate_per_year)
+        assert COPPERPLATE_LOCATION in values.index
+        assert (values.loc[[COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
 
     def test_independent_of_supply_efficiency(self):
         """AC7: changing the CHP efficiency leaves the result unchanged."""
