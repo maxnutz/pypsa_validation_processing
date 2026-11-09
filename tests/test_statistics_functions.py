@@ -1219,7 +1219,13 @@ class TestFinalEnergyByCarrierDistrictHeat:
         _add_bus(n, "A urban central heat", "urban central heat", "MWh_th", "A")
         _add_bus(n, "A urban decentral heat", "urban decentral heat", "MWh_th", "A")
         _add_bus(n, "A water pits", "urban central water pits", "MWh_th", "A")
-        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
+        )
         heat = "A urban central heat"
         _add_dispatched(
             n,
@@ -1319,11 +1325,11 @@ class TestFinalEnergyByCarrierDistrictHeat:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_every_location_non_negative(self, aggregate_per_year):
-        """AC5 / AC6 / AC10: B and copperplate EU present with 0.0, values >= 0."""
+        """AC5 / AC6 / AC10: B and copperplate present with 0.0, values >= 0."""
         n = self._ac3_network()
         values = self._values(n, aggregate_per_year=aggregate_per_year)
-        assert set(values.index) == {"A", "B", "EU"}
-        assert (values.loc[["B", "EU"]] == 0.0).all(axis=None)
+        assert set(values.index) == {"A", "B", COPPERPLATE_LOCATION}
+        assert (values.loc[["B", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
         assert (values >= 0).all(axis=None)
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
