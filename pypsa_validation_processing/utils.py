@@ -536,7 +536,7 @@ def apply_domestic_share(
     ValueError
         If *energy_totals* is ``None``, *kind* is not supported, or a row
         with non-zero Energy statistics belongs to a country without a row in
-        *energy_totals*.
+        *energy_totals* or with a NaN in its *kind* columns.
     """
     if energy_totals is None:
         raise ValueError("energy_totals is required to compute domestic shares (D4).")
@@ -556,6 +556,11 @@ def apply_domestic_share(
     domestic = energy_totals.loc[needed, f"total domestic {kind}"]
     total = domestic + energy_totals.loc[needed, f"total international {kind}"]
     share = domestic.div(total).where(total.ne(0), 0.0)
+    if share.isna().any():
+        raise ValueError(
+            f"Missing {kind} energy totals for the countries "
+            f"{sorted(share.index[share.isna()])} with {kind} demand (D4)."
+        )
     factor = pd.Series(countries, index=energy_stats.index).map(share).fillna(0.0)
     return energy_stats.mul(factor, axis=0)
 

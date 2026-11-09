@@ -349,6 +349,13 @@ class TestApplyDomesticShare:
         with pytest.raises(ValueError, match="CH"):
             apply_domestic_share(flows, totals, "aviation")
 
+    def test_nan_totals_with_demand_raises(self, totals):
+        """D4: a non-zero location whose country row has NaN totals raises ValueError."""
+        totals.loc["XK"] = [float("nan"), 0.196, float("nan"), float("nan")]
+        flows = self._flows({"AT11": 1.0, "XK": 1.0})
+        with pytest.raises(ValueError, match="XK"):
+            apply_domestic_share(flows, totals, "aviation")
+
     def test_zero_rows_need_no_lookup(self, totals):
         """D4: rows that are 0 (e.g. EU) stay 0 without a country row."""
         flows = self._flows({"AT11": 10.0, "EU": 0.0})
