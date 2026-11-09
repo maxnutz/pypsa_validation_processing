@@ -1,6 +1,6 @@
 # `Net Imports|Oil`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -67,6 +67,7 @@ In PyPSA-AT, oil is one copperplate bus `EU oil` (measured 2020, 2040). Fossil o
 - Sign convention: positive = net import. Values MAY be negative (e.g. the pseudo-location `EU`, which holds the refining; it is returned by the function but dropped from the output, C8.7, OQ-17).
 - Weighting: per C6.10; `f_oil` is a yearly scalar for every snapshot.
 - Model note: domestic crude production is not modelled in PyPSA-AT (`oil primary` is a single Generator). So for a regional location, net imports equal its fossil oil consumption.
+- Scope note (comparison with statistics): the definition (section 2) does not exclude non-energy use. Energy statistics count all net imports of oil (Eurostat `IMP − EXP` on `O4000XBIO`), including oil for non-energy use (`FC_NE`: bitumen, lubricants, feedstocks) and refinery own use (`NRG_PR_E`). PyPSA-AT represents neither, except `naphtha for industry`. So `NI_oil` is lower than the statistics by about `FC_NE − naphtha for industry + NRG_PR_E`. This is a model limitation: the Eurostat reference stays `IMP − EXP` and is not corrected. Measured for AT (PR #152): model 2025 374.3 PJ (`20261020_carbon_accounting_run`) and 360.7 PJ (`WIND_150_aut`), Eurostat 2024 448.4 PJ (−16.5 % / −19.6 %). The gap is explained by `FC_NE` 65.6 PJ − naphtha 13.65 PJ + `NRG_PR_E` 23.1 PJ ≈ 75 PJ. The function docstring repeats this note under "Notes".
 
 ## 8. Optional kwargs
 | Kwarg | Used? | Purpose | Behaviour if unavailable |
