@@ -23,6 +23,7 @@ from pypsa_validation_processing.statistics_functions import (
 )
 
 from pypsa_validation_processing.utils import (
+    COPPERPLATE_LOCATION,
     MissingInputError,
     UNITS_MAPPING,
     apply_coke_correction,
@@ -433,8 +434,8 @@ class TestNetImportsOil:
         n = _real_network(n_snapshots)
         n.snapshot_weightings.loc[:, :] = 1.0
         ones = [1.0] * n_snapshots
-        _add_bus(n, "EU oil", "oil", "MWh_th", "EU")
-        _add_bus(n, "EU oil primary", "oil primary", "MWh_th", "EU")
+        _add_bus(n, "EU oil", "oil", "MWh_th", COPPERPLATE_LOCATION)
+        _add_bus(n, "EU oil primary", "oil primary", "MWh_th", COPPERPLATE_LOCATION)
         for loc in ("A", "B", "C"):
             _add_bus(n, loc, "AC", "MWh_el", loc)
         _add_bus(n, "A land transport oil", "land transport oil", "MWh_th", "A")
@@ -492,7 +493,7 @@ class TestNetImportsOil:
         result = Net_Imports__Oil(n, aggregate_per_year=aggregate_per_year)
         _check_c6_format(result, n, aggregate_per_year)
         values = result.droplevel("unit")
-        assert set(values.index) == {"A", "B", "C", "EU"}
+        assert set(values.index) == {"A", "B", "C", COPPERPLATE_LOCATION}
         assert (values.loc[["C"]] == 0.0).all(axis=None)
 
     def test_ac3_values(self):
@@ -500,14 +501,14 @@ class TestNetImportsOil:
         values = self._values(self._network())
         assert values["A"] == pytest.approx(48.0)
         assert values["B"] == pytest.approx(32.0)
-        assert values["EU"] == pytest.approx(-80.0)
+        assert values[COPPERPLATE_LOCATION] == pytest.approx(-80.0)
 
     def test_ac7_store_charging(self):
         """AC5 / AC7: Store charging 10 at EU: A 48, B 24, EU −72; sum 0."""
         values = self._values(self._network(boiler=30.0, store=10.0))
         assert values["A"] == pytest.approx(48.0)
         assert values["B"] == pytest.approx(24.0)
-        assert values["EU"] == pytest.approx(-72.0)
+        assert values[COPPERPLATE_LOCATION] == pytest.approx(-72.0)
         assert values.sum() == pytest.approx(0.0)
 
     def test_flow_consistency(self):
