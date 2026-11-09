@@ -534,9 +534,11 @@ def apply_domestic_share(
     Raises
     ------
     ValueError
-        If *energy_totals* is ``None``, *kind* is not supported, or a row
-        with non-zero Energy statistics belongs to a country without a row in
-        *energy_totals* or with a NaN in its *kind* columns.
+        If *energy_totals* is ``None`` or *kind* is not supported.
+    MissingInputError
+        If a row with non-zero Energy statistics belongs to a country without
+        a row in *energy_totals*; ``Network_Processor`` then skips the
+        variable.
     """
     if energy_totals is None:
         raise ValueError("energy_totals is required to compute domestic shares (D4).")
@@ -549,18 +551,13 @@ def apply_domestic_share(
     needed = pd.Index(countries[nonzero.to_numpy()]).unique()
     missing = needed.difference(energy_totals.index)
     if not missing.empty:
-        raise ValueError(
-            f"No energy totals row for the countries {sorted(missing)} with "
-            f"{kind} demand (D4)."
+        raise MissingInputError(
+            f"energy totals rows for the countries {sorted(missing)} with "
+            f"{kind} demand (D4)"
         )
     domestic = energy_totals.loc[needed, f"total domestic {kind}"]
     total = domestic + energy_totals.loc[needed, f"total international {kind}"]
     share = domestic.div(total).where(total.ne(0), 0.0)
-    if share.isna().any():
-        raise ValueError(
-            f"Missing {kind} energy totals for the countries "
-            f"{sorted(share.index[share.isna()])} with {kind} demand (D4)."
-        )
     factor = pd.Series(countries, index=energy_stats.index).map(share).fillna(0.0)
     return energy_stats.mul(factor, axis=0)
 

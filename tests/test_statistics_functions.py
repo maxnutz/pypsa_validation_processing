@@ -1529,7 +1529,7 @@ class TestFinalEnergyBySectorTransportation:
         assert self._normalised(n)["AA1"] == pytest.approx(1.0)
 
     def test_missing_country_in_energy_totals_raises(self):
-        """D4: non-zero aviation demand in a country without energy totals raises."""
+        """D4: non-zero aviation demand in a country without energy totals raises MissingInputError."""
         n = self._network()
         _add_bus(
             n, "BB1 kerosene for aviation", "kerosene for aviation", "MWh_LHV", "BB1"
@@ -1542,7 +1542,7 @@ class TestFinalEnergyBySectorTransportation:
             bus="BB1 kerosene for aviation",
             carrier="kerosene for aviation",
         )
-        with pytest.raises(ValueError, match="BB"):
+        with pytest.raises(MissingInputError, match="BB"):
             Final_Energy_by_Sector__Transportation(n, energy_totals=self.ENERGY_TOTALS)
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
