@@ -520,6 +520,8 @@ def fossil_gas_share(n: pypsa.Network) -> float:
     supply = n.statistics.supply(
         bus_carrier="gas", groupby=["carrier"], nice_names=False
     )
+    if supply.empty:
+        return 0.0
     supply = supply.drop("Store", level="component", errors="ignore")
     bus_carrier = n.buses["carrier"]
     between_gas_buses = (bus_carrier.reindex(n.links["bus0"]).to_numpy() == "gas") & (

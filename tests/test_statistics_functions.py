@@ -907,7 +907,10 @@ class TestFinalEnergyByCarrierNaturalGas:
         assert (values.loc[["AA2", "EU"]] == 0.0).all(axis=None)
 
     def test_ac3_value(self):
-        """AC3: 0.6 · (10 + 20) = 18."""
+        """Test Natural Gas as fossil share of gas mix (AC3)
+        Fossil share = 0.6, gas demand (10 heating + 20 industry) = 30.
+        0.6 · (10 + 20) = 18.
+        """
         assert self._values(self._network(), _shares())["AA1"] == pytest.approx(18.0)
 
     def test_ac4_flow_consistency_time_varying_supply(self):
@@ -922,7 +925,11 @@ class TestFinalEnergyByCarrierNaturalGas:
         )
 
     def test_ac5_non_negative_with_local_renewable_surplus(self):
-        """AC5: renewable supply above local demand at AA2 still gives >= 0 (#97)."""
+        """AC5: renewable supply above local demand at AA2 still gives >= 0 (#97).
+
+        The AA2 surplus enters the system-wide share: f_gas = 60 / 200 = 0.3,
+        AA1 = 0.3 · (10 + 20) = 9.
+        """
         n = self._network()
         _add_bus(n, "AA2 biogas", "biogas", "MWh_LHV", "AA2")
         _add_dispatched(
@@ -934,7 +941,10 @@ class TestFinalEnergyByCarrierNaturalGas:
             bus1="AA2 gas",
             carrier="biogas to gas",
         )
-        assert (self._values(n, _shares()) >= 0).all()
+        values = self._values(n, _shares())
+        assert (values >= 0).all()
+        assert values["AA1"] == pytest.approx(9.0)
+        assert values["AA2"] == 0.0
 
     def test_ac7_transport_and_store_ignored(self):
         """AC7: gas pipeline flows and the gas Store do not change f_gas."""
@@ -956,6 +966,21 @@ class TestFinalEnergyByCarrierNaturalGas:
     def test_ac8_unknown_supplier_raises(self):
         """AC8: an unknown carrier with non-zero supply to a gas bus raises."""
         n = self._network()
+        _add_dispatched(
+            n,
+            "Generator",
+            "AA1 mystery gas",
+            {"p": [5.0]},
+            bus="AA1 gas",
+            carrier="mystery gas",
+        )
+        with pytest.raises(ValueError, match="mystery gas"):
+            self._values(n, _shares())
+
+    def test_ac8_unknown_supplier_raises_without_consumers(self):
+        """AC8: the unknown-supplier check also runs when no gas is consumed."""
+        n = _real_network(1)
+        _add_bus(n, "AA1 gas", "gas", "MWh_LHV", "AA1")
         _add_dispatched(
             n,
             "Generator",

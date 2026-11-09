@@ -510,10 +510,11 @@ def Final_Energy_by_Carrier__Natural_Gas(
         and every location of the network (C6.13).
     """
     boiler_carriers = ["rural gas boiler", "urban decentral gas boiler"]
+    has_gas_bus = "gas" in set(n.buses["carrier"])
+    # computed even without consumers so that unknown suppliers raise (AC8)
+    gas_share = fossil_gas_share(n) if has_gas_bus else 0.0
     parts = []
-    if "gas" in set(n.buses["carrier"]) and set(boiler_carriers) & set(
-        n.links["carrier"]
-    ):
+    if has_gas_bus and set(boiler_carriers) & set(n.links["carrier"]):
         boilers = n.statistics.withdrawal(
             bus_carrier="gas",
             carrier=boiler_carriers,
@@ -538,8 +539,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         if not part.empty
     ]
     result = (
-        fossil_gas_share(n)
-        * pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        gas_share * pd.concat(parts).groupby(level=statistics_grouping_index).sum()
         if parts
         else pd.Series(dtype=float)
     )
