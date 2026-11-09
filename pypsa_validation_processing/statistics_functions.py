@@ -442,6 +442,17 @@ def Net_Imports__Oil(
         Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network (C6.13).
+
+    Notes
+    -----
+    The result counts only oil the model consumes. Energy statistics
+    (Eurostat ``IMP − EXP``, Statistik Austria) count all net imports of oil,
+    including oil for non-energy use and refinery own use. PyPSA-AT models
+    neither, except ``naphtha for industry``. So the result is lower than
+    statistics by about non-energy use minus naphtha plus refinery own use.
+    For AT 2024 (Eurostat), that is 65.6 − 13.7 + 23.1 ≈ 75 PJ, about 17 % of
+    net imports. Take this into account in comparisons with statistics or
+    other models.
     """
     if "oil" not in set(n.buses["carrier"]):
         return ensure_all_locations(
