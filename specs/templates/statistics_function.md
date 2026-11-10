@@ -63,7 +63,17 @@ Per [principles.md](../constitution/principles.md) P6.
 Changes to the ported logic, only as far as needed for the function contract (one bullet each, with reason):
 - <e.g. country aggregation removed; returns locations (C6.5)>
 
-If the source is `pypsa.statistics`: state that `export_ariadne_variables.py` was searched and no exact or semantic match exists (search terms, functions checked).
+If the source is `pypsa.statistics`, either
+- (no match, P6.3) state that `export_ariadne_variables.py` was searched and no exact or semantic match exists (search terms, functions checked), or
+- (exact match, P6.4) record the equivalence proof:
+
+| Item | Value |
+|---|---|
+| pypsa-de evaluation compared | `<pypsa-de function/expression, ported per this spec>` |
+| `pypsa.statistics` evaluation | `<full expression that gives the same quantity, with groupby_time=False and round=False>`; e.g. for a flow `n.statistics.withdrawal(components=[…], carrier=…, groupby=["location", "unit"], nice_names=False, groupby_time=False, round=False)`, for a Load-weighted price `−revenue / withdrawal` of the same arguments. Any `n.statistics` metric MAY be used; these are examples only |
+| Network, pypsa version, date | `<resources/…/networks/….nc>`, `<1.1.2>`, `<YYYY-MM-DD>` |
+| Result | `<equal at all N locations × T snapshots, max. absolute / relative difference …; K locations non-zero>` (tolerance P6.4: `numpy.isclose(a, b, rtol=1e-9, atol=1e-9)`; an all-zero comparison is not a proof) |
+| Code lines (port / `pypsa.statistics`) | `<n> / <m>` (without docstrings, comments, blank lines) |
 
 ## 5. Match type
 - Match type: `<exact | semantic | none>`
@@ -97,8 +107,8 @@ Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_c
 ## 10. Edge cases
 | Case | Expected behaviour |
 |---|---|
-| none of the carriers present in a location | `0.0` for this location (every snapshot with `aggregate_per_year=False`), unit as in section 3; the location is not dropped (C6.13) |
-| none of the carriers present in the network | `0.0` for every location of `n.buses.location` (C6.13) |
+| none of the carriers present in a location | `0.0` for this location (every snapshot with `aggregate_per_year=False`), unit as in section 3; the location is not dropped (C6.13); `intensive`: value NaN, weight per C6.13 |
+| none of the carriers present in the network | `0.0` for every location of `n.buses.location` (C6.13); `intensive`: value NaN |
 | <only some carriers present in a location> | <e.g. absent carriers contribute 0> |
 | <time series and yearly results disagree> | <must not happen; C6-AC3> |
 
@@ -109,7 +119,7 @@ Concrete enough to become tests in `tests/test_statistics_functions.py`.
 - AC3: <numeric check on a mock network: input values → expected output per location and unit>
 - AC4: The `True` and `False` results are consistent per the aggregation class (C6-AC3).
 - AC4: <sign convention check>
-- AC5: On a mock network with a location without any of the carriers, that location is present with `0.0`; on a mock network without any of the carriers, every location is present with `0.0` (C6-AC6).
+- AC5: On a mock network with a location without any of the carriers, that location is present with `0.0`; on a mock network without any of the carriers, every location is present with `0.0` (C6-AC6); for `intensive`, with the value NaN (C6.12).
 - AC6: <special case check>
 
 ## 12. Open questions

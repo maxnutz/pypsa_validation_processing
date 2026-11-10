@@ -160,9 +160,7 @@ def Net_Imports__Electricity(
     into ``l`` minus the energy withdrawn from it. Imports over a lossy
     branch are counted at the receiving port, exports at the sending port.
     Positive = net import, negative = net export. Country values follow
-    from summing locations (C8, class ``flow``); losses of branches within
-    one country, or within one location, stay in that sum as negative net
-    imports (spec ``Net_Imports__Electricity.md`` section 7).
+    from summing locations (C8, class ``flow``).
 
     Parameters
     ----------
@@ -180,6 +178,15 @@ def Net_Imports__Electricity(
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network; locations without branches get
         ``0.0`` (C6.13).
+
+    Notes
+    -----
+    Limitation: the losses of branches between two locations of the same
+    country are not cross-border flows, but stay in the country sum as
+    negative net imports. The country value is therefore its cross-border
+    net imports minus its internal branch losses (accepted bias, spec
+    ``Net_Imports__Electricity.md`` section 7). Branches with both ends in
+    the same location do not exist by model design.
     """
     result = n.statistics.energy_balance(
         components=["Line", "Link"],
