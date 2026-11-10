@@ -81,7 +81,7 @@ def _check_c6_format(
     if aggregate_per_year:
         assert pd.api.types.is_numeric_dtype(result)
     else:
-        assert set(result.columns) <= set(n.snapshots)
+        assert list(result.columns) == list(n.snapshots)
         assert all(pd.api.types.is_numeric_dtype(d) for d in result.dtypes)
 
 

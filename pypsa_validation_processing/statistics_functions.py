@@ -710,7 +710,9 @@ def Final_Energy_by_Sector__Industry(
         :class:`pandas.DataFrame` with snapshots as columns.
     industry_non_energy_shares : pd.DataFrame | None, optional
         Eurostat non-energy shares, index (``country``, ``carrier``), column
-        ``non_energy_share`` (C2.5).
+        ``non_energy_share`` (C2.5). Required if the network has ``gas``,
+        ``naphtha`` or ``coal for industry`` Loads; ``Network_Processor``
+        skips the variable if the table is not available.
 
     Returns
     -------
@@ -718,6 +720,32 @@ def Final_Energy_by_Sector__Industry(
         Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         (``MWh``) and every location of the network (C6.13).
+
+    Raises
+    ------
+    ValueError
+        If *industry_non_energy_shares* is ``None`` and the network has a
+        ``gas``, ``naphtha`` or ``coal for industry`` Load.
+
+    Notes
+    -----
+    The non-energy use ``NE_x(l)`` (feedstocks) is determined with the
+    Eurostat fallback (D5, C2.5), because the networks do not carry industry
+    production data for the physical method of pypsa-de yet:
+
+    - ``NE_x(l) = S[c, x] · L[x for industry](l)``, with ``S`` the share
+      ``FC_IND_NE / (FC_IND_E + FC_IND_NE)`` of the Eurostat energy balance
+      (``FC_NE`` for coal) and ``c`` the country of location ``l`` (first two
+      characters). ``x`` maps the Loads ``gas``, ``naphtha`` and ``coal for
+      industry`` to the Eurostat carriers ``Natural Gas``, ``Oil`` and
+      ``Coal``.
+    - A country without a share gets the mean share of all countries for
+      that carrier, with a ``WARNING``.
+    - ``NE_H2 = 0`` (Eurostat has no hydrogen share), with a ``WARNING``.
+    - The coke correction of coal uses ``κ = 0`` (D6), with a ``WARNING``.
+
+    See :func:`~pypsa_validation_processing.utils.non_energy_use` and
+    :func:`~pypsa_validation_processing.utils.apply_coke_correction`.
     """
     stats = {"groupby_time": aggregate_per_year, **kwargs}
     loads = set(n.loads["carrier"])
