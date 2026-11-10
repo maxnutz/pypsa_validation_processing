@@ -263,10 +263,12 @@ def Final_Energy_by_Carrier__Oil(
         :class:`pandas.DataFrame` with snapshots as columns.
     energy_totals : pd.DataFrame | None, optional
         Energy totals of one year, indexed by ``country`` (C2.4), for the
-        domestic shares of aviation and navigation (D4).
+        domestic shares of aviation and navigation (D4). Required if the
+        network has a ``kerosene for aviation`` or ``shipping oil`` Load.
     industry_non_energy_shares : pd.DataFrame | None, optional
         Eurostat non-energy shares, index (``country``, ``carrier``), column
-        ``non_energy_share`` (C2.5).
+        ``non_energy_share`` (C2.5). Required if the network has a
+        ``naphtha for industry`` Load.
 
     Returns
     -------
@@ -279,7 +281,11 @@ def Final_Energy_by_Carrier__Oil(
     ------
     ValueError
         If a carrier other than ``kerosene for aviation`` and
-        ``methanol-to-kerosene`` supplies a ``kerosene for aviation`` bus.
+        ``methanol-to-kerosene`` supplies a ``kerosene for aviation`` bus;
+        if *energy_totals* is ``None`` and the network has a
+        ``kerosene for aviation`` or ``shipping oil`` Load; or if
+        *industry_non_energy_shares* is ``None`` and the network has a
+        ``naphtha for industry`` Load.
     """
     stats = {"groupby_time": aggregate_per_year, **kwargs}
     loads = set(n.loads["carrier"])
