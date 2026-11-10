@@ -67,8 +67,17 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [x] PR #139: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43); `country: XK` accepted, pypsa-eur notation (C1.6, C1-AC2; SC-45). A unit with the same name as a carrier of `n` is valid; only non-empty keys of `UNITS_MAPPING` are checked (C6.5, C9.1; SC-46). Remove the unreachable warn-and-skip branch for a missing function in `_execute_function_for_variable` (missing functions raise at initialisation, C4; SC-6; owner, PR #130 review 2026-11-03).
 - [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44; OQ-4 decided 2026-11-03 (SC-45).
 
+## WP6 Infra-Enshure coupling variables (milestone 2) — independent, parallel to WP4
+- [x] Spec PR #148: D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
+- [ ] Spec PR: prices including the CO2 price (owner decision 2026-11-06 after PR #148): D9 without the CO2 subtraction `γ`, the six price specs adapted (AC8: a CO2 port of a supplying Link does not change the result). Removing the CO2 price consistently is a later, optional extension (#163); exposure as separate variables or config switch: #162.
+- [ ] Before implementation: OQ-33 (definitions, made in another repository and imported later; discussed in parallel), OQ-34 (unit label, currency year), OQ-35 (heat; scope of #76). `industry methanol` needs a separate variable (owner, PR #148 review 2026-11-06), no issue yet.
+- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) accepts only the levels `location` and `unit`, so it needs an extension or a D9-specific fill (value and weight NaN, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR.
+- [ ] Code PR(s): the other five prices (#100–#104, low prio).
+- [ ] Validation of the price variables against pypsa-de results: pypsa-de sets prices ≥ 1e4 EUR/MWh to NaN in `get_weighted_costs_links` (`export_ariadne_variables.py` l.3515, used for `…|Liquids|Oil` and `…|Gases`); D9 has no cut-off (owner, PR #148 review 2026-11-06).
+- [ ] Spec PR: investments (#106, OQ-36).
+
 ## Later (need specs first)
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).
-- New variables: Final Energy #71, Ambient Heat #75, Net Imports Biomass/Coal/Natural Gas #66–68, Investments #106, prices #76, #99–104 (#100–104 low prio).
+- New variables: Final Energy #71, Ambient Heat #75, Net Imports Biomass/Coal/Natural Gas #66–68. Investments #106 and prices #76, #99–104: WP6.
 - Physical method for non-energy use (C2.5) once PyPSA-AT stores industry production in `n.meta`.
 - Other: metadata #26, cache #52, documentation #82.
