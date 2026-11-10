@@ -81,6 +81,17 @@ def Final_Energy_by_Carrier__Electricity(
         Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network (C6.13).
+
+    Notes
+    -----
+    ``home battery charger`` (withdrawal) and ``home battery discharger``
+    (supply) are both excluded. Measured on the networks in ``resources/``
+    (``20261020_carbon_accounting_run``, ``AT_KN2040``, ``AT_KN2040_1H``,
+    ``electricity_network_0p3``): the ``home battery`` stores are cyclic, so
+    charger minus discharger equals the round-trip loss, charger
+    ``· (1 − η²)`` with ``η = 0.98``. The largest loss is 3.05 TWh
+    (``AT_KN2040_1H`` 2040, 0.06 % of the ``low voltage`` withdrawal);
+    it is not counted.
     """
     sector_carriers = [
         "agriculture electricity",
@@ -92,7 +103,8 @@ def Final_Energy_by_Carrier__Electricity(
     stats = {"groupby_time": aggregate_per_year, "nice_names": False}
     groupby = ["carrier", "location", "unit"]
     bus_carriers = set(n.buses["carrier"])
-    # pypsa raises ValueError for a bus carrier that is not in the network
+    # pypsa raises ValueError for a bus carrier that is not in the network,
+    # but returns an empty result for an absent carrier (filtered below)
     has_lv = "low voltage" in bus_carriers
     lv_carriers = (
         n.statistics.withdrawal(
@@ -114,12 +126,12 @@ def Final_Energy_by_Carrier__Electricity(
                 bus_carrier="low voltage", carrier=included, groupby=groupby, **stats
             )
         )
-    if has_lv and "V2G" in set(n.links["carrier"]):
+    if has_lv:
         v2g = n.statistics.supply(
             bus_carrier="low voltage", carrier="V2G", groupby=groupby, **stats
         )
         parts.append(-v2g)
-    if "DAC" in set(n.links["carrier"]) and "AC" in bus_carriers:
+    if "AC" in bus_carriers:
         parts.append(
             n.statistics.withdrawal(
                 bus_carrier="AC", carrier="DAC", groupby=groupby, **stats
@@ -149,9 +161,7 @@ def Net_Imports__Electricity(
     into ``l`` minus the energy withdrawn from it. Imports over a lossy
     branch are counted at the receiving port, exports at the sending port.
     Positive = net import, negative = net export. Country values follow
-    from summing locations (C8, class ``flow``); losses of branches within
-    one country, or within one location, stay in that sum as negative net
-    imports (spec ``Net_Imports__Electricity.md`` section 7).
+    from summing locations (C8, class ``flow``).
 
     Parameters
     ----------
@@ -169,6 +179,15 @@ def Net_Imports__Electricity(
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network; locations without branches get
         ``0.0`` (C6.13).
+
+    Notes
+    -----
+    Limitation: the losses of branches between two locations of the same
+    country are not cross-border flows, but stay in the country sum as
+    negative net imports. The country value is therefore its cross-border
+    net imports minus its internal branch losses (accepted bias, spec
+    ``Net_Imports__Electricity.md`` section 7). Branches with both ends in
+    the same location do not exist by model design.
     """
     result = n.statistics.energy_balance(
         components=["Line", "Link"],
@@ -443,6 +462,17 @@ def Net_Imports__Oil(
         Series (``aggregate_per_year=True``) or DataFrame
         (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
         and every location of the network (C6.13).
+
+    Notes
+    -----
+    The result counts only oil the model consumes. Energy statistics
+    (Eurostat ``IMP − EXP``, Statistik Austria) count all net imports of oil,
+    including oil for non-energy use and refinery own use. PyPSA-AT models
+    neither, except ``naphtha for industry``. So the result is lower than
+    statistics by about non-energy use minus naphtha plus refinery own use.
+    For AT 2024 (Eurostat), that is 65.6 − 13.7 + 23.1 ≈ 75 PJ, about 17 % of
+    net imports. Take this into account in comparisons with statistics or
+    other models.
     """
     if "oil" not in set(n.buses["carrier"]):
         return ensure_all_locations(
@@ -511,10 +541,11 @@ def Final_Energy_by_Carrier__Natural_Gas(
         and every location of the network (C6.13).
     """
     boiler_carriers = ["rural gas boiler", "urban decentral gas boiler"]
+    has_gas_bus = "gas" in set(n.buses["carrier"])
+    # computed even without consumers so that unknown suppliers raise (AC8)
+    gas_share = fossil_gas_share(n) if has_gas_bus else 0.0
     parts = []
-    if "gas" in set(n.buses["carrier"]) and set(boiler_carriers) & set(
-        n.links["carrier"]
-    ):
+    if has_gas_bus and set(boiler_carriers) & set(n.links["carrier"]):
         boilers = n.statistics.withdrawal(
             bus_carrier="gas",
             carrier=boiler_carriers,
@@ -539,8 +570,7 @@ def Final_Energy_by_Carrier__Natural_Gas(
         if not part.empty
     ]
     result = (
-        fossil_gas_share(n)
-        * pd.concat(parts).groupby(level=statistics_grouping_index).sum()
+        gas_share * pd.concat(parts).groupby(level=statistics_grouping_index).sum()
         if parts
         else pd.Series(dtype=float)
     )
@@ -628,7 +658,7 @@ def Final_Energy_by_Carrier__District_Heat(
         supplying = at_heat[positive | (p < 0).any().to_numpy()]
         if not supplying.empty:
             raise ValueError(
-                f"DAC Link(s) supply heat to '{bus_carrier}' buses: {list(supplying)}"
+                f"DAC Link(s) supply heat to '{bus_carrier}' buses: {list(supplying)}. This evaluation assumes DAC only withdraws heat from such buses, not supply it."
             )
 
     withdrawal = n.statistics.withdrawal(

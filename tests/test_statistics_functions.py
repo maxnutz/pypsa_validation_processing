@@ -23,6 +23,7 @@ from pypsa_validation_processing.statistics_functions import (
 )
 
 from pypsa_validation_processing.utils import (
+    COPPERPLATE_LOCATION,
     MissingInputError,
     UNITS_MAPPING,
     apply_coke_correction,
@@ -447,8 +448,8 @@ class TestNetImportsOil:
         n = _real_network(n_snapshots)
         n.snapshot_weightings.loc[:, :] = 1.0
         ones = [1.0] * n_snapshots
-        _add_bus(n, "EU oil", "oil", "MWh_th", "EU")
-        _add_bus(n, "EU oil primary", "oil primary", "MWh_th", "EU")
+        _add_bus(n, "EU oil", "oil", "MWh_th", COPPERPLATE_LOCATION)
+        _add_bus(n, "EU oil primary", "oil primary", "MWh_th", COPPERPLATE_LOCATION)
         for loc in ("A", "B", "C"):
             _add_bus(n, loc, "AC", "MWh_el", loc)
         _add_bus(n, "A land transport oil", "land transport oil", "MWh_th", "A")
@@ -506,7 +507,7 @@ class TestNetImportsOil:
         result = Net_Imports__Oil(n, aggregate_per_year=aggregate_per_year)
         _check_c6_format(result, n, aggregate_per_year)
         values = result.droplevel("unit")
-        assert set(values.index) == {"A", "B", "C", "EU"}
+        assert set(values.index) == {"A", "B", "C", COPPERPLATE_LOCATION}
         assert (values.loc[["C"]] == 0.0).all(axis=None)
 
     def test_ac3_values(self):
@@ -514,14 +515,14 @@ class TestNetImportsOil:
         values = self._values(self._network())
         assert values["A"] == pytest.approx(48.0)
         assert values["B"] == pytest.approx(32.0)
-        assert values["EU"] == pytest.approx(-80.0)
+        assert values[COPPERPLATE_LOCATION] == pytest.approx(-80.0)
 
     def test_ac7_store_charging(self):
         """AC5 / AC7: Store charging 10 at EU: A 48, B 24, EU −72; sum 0."""
         values = self._values(self._network(boiler=30.0, store=10.0))
         assert values["A"] == pytest.approx(48.0)
         assert values["B"] == pytest.approx(24.0)
-        assert values["EU"] == pytest.approx(-72.0)
+        assert values[COPPERPLATE_LOCATION] == pytest.approx(-72.0)
         assert values.sum() == pytest.approx(0.0)
 
     def test_flow_consistency(self):
@@ -907,7 +908,10 @@ class TestFinalEnergyByCarrierNaturalGas:
         assert (values.loc[["AA2", "EU"]] == 0.0).all(axis=None)
 
     def test_ac3_value(self):
-        """AC3: 0.6 · (10 + 20) = 18."""
+        """Test Natural Gas as fossil share of gas mix (AC3)
+        Fossil share = 0.6, gas demand (10 heating + 20 industry) = 30.
+        0.6 · (10 + 20) = 18.
+        """
         assert self._values(self._network(), _shares())["AA1"] == pytest.approx(18.0)
 
     def test_ac4_flow_consistency_time_varying_supply(self):
@@ -922,7 +926,11 @@ class TestFinalEnergyByCarrierNaturalGas:
         )
 
     def test_ac5_non_negative_with_local_renewable_surplus(self):
-        """AC5: renewable supply above local demand at AA2 still gives >= 0 (#97)."""
+        """AC5: renewable supply above local demand at AA2 still gives >= 0 (#97).
+
+        The AA2 surplus enters the system-wide share: f_gas = 60 / 200 = 0.3,
+        AA1 = 0.3 · (10 + 20) = 9.
+        """
         n = self._network()
         _add_bus(n, "AA2 biogas", "biogas", "MWh_LHV", "AA2")
         _add_dispatched(
@@ -934,7 +942,10 @@ class TestFinalEnergyByCarrierNaturalGas:
             bus1="AA2 gas",
             carrier="biogas to gas",
         )
-        assert (self._values(n, _shares()) >= 0).all()
+        values = self._values(n, _shares())
+        assert (values >= 0).all()
+        assert values["AA1"] == pytest.approx(9.0)
+        assert values["AA2"] == 0.0
 
     def test_ac7_transport_and_store_ignored(self):
         """AC7: gas pipeline flows and the gas Store do not change f_gas."""
@@ -956,6 +967,21 @@ class TestFinalEnergyByCarrierNaturalGas:
     def test_ac8_unknown_supplier_raises(self):
         """AC8: an unknown carrier with non-zero supply to a gas bus raises."""
         n = self._network()
+        _add_dispatched(
+            n,
+            "Generator",
+            "AA1 mystery gas",
+            {"p": [5.0]},
+            bus="AA1 gas",
+            carrier="mystery gas",
+        )
+        with pytest.raises(ValueError, match="mystery gas"):
+            self._values(n, _shares())
+
+    def test_ac8_unknown_supplier_raises_without_consumers(self):
+        """AC8: the unknown-supplier check also runs when no gas is consumed."""
+        n = _real_network(1)
+        _add_bus(n, "AA1 gas", "gas", "MWh_LHV", "AA1")
         _add_dispatched(
             n,
             "Generator",
@@ -1052,7 +1078,13 @@ class TestFinalEnergyByCarrierDistrictHeat:
         _add_bus(n, "A urban central heat", "urban central heat", "MWh_th", "A")
         _add_bus(n, "A urban decentral heat", "urban decentral heat", "MWh_th", "A")
         _add_bus(n, "A water pits", "urban central water pits", "MWh_th", "A")
-        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
+        )
         heat = "A urban central heat"
         _add_dispatched(
             n,
@@ -1152,12 +1184,23 @@ class TestFinalEnergyByCarrierDistrictHeat:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_every_location_non_negative(self, aggregate_per_year):
-        """AC5 / AC6 / AC10: B and copperplate EU present with 0.0, values >= 0."""
+        """AC5 / AC6 / AC10: B and copperplate present with 0.0, values >= 0."""
         n = self._ac3_network()
         values = self._values(n, aggregate_per_year=aggregate_per_year)
-        assert set(values.index) == {"A", "B", "EU"}
-        assert (values.loc[["B", "EU"]] == 0.0).all(axis=None)
+        assert set(values.index) == {"A", "B", COPPERPLATE_LOCATION}
+        assert (values.loc[["B", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
         assert (values >= 0).all(axis=None)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_copperplate_location_is_zero(self, aggregate_per_year):
+        """AC10: fuel withdrawn at copperplate EU by a heat-supplying CHP is not
+        counted; the copperplate location has no district heat."""
+        n = self._ac3_network(n_snapshots=2)
+        assert (n.links_t.p0["A urban central coal CHP"] != 0).all()
+        assert n.buses.loc["EU coal", "location"] == COPPERPLATE_LOCATION
+        values = self._values(n, aggregate_per_year=aggregate_per_year)
+        assert COPPERPLATE_LOCATION in values.index
+        assert (values.loc[[COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
 
     def test_independent_of_supply_efficiency(self):
         """AC7: changing the CHP efficiency leaves the result unchanged."""
@@ -1227,7 +1270,13 @@ class TestFinalEnergyByCarrierCoal:
         n.snapshot_weightings.loc[:, :] = 1.0
         _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
         _add_bus(n, "AA2", "AC", "MWh_el", "AA2")
-        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
+        )
         if with_coal:
             _add_bus(n, "AA1 coal for industry", "coal for industry", "MWh_LHV", "AA1")
             _add_bus(n, "AA2 coal for industry", "coal for industry", "MWh_LHV", "AA2")
@@ -1258,7 +1307,7 @@ class TestFinalEnergyByCarrierCoal:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_format_and_every_location(self, aggregate_per_year):
-        """AC1 / AC2 / AC6: C6 format; AA2 (zero withdrawal) and EU kept with 0.0."""
+        """AC1 / AC2 / AC6: C6 format; AA2 (zero withdrawal) and copperplate kept with 0.0."""
         n = self._network()
         result = Final_Energy_by_Carrier__Coal(
             n,
@@ -1267,8 +1316,8 @@ class TestFinalEnergyByCarrierCoal:
         )
         _check_c6_format(result, n, aggregate_per_year)
         values = result.droplevel("unit")
-        assert set(values.index) == {"AA1", "AA2", "EU"}
-        assert (values.loc[["AA2", "EU"]] == 0.0).all(axis=None)
+        assert set(values.index) == {"AA1", "AA2", COPPERPLATE_LOCATION}
+        assert (values.loc[["AA2", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
 
     def test_ac3_without_non_energy_use(self):
         """AC3: kappa = 0 and share 0 gives 20."""
