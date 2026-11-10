@@ -180,7 +180,8 @@ class MockPyPSANetwork:
         # Locations and snapshots used by result validation (C6.2, C6.6)
         locations = ["AT1", "AT2", "AT3", "DE1", "DE2", "FR1"]
         self.buses = pd.DataFrame(
-            {"location": locations}, index=[f"{loc} bus" for loc in locations]
+            {"location": locations, "carrier": "AC"},
+            index=[f"{loc} bus" for loc in locations],
         )
         self.snapshots = pd.date_range(
             "2019-01-01", periods=4, freq="6h", name="snapshot"
