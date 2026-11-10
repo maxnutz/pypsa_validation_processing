@@ -2,7 +2,15 @@
 
 ::: pypsa_validation_processing.statistics_functions
     options:
-      members: true
-      filters:
-        - "!^_"
-        - "!^(UNITS_MAPPING|kwargs|kwargs_filtering|kwargs_imports|remap_unit_index|get_energy_totals_domestic_share|create_location_index_from_copperplate)$"
+      members:
+        - Final_Energy_by_Carrier__Electricity
+        - Net_Imports__Electricity
+        - Final_Energy_by_Carrier__Coal
+        - Final_Energy_by_Carrier__Oil
+        - Net_Imports__Oil
+        - Final_Energy_by_Carrier__Natural_Gas
+        - Final_Energy_by_Carrier__District_Heat
+        - Final_Energy_by_Sector__Transportation
+        - Final_Energy_by_Sector__Industry
+        - Final_Energy_by_Sector__Agriculture
+        - Final_Energy_by_Sector__Residential_and_Commercial

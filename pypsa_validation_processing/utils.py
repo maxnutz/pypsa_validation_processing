@@ -711,6 +711,77 @@ def apply_coke_correction(
     return coal_energy * (1.0 - kappa) + coal_energy * kappa / MWH_COAL_PER_MWH_COKE
 
 
+def ensure_all_locations(
+    result: pd.Series | pd.DataFrame,
+    n: pypsa.Network,
+    unit: str,
+    aggregate_per_year: bool,
+) -> pd.Series | pd.DataFrame:
+    """Add every location of *n* missing in *result* with ``0.0`` (C6.13).
+
+    Parameters
+    ----------
+    result : pd.Series | pd.DataFrame
+        Result of a statistics function whose index levels contain at least
+        ``location`` and ``unit`` (C6.1-C6.3), or a result with zero rows
+        (e.g. an empty ``n.statistics`` result).
+    n : pypsa.Network
+        Evaluated network; its locations are the non-empty values of
+        ``n.buses.location``.
+    unit : str
+        Normalised unit of the variable (a key of ``UNITS_MAPPING``) for the
+        added rows.
+    aggregate_per_year : bool
+        If ``True``, return a :class:`pandas.Series`; if ``False``, a
+        :class:`pandas.DataFrame` with the snapshots of *n* as columns. Needed
+        because ``n.statistics`` returns an empty ``pd.Series`` in both modes.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        *result* plus one row per missing location (two rows, ``value`` and
+        ``weight``, if *result* has a ``quantity`` level, C6.12), with
+        ``0.0`` (``aggregate_per_year=False``: in every snapshot column of
+        *n*). Further index levels of *result* are NaN in the added rows; C8
+        aggregates them away.
+
+    Raises
+    ------
+    ValueError
+        If a non-empty *result* lacks the index level ``location`` or
+        ``unit``.
+    """
+    locations = n.buses["location"]
+    locations = pd.Index(locations[locations.notna() & (locations != "")].unique())
+    if result.empty:
+        names, present = statistics_grouping_index, pd.Index([])
+    elif not set(statistics_grouping_index) <= set(result.index.names):
+        raise ValueError(
+            f"Index levels must contain {statistics_grouping_index}, "
+            f"got: {list(result.index.names)}"
+        )
+    else:
+        names = list(result.index.names)
+        present = result.index.get_level_values("location")
+    missing = locations.difference(present)
+    quantities = ["value", "weight"] if "quantity" in names else [None]
+    rows = [
+        {"location": loc, "unit": unit, "quantity": q}
+        for loc in missing
+        for q in quantities
+    ]
+    index = pd.MultiIndex.from_frame(pd.DataFrame(rows, columns=names))
+    if not aggregate_per_year:
+        filled = pd.DataFrame(0.0, index=index, columns=n.snapshots)
+    else:
+        filled = pd.Series(0.0, index=index)
+    if result.empty:
+        return filled
+    if missing.empty:
+        return result
+    return pd.concat([result, filled])
+
+
 def _decentral_heat_input(
     n: pypsa.Network, bus_carrier: str, aggregate_per_year: bool
 ) -> list[pd.Series | pd.DataFrame]:
