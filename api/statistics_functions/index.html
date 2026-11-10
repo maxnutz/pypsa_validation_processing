@@ -1715,16 +1715,19 @@ Eurostat energy balance data.</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__District_Heat" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__District_Heat</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__District_Heat</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extract Final Energy of District Heat from PyPSA Network.</p>
-<p>Returns the total final energy demand, district heating facilities
-have to provide district heating.</p>
+        <p>Extract Final Energy [by Carrier]|District Heat from a PyPSA Network.</p>
+<p>Heat delivered from district heating grids to consumers, without
+distribution losses: <code>FE(l) = L[urban central heat](l) / (1 + λ)
++ L[low-temperature heat for industry](l) + W[DAC](l)</code>, all withdrawn
+from <code>urban central heat</code> buses at <code>l</code>. Storage chargers and the heat
+vent withdraw heat but are not consumers; supplying links are not counted.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1772,6 +1775,23 @@ have to provide district heating.</p>
                   <code>True</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network config; <code>λ</code> is
+<code>config["sector"]["district_heating"]["district_heating_loss"]</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1791,12 +1811,9 @@ have to provide district heating.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex including
-<code>location</code> and <code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -1804,13 +1821,39 @@ Network_Processor._aggregate_to_country() if configured.</p>
     </table>
 
 
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>The energy demand of district heating is calculated based on the
-links from other carriers buses to the urban central heat buses.
-This includes waste heat from eg. DAC. Taking the withdrawal from
-the source bus of the link gives the energy in elem of the source carrier.</p>
-</details>
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="MissingInputError (pypsa_validation_processing.utils.MissingInputError)" href="../utils/#pypsa_validation_processing.utils.MissingInputError">MissingInputError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the district heating loss is missing in <em>config</em>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a <code>DAC</code> Link supplies heat to an <code>urban central heat</code> bus, or a
+component with an unknown carrier withdraws from such a bus.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 
