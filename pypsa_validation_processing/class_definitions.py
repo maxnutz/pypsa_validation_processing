@@ -605,7 +605,8 @@ class Network_Processor:
             One row per country, or ``None`` (with a WARNING) if neither
             source is available, the CSV cannot be read, or the selected table
             lacks a column of ``_ENERGY_TOTALS_REQUIRED_COLUMNS``. There is no
-            fallback from an incomplete ``n.meta`` table to the CSV.
+            fallback from an incomplete ``n.meta`` table to the CSV. Countries
+            with NaN in one of these columns are dropped (with a WARNING).
         """
         resources = (getattr(n, "meta", None) or {}).get("resources") or {}
         table = resources.get("energy_totals")
@@ -647,7 +648,18 @@ class Network_Processor:
                 if c not in energy_totals.columns
             ]
             if not missing_columns:
-                return energy_totals
+                incomplete = energy_totals[_ENERGY_TOTALS_REQUIRED_COLUMNS].isna()
+                incomplete = energy_totals.index[incomplete.any(axis=1)]
+                if not incomplete.empty:
+                    logger.warning(
+                        "Network '%s': energy totals in %s have NaN in the D4 "
+                        "columns for the countries %s; these countries are "
+                        "dropped. Variables that need them are skipped.",
+                        label,
+                        source,
+                        sorted(incomplete),
+                    )
+                return energy_totals.drop(index=incomplete)
             missing = f"columns {missing_columns} in {source}"
         logger.warning(
             "Network '%s': no energy totals available (missing %s). Variables "
