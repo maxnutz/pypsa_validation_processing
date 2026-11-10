@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -740,6 +740,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.ensure_all_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensure_all_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -974,6 +985,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.ensure_all_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensure_all_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1125,11 +1147,7 @@ direct comparison of input-output flows.</p>
               </div>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="UNITS_MAPPING = {'MWh_el': 'MWh', 'MWh_LHV': 'MWh', 'MWh_th': 'MWh', 'land transport': 'MWh', 't_co2': 't', 'MWh': 'MWh'}
-
-  
-      module-attribute
-   (pypsa_validation_processing.utils.UNITS_MAPPING)" href="../statistics_functions/#pypsa_validation_processing.statistics_functions.UNITS_MAPPING">UNITS_MAPPING</a></code>
+                  <code><span title="pypsa_validation_processing.utils.UNITS_MAPPING">UNITS_MAPPING</span></code>
             </td>
           </tr>
       </tbody>
@@ -2205,6 +2223,160 @@ to <code>MWh</code>, C6.5). Empty if no decentral heat bus is supplied.</p>
 
 </div>
 
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.ensure_all_locations" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ensure_all_locations</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add every location of <em>n</em> missing in <em>result</em> with <code>0.0</code> (C6.13).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>result</code>
+            </td>
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Result of a statistics function whose index levels contain at least
+<code>location</code> and <code>unit</code> (C6.1-C6.3), or a result with zero rows
+(e.g. an empty <code>n.statistics</code> result).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Evaluated network; its locations are the non-empty values of
+<code>n.buses.location</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>unit</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Normalised unit of the variable (a key of <code>UNITS_MAPPING</code>) for the
+added rows.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code>, return a :class:<code>pandas.Series</code>; if <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with the snapshots of <em>n</em> as columns. Needed
+because <code>n.statistics</code> returns an empty <code>pd.Series</code> in both modes.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><em>result</em> plus one row per missing location (two rows, <code>value</code> and
+<code>weight</code>, if <em>result</em> has a <code>quantity</code> level, C6.12), with
+<code>0.0</code> (<code>aggregate_per_year=False</code>: in every snapshot column of
+<em>n</em>). Further index levels of <em>result</em> are NaN in the added rows; C8
+aggregates them away.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a non-empty <em>result</em> lacks the index level <code>location</code> or
+<code>unit</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
 
 
   </div>
@@ -2270,7 +2442,7 @@ to <code>MWh</code>, C6.5). Empty if no decentral heat bus is supplied.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.instant", "search.suggest", "search.highlight", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
