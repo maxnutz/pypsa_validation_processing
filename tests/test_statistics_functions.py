@@ -22,9 +22,77 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Oil,
 )
 
-from pypsa_validation_processing.utils import UNITS_MAPPING
+from pypsa_validation_processing.utils import (
+    COPPERPLATE_LOCATION,
+    MissingInputError,
+    UNITS_MAPPING,
+)
 
 from conftest import MockPyPSANetwork, MockNetworkCollection
+
+# ---------------------------------------------------------------------------
+# Shared helpers for tests on real pypsa networks (WP4)
+# ---------------------------------------------------------------------------
+
+WEIGHT = 3.0
+
+
+def _real_network(n_snapshots: int = 2) -> pypsa.Network:
+    """Return an empty network with 3-hour snapshots weighted by ``WEIGHT``."""
+    n = pypsa.Network()
+    n.set_snapshots(pd.date_range("2025-01-01", periods=n_snapshots, freq="3h"))
+    n.snapshot_weightings.loc[:, :] = WEIGHT
+    return n
+
+
+def _add_bus(
+    n: pypsa.Network, name: str, carrier: str, unit: str, location: str
+) -> None:
+    """Add a bus with carrier, unit and location."""
+    n.add("Bus", name, carrier=carrier, unit=unit, location=location)
+
+
+def _add_dispatched(
+    n: pypsa.Network,
+    component: str,
+    name: str,
+    dispatch: dict[str, list[float]],
+    **attrs: object,
+) -> None:
+    """Add a component and set its dispatch time series (e.g. ``p``, ``p0``, ``p1``)."""
+    n.add(component, name, **attrs)
+    for attr, values in dispatch.items():
+        n.components[component].dynamic[attr][name] = values
+
+
+def _check_c6_format(
+    result: pd.Series | pd.DataFrame, n: pypsa.Network, aggregate_per_year: bool
+) -> None:
+    """C6-AC1 / C6-AC2: type, index levels, units, locations, numeric values."""
+    assert isinstance(result, pd.Series if aggregate_per_year else pd.DataFrame)
+    assert isinstance(result.index, pd.MultiIndex)
+    assert {"location", "unit"} <= set(result.index.names)
+    assert len(result) > 0
+    units = result.index.get_level_values("unit")
+    assert all(u and u in UNITS_MAPPING for u in units)
+    locations = set(result.index.get_level_values("location"))
+    assert locations <= set(n.buses.location) and "" not in locations
+    if aggregate_per_year:
+        assert pd.api.types.is_numeric_dtype(result)
+    else:
+        assert set(result.columns) <= set(n.snapshots)
+        assert all(pd.api.types.is_numeric_dtype(d) for d in result.dtypes)
+
+
+def _check_flow_consistency(func, n: pypsa.Network, **kwargs: object) -> None:
+    """C6-AC3 (flow): weighted column sum of the False result equals True."""
+    yearly = func(n, aggregate_per_year=True, **kwargs)
+    series = func(n, aggregate_per_year=False, **kwargs)
+    weighted = series.mul(n.snapshot_weightings.objective, axis=1).sum(axis=1)
+    pd.testing.assert_series_equal(
+        weighted.sort_index(), yearly.sort_index(), check_names=False
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tests for Final_Energy_by_Carrier__Electricity
@@ -1137,231 +1205,195 @@ class TestFinalEnergyByCarrierNaturalGas:
 
 
 class TestFinalEnergyByCarrierDistrictHeat:
-    """Test suite for Final_Energy_by_Carrier__District_Heat function."""
+    """Spec Final_Energy_by_Carrier__District_Heat.md AC1-AC10."""
 
-    class _DistrictHeatStatisticsAccessor:
-        """Minimal accessor to verify district-heat extraction behavior."""
+    CONFIG = {"sector": {"district_heating": {"district_heating_loss": 0.15}}}
 
-        def __init__(self):
-            self.calls: list[dict] = []
-
-        @staticmethod
-        def _series_from_groupby(
-            groupby: list[str],
-            values: list[float],
-            location: str = "AT1",
-            unit: str = "MWh_th",
-        ) -> pd.Series:
-            index = pd.MultiIndex.from_tuples(
-                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
-                names=groupby,
-            )
-            return pd.Series(values, index=index, dtype=float)
-
-        @staticmethod
-        def _dataframe_from_groupby(
-            groupby: list[str],
-            values: list[float],
-            location: str = "AT1",
-            unit: str = "MWh_th",
-        ) -> pd.DataFrame:
-            index = pd.MultiIndex.from_tuples(
-                [tuple({"location": location, "unit": unit}[k] for k in groupby)],
-                names=groupby,
-            )
-            columns = pd.Index(
-                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
-            )
-            return pd.DataFrame([values[: len(columns)]], index=index, columns=columns)
-
-        def energy_balance(
-            self,
-            bus_carrier: str | list[str] | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            aggregate_time: bool = True,
-            groupby: list[str] | None = None,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "aggregate_time": aggregate_time,
-                    "groupby": groupby,
-                    "nice_names": nice_names,
-                }
-            )
-
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            if (
-                bus_carrier == "urban central heat"
-                and carrier == "urban central heat vent"
-                and components == "Generator"
-            ):
-                if aggregate_time:
-                    return self._series_from_groupby(groupby, [5.0])
-                return self._dataframe_from_groupby(groupby, [5.0, 5.0])
-
-            if aggregate_time:
-                return pd.Series(
-                    dtype=float,
-                    index=pd.MultiIndex.from_tuples([], names=groupby),
-                )
-            return pd.DataFrame(
-                index=pd.MultiIndex.from_tuples([], names=groupby),
-                columns=pd.Index(pd.to_datetime([], name="snapshot")),
-                dtype=float,
-            )
-
-        def withdrawal(
-            self,
-            bus_carrier: str | list[str] | None = None,
-            carrier: list[str] | str | None = None,
-            components: str | list[str] | None = None,
-            aggregate_time: bool = True,
-            groupby: list[str] | None = None,
-            nice_names: bool | None = None,
-            **_: object,
-        ) -> pd.Series | pd.DataFrame:
-            self.calls.append(
-                {
-                    "bus_carrier": bus_carrier,
-                    "carrier": carrier,
-                    "components": components,
-                    "aggregate_time": aggregate_time,
-                    "groupby": groupby,
-                    "nice_names": nice_names,
-                }
-            )
-
-            if groupby is None:
-                groupby = ["location", "unit"]
-
-            if aggregate_time:
-                return self._series_from_groupby(groupby, [55.0])
-            return self._dataframe_from_groupby(groupby, [55.0, 56.0])
-
-    class _DistrictHeatNetwork:
-        """Minimal network exposing district-heat buses/links and statistics."""
-
-        def __init__(self):
-            self.statistics = (
-                TestFinalEnergyByCarrierDistrictHeat._DistrictHeatStatisticsAccessor()
-            )
-            self.snapshots = pd.DatetimeIndex(
-                pd.to_datetime(["2019-01-01", "2019-01-02"]), name="snapshot"
-            )
-            self.buses = pd.DataFrame(
-                {
-                    "carrier": [
-                        "urban central heat",
-                        "urban central heat",
-                        "AC",
-                        "gas",
-                        "district heat storage",
-                        "biomass",
-                        "hydrogen",
-                    ]
-                },
-                index=[
-                    "AT1 urban central heat",
-                    "AT2 urban central heat",
-                    "AT1 AC",
-                    "AT2 gas",
-                    "AT1 heat storage",
-                    "AT2 biomass",
-                    "AT2 hydrogen",
-                ],
-            )
-            self.links = pd.DataFrame(
-                {
-                    "bus0": [
-                        "AT1 AC",
-                        "AT2 gas",
-                        "AT2 biomass",
-                        "AT2 hydrogen",
-                    ],
-                    "bus1": [
-                        "AT1 urban central heat",
-                        "AT2 urban central heat",
-                        "AT2 urban central heat",
-                        "AT2 urban central heat",
-                    ],
-                    "bus2": [
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                    ],
-                    "bus3": [
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                        "AT1 heat storage",
-                    ],
-                    "carrier": [
-                        "urban central resistive heater",
-                        "urban central gas boiler",
-                        "central heat charger",
-                        "central heat discharger",
-                    ],
-                },
-                index=["l1", "l2", "l3", "l4"],
-            )
-
-    def _district_heat_network(self):
-        return self._DistrictHeatNetwork()
-
-    def test_returns_series(self):
-        """Function returns a Series with expected output format."""
-        result = Final_Energy_by_Carrier__District_Heat(self._district_heat_network())
-        assert isinstance(result, pd.Series)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-
-    def test_filters_charger_and_discharger_carriers(self):
-        """Carrier query excludes charger/discharger links connected to central heat."""
-        network = self._district_heat_network()
-        _ = Final_Energy_by_Carrier__District_Heat(network)
-
-        calls = network.statistics.calls
-        assert len(calls) == 2
-        queried_carriers = set(calls[0]["carrier"])
-        assert queried_carriers == {
-            "urban central resistive heater",
-            "urban central gas boiler",
-        }
-        assert calls[1]["bus_carrier"] == "urban central heat"
-        assert calls[1]["carrier"] == "urban central heat vent"
-        assert calls[1]["components"] == "Generator"
-
-    def test_uses_supply_bus_carriers_from_bus0(self):
-        """bus_carrier query uses carriers from bus0 of relevant central-heat links."""
-        network = self._district_heat_network()
-        _ = Final_Energy_by_Carrier__District_Heat(network)
-
-        queried_bus_carriers = set(network.statistics.calls[0]["bus_carrier"])
-        # Links via bus0 include AC, gas, biomass and hydrogen supply buses.
-        assert queried_bus_carriers == {"AC", "gas", "biomass", "hydrogen"}
-        assert network.statistics.calls[1]["carrier"] == "urban central heat vent"
-
-    def test_returns_dataframe_for_aggregate_per_year_false(self):
-        """aggregate_per_year=False returns timeseries DataFrame output."""
-        network = self._district_heat_network()
-        result = Final_Energy_by_Carrier__District_Heat(
-            network, aggregate_per_year=False
+    @staticmethod
+    def _ac3_network(n_snapshots: int = 1) -> pypsa.Network:
+        """AC3 mock at location A (plus empty location B, copperplate EU)."""
+        n = _real_network(n_snapshots)
+        ones = [1.0] * n_snapshots
+        for loc in ("A", "B"):
+            _add_bus(n, loc, "AC", "MWh_el", loc)
+        _add_bus(n, "A urban central heat", "urban central heat", "MWh_th", "A")
+        _add_bus(n, "A urban decentral heat", "urban decentral heat", "MWh_th", "A")
+        _add_bus(n, "A water pits", "urban central water pits", "MWh_th", "A")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
         )
-        assert isinstance(result, pd.DataFrame)
-        assert isinstance(result.index, pd.MultiIndex)
-        assert result.index.names == ["location", "unit"]
-        assert isinstance(result.columns, pd.DatetimeIndex)
-        assert len(result.columns) == len(network.snapshots)
-        pd.testing.assert_index_equal(result.columns, network.snapshots)
+        heat = "A urban central heat"
+        _add_dispatched(
+            n,
+            "Load",
+            "A uc heat",
+            {"p": [115.0 * v for v in ones]},
+            bus=heat,
+            carrier="urban central heat",
+        )
+        _add_dispatched(
+            n,
+            "Load",
+            "A lt ind",
+            {"p": [10.0 * v for v in ones]},
+            bus=heat,
+            carrier="low-temperature heat for industry",
+        )
+        _add_dispatched(
+            n,
+            "Load",
+            "A lt ind dec",
+            {"p": [7.0 * v for v in ones]},
+            bus="A urban decentral heat",
+            carrier="low-temperature heat for industry",
+        )
+        _add_dispatched(
+            n,
+            "Link",
+            "A DAC",
+            {"p0": [2.0 * v for v in ones], "p1": [5.0 * v for v in ones]},
+            bus0="A",
+            bus1=heat,
+            carrier="DAC",
+            efficiency=-2.5,
+        )
+        _add_dispatched(
+            n,
+            "Link",
+            "A pits charger",
+            {"p0": [20.0 * v for v in ones], "p1": [-20.0 * v for v in ones]},
+            bus0=heat,
+            bus1="A water pits",
+            carrier="urban central water pits charger",
+        )
+        _add_dispatched(
+            n,
+            "Generator",
+            "A vent",
+            {"p": [-3.0 * v for v in ones]},
+            bus=heat,
+            carrier="urban central heat vent",
+            p_min_pu=-1,
+            p_max_pu=0,
+        )
+        _add_dispatched(
+            n,
+            "Link",
+            "A urban central coal CHP",
+            {
+                "p0": [300.0 * v for v in ones],
+                "p1": [-100.0 * v for v in ones],
+                "p2": [-150.0 * v for v in ones],
+            },
+            bus0="EU coal",
+            bus1="A",
+            bus2=heat,
+            carrier="urban central coal CHP",
+            efficiency=0.33,
+            efficiency2=0.5,
+        )
+        return n
+
+    def _values(self, n: pypsa.Network, **kwargs: object) -> pd.Series:
+        result = Final_Energy_by_Carrier__District_Heat(n, config=self.CONFIG, **kwargs)
+        return result.droplevel("unit")
+
+    def test_ac3_value(self):
+        """AC3: 115/1.15 + 10 + 5 = 115 at A; decentral, charger, vent excluded."""
+        n = self._ac3_network()
+        result = Final_Energy_by_Carrier__District_Heat(n, config=self.CONFIG)
+        _check_c6_format(result, n, aggregate_per_year=True)
+        assert self._values(n)["A"] == pytest.approx(115.0 * WEIGHT)
+
+    def test_timeseries_format_and_flow_consistency(self):
+        """AC2 / AC4: DataFrame per snapshot, weighted sum equals yearly value."""
+        n = self._ac3_network(n_snapshots=2)
+        result = Final_Energy_by_Carrier__District_Heat(
+            n, aggregate_per_year=False, config=self.CONFIG
+        )
+        _check_c6_format(result, n, aggregate_per_year=False)
+        assert result.droplevel("unit").loc["A"].tolist() == pytest.approx(
+            [115.0, 115.0]
+        )
+        _check_flow_consistency(
+            Final_Energy_by_Carrier__District_Heat, n, config=self.CONFIG
+        )
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_every_location_non_negative(self, aggregate_per_year):
+        """AC5 / AC6 / AC10: B and copperplate present with 0.0, values >= 0."""
+        n = self._ac3_network()
+        values = self._values(n, aggregate_per_year=aggregate_per_year)
+        assert set(values.index) == {"A", "B", COPPERPLATE_LOCATION}
+        assert (values.loc[["B", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
+        assert (values >= 0).all(axis=None)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_copperplate_location_is_zero(self, aggregate_per_year):
+        """AC10: fuel withdrawn at copperplate EU by a heat-supplying CHP is not
+        counted; the copperplate location has no district heat."""
+        n = self._ac3_network(n_snapshots=2)
+        assert (n.links_t.p0["A urban central coal CHP"] != 0).all()
+        assert n.buses.loc["EU coal", "location"] == COPPERPLATE_LOCATION
+        values = self._values(n, aggregate_per_year=aggregate_per_year)
+        assert COPPERPLATE_LOCATION in values.index
+        assert (values.loc[[COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
+
+    def test_independent_of_supply_efficiency(self):
+        """AC7: changing the CHP efficiency leaves the result unchanged."""
+        n = self._ac3_network()
+        expected = self._values(n)
+        n.links.loc["A urban central coal CHP", "efficiency2"] = 0.9
+        pd.testing.assert_series_equal(self._values(n), expected)
+
+    def test_unknown_withdrawing_carrier_raises(self):
+        """AC8: an unknown carrier withdrawing from urban central heat raises."""
+        n = self._ac3_network()
+        _add_dispatched(
+            n,
+            "Load",
+            "A mystery",
+            {"p": [1.0]},
+            bus="A urban central heat",
+            carrier="mystery heat",
+        )
+        with pytest.raises(ValueError, match="mystery heat"):
+            Final_Energy_by_Carrier__District_Heat(n, config=self.CONFIG)
+
+    @pytest.mark.parametrize(
+        "efficiency, p1",
+        [(2.5, [-5.0]), (-2.5, [-5.0])],
+        ids=["positive efficiency", "negative withdrawal"],
+    )
+    def test_dac_supplying_heat_raises(self, efficiency, p1):
+        """AC9: a DAC link that supplies heat to urban central heat raises."""
+        n = self._ac3_network()
+        n.links.loc["A DAC", "efficiency"] = efficiency
+        n.links_t.p1["A DAC"] = p1
+        with pytest.raises(ValueError, match="A DAC"):
+            Final_Energy_by_Carrier__District_Heat(n, config=self.CONFIG)
+
+    @pytest.mark.parametrize("config", [None, {}, {"sector": {"district_heating": {}}}])
+    def test_missing_loss_raises_missing_input(self, config):
+        """Section 8: missing district_heating_loss raises MissingInputError."""
+        with pytest.raises(MissingInputError, match="district_heating_loss"):
+            Final_Energy_by_Carrier__District_Heat(self._ac3_network(), config=config)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_no_district_heating(self, aggregate_per_year):
+        """Edge case: no urban central heat bus gives 0.0 for every location."""
+        n = _real_network()
+        for loc in ("A", "B"):
+            _add_bus(n, loc, "AC", "MWh_el", loc)
+        result = Final_Energy_by_Carrier__District_Heat(
+            n, aggregate_per_year=aggregate_per_year, config=self.CONFIG
+        )
+        _check_c6_format(result, n, aggregate_per_year)
+        assert (result == 0.0).all(axis=None)
 
 
 # ---------------------------------------------------------------------------

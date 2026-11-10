@@ -43,6 +43,7 @@ from pypsa_validation_processing.utils import (
     get_energy_totals_domestic_share,
     create_location_index_from_copperplate,
     ensure_all_locations,
+    MissingInputError,
 )
 
 logger = logging.getLogger(__name__)
@@ -672,11 +673,15 @@ def Final_Energy_by_Carrier__Natural_Gas(
 def Final_Energy_by_Carrier__District_Heat(
     n: pypsa.Network,
     aggregate_per_year: bool = True,
+    config: dict | None = None,
 ) -> pd.Series | pd.DataFrame:
-    """Extract Final Energy of District Heat from PyPSA Network.
+    """Extract Final Energy [by Carrier]|District Heat from a PyPSA Network.
 
-    Returns the total final energy demand, district heating facilities
-    have to provide district heating.
+    Heat delivered from district heating grids to consumers, without
+    distribution losses: ``FE(l) = L[urban central heat](l) / (1 + λ)
+    + L[low-temperature heat for industry](l) + W[DAC](l)``, all withdrawn
+    from ``urban central heat`` buses at ``l``. Storage chargers and the heat
+    vent withdraw heat but are not consumers; supplying links are not counted.
 
     Parameters
     ----------
@@ -686,78 +691,89 @@ def Final_Energy_by_Carrier__District_Heat(
         If ``True`` (default), aggregate over all snapshots and return a
         :class:`pandas.Series`. If ``False``, return a
         :class:`pandas.DataFrame` with snapshots as columns.
+    config : dict | None, optional
+        Network config; ``λ`` is
+        ``config["sector"]["district_heating"]["district_heating_loss"]``.
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Pandas Series (``aggregate_per_year=True``) or DataFrame
-        (``aggregate_per_year=False``) with MultiIndex including
-        ``location`` and ``unit``.
-        Returns data at regional level as provided by the PyPSA network.
-        Country-level aggregation is handled by
-        Network_Processor._aggregate_to_country() if configured.
+        Series (``aggregate_per_year=True``) or DataFrame
+        (``aggregate_per_year=False``) with MultiIndex ``location``, ``unit``
+        and every location of the network (C6.13).
 
-    Notes
-    -----
-    The energy demand of district heating is calculated based on the
-    links from other carriers buses to the urban central heat buses.
-    This includes waste heat from eg. DAC. Taking the withdrawal from
-    the source bus of the link gives the energy in elem of the source carrier.
+    Raises
+    ------
+    MissingInputError
+        If the district heating loss is missing in *config*.
+    ValueError
+        If a ``DAC`` Link supplies heat to an ``urban central heat`` bus, or a
+        component with an unknown carrier withdraws from such a bus.
     """
-    # get all buses that are connected to central heat bus with links
-    central_heat_buses = n.buses[n.buses.carrier == "urban central heat"].index
-    # get all carriers of links to central_heat_buses
-    central_heat_supply_links = n.links[
-        (
-            n.links.bus1.isin(central_heat_buses)
-            | n.links.bus2.isin(central_heat_buses)
-            | n.links.bus3.isin(central_heat_buses)
+    try:
+        loss = float(config["sector"]["district_heating"]["district_heating_loss"])
+    except (KeyError, TypeError) as exc:
+        raise MissingInputError(
+            "sector.district_heating.district_heating_loss"
+        ) from exc
+    bus_carrier = "urban central heat"
+    factors = {
+        ("Load", "urban central heat"): 1.0 / (1.0 + loss),
+        ("Load", "low-temperature heat for industry"): 1.0,
+        ("Link", "DAC"): 1.0,
+        ("Link", "urban central water pits charger"): 0.0,
+        ("Link", "urban central water tanks charger"): 0.0,
+        ("Generator", "urban central heat vent"): 0.0,
+    }
+    if bus_carrier not in set(n.buses["carrier"]):
+        return ensure_all_locations(
+            pd.Series(dtype=float), n, "MWh", aggregate_per_year
         )
-    ]
-    central_heat_supply_buses = n.buses[
-        n.buses.index.isin(central_heat_supply_links.bus0.values)
-    ]
-    supply_bus_carriers = central_heat_supply_buses.carrier.unique()
 
-    pattern = r"charger|discharger"
-    carrier_series = central_heat_supply_links["carrier"].dropna().astype("string")
-    is_charger_or_discharger = carrier_series.str.contains(
-        pattern, case=False, regex=True
+    heat_buses = n.buses.index[n.buses["carrier"] == bus_carrier]
+    dac = n.links[n.links["carrier"] == "DAC"]
+    for port in [c[3:] for c in dac.columns if re.fullmatch(r"bus\d+", c)]:
+        at_heat = dac.index[dac[f"bus{port}"].isin(heat_buses)]
+        if at_heat.empty:
+            continue
+        # efficiency > 0 at a non-input port means the link outputs heat there
+        efficiency = {"0": None, "1": "efficiency"}.get(port, f"efficiency{port}")
+        positive = (
+            dac.loc[at_heat, efficiency].to_numpy() > 0
+            if efficiency
+            else np.zeros(len(at_heat), dtype=bool)
+        )
+        p = n.links_t[f"p{port}"].reindex(columns=at_heat, fill_value=0.0)
+        supplying = at_heat[positive | (p < 0).any().to_numpy()]
+        if not supplying.empty:
+            raise ValueError(
+                f"DAC Link(s) supply heat to '{bus_carrier}' buses: {list(supplying)}. This evaluation assumes DAC only withdraws heat from such buses, not supply it."
+            )
+
+    withdrawal = n.statistics.withdrawal(
+        bus_carrier=bus_carrier,
+        groupby=["carrier", "location", "unit"],
+        groupby_time=aggregate_per_year,
+        nice_names=False,
     )
-    central_heat_supply_links_without_chargers = carrier_series[
-        ~is_charger_or_discharger
-    ].unique()
-
-    res = n.statistics.withdrawal(
-        bus_carrier=list(supply_bus_carriers),
-        carrier=list(central_heat_supply_links_without_chargers),
-        aggregate_time=aggregate_per_year,
-        **kwargs,
-    )
-
-    # urban central heat vent is a generator on urban central heat bus,
-    # but not a component of Final Energy and needs to be substracted.
-    heat_vent = n.statistics.energy_balance(
-        bus_carrier="urban central heat",
-        carrier="urban central heat vent",
-        components="Generator",
-        aggregate_time=aggregate_per_year,
-        **kwargs,
-    )
-    # units need to be mapped to MWh for correct summing of final values
-    # this is currently not a clean solution -> TODO: #73
-    res = remap_unit_index(res)
-    heat_vent = remap_unit_index(heat_vent)
-    # idx_frame_res = res.index.to_frame(index=False)
-    # idx_frame_heat_vent = heat_vent.index.to_frame(index=False)
-    # idx_frame_res["unit"] = idx_frame_res["unit"].map(UNITS_MAPPING)
-    # idx_frame_heat_vent["unit"] = idx_frame_heat_vent["unit"].map(UNITS_MAPPING)
-    # res.index = pd.MultiIndex.from_frame(idx_frame_res)
-    # heat_vent.index = pd.MultiIndex.from_frame(idx_frame_heat_vent)
-    result = (res.groupby(["location", "unit"]).sum()).add(heat_vent, fill_value=0)
-
+    # groupby_time=False also returns NaN rows for pure suppliers
+    withdrawal = withdrawal.fillna(0.0)
+    keys = withdrawal.index.droplevel(["location", "unit"])
+    withdrawing = withdrawal.ne(0)
+    if isinstance(withdrawing, pd.DataFrame):
+        withdrawing = withdrawing.any(axis=1)
+    unknown = sorted(set(keys[withdrawing.to_numpy()]) - set(factors))
+    if unknown:
+        raise ValueError(
+            f"Unknown components withdraw from '{bus_carrier}' buses: {unknown}"
+        )
+    factor = pd.Series(keys.map(factors), index=withdrawal.index, dtype=float)
+    result = withdrawal.mul(factor, axis=0)
+    if not result.empty:
+        result = result.groupby(level=statistics_grouping_index).sum()
+    result = ensure_all_locations(result, n, "MWh", aggregate_per_year)
     logger.debug(
-        f"Final Energy by Carrier|District Heat finished. Resulting shape: {result.shape}. "
+        f"Final Energy [by Carrier]|District Heat finished. Shape: {result.shape}."
     )
     return result
 
