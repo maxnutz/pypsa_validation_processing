@@ -1065,10 +1065,13 @@ based on the <code>aggregation_level</code> configuration by the name of the ent
 
     <div class="doc doc-contents ">
 
-        <p>Extract electricity-carrier final energy from a PyPSA Network.</p>
-<p>Returns the total final energy demand supplied by electricity across
-agriculture, residential and commercial, transportation, and industry
-and DAC.</p>
+        <p>Extract Final Energy [by Carrier]|Electricity from a PyPSA Network.</p>
+<p>Sum of the electricity withdrawn from <code>low voltage</code> buses by the sector
+consumers (agriculture, residential and commercial incl. decentral heat
+pumps and resistive heaters, <code>BEV charger</code>, <code>industry electricity</code>),
+minus the <code>V2G</code> feed-in to <code>low voltage</code> (per snapshot, not clipped),
+plus the <code>DAC</code> withdrawal from <code>AC</code> buses. Distribution grid, storage
+chargers and district-heat suppliers (<code>urban central …</code>) are excluded.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1135,12 +1138,9 @@ and DAC.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -1150,14 +1150,14 @@ Network_Processor._aggregate_to_country() if configured.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Combines electricity withdrawals from the following contributions:
-agriculture electricity loads, residential/commercial low-voltage loads
-(excluding dedicated industry/agriculture/charger/distribution categories,
-BEV charging) industry electricity loads, and DAC electricity demand
-change in home battery is of magnitude 1e-9 compared to electricity demand.
-Concerning heat: rural air heat pump, rural ground heat pump, rural resisive
-heater and urban decentral heatings are included. Central heatings using
-electricity as fuel are NOT included.</p>
+  <p><code>home battery charger</code> (withdrawal) and <code>home battery discharger</code>
+(supply) are both excluded. Measured on the networks in <code>resources/</code>
+(<code>20261020_carbon_accounting_run</code>, <code>AT_KN2040</code>, <code>AT_KN2040_1H</code>,
+<code>electricity_network_0p3</code>): the <code>home battery</code> stores are cyclic, so
+charger minus discharger equals the round-trip loss, charger
+<code>· (1 − η²)</code> with <code>η = 0.98</code>. The largest loss is 3.05 TWh
+(<code>AT_KN2040_1H</code> 2040, 0.06 % of the <code>low voltage</code> withdrawal);
+it is not counted.</p>
 </details>
 
     </div>
