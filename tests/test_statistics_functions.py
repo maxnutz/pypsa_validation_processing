@@ -1104,7 +1104,13 @@ class TestFinalEnergyByCarrierDistrictHeat:
         _add_bus(n, "A urban central heat", "urban central heat", "MWh_th", "A")
         _add_bus(n, "A urban decentral heat", "urban decentral heat", "MWh_th", "A")
         _add_bus(n, "A water pits", "urban central water pits", "MWh_th", "A")
-        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
+        )
         heat = "A urban central heat"
         _add_dispatched(
             n,
@@ -1204,12 +1210,23 @@ class TestFinalEnergyByCarrierDistrictHeat:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_every_location_non_negative(self, aggregate_per_year):
-        """AC5 / AC6 / AC10: B and copperplate EU present with 0.0, values >= 0."""
+        """AC5 / AC6 / AC10: B and copperplate present with 0.0, values >= 0."""
         n = self._ac3_network()
         values = self._values(n, aggregate_per_year=aggregate_per_year)
-        assert set(values.index) == {"A", "B", "EU"}
-        assert (values.loc[["B", "EU"]] == 0.0).all(axis=None)
+        assert set(values.index) == {"A", "B", COPPERPLATE_LOCATION}
+        assert (values.loc[["B", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
         assert (values >= 0).all(axis=None)
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_copperplate_location_is_zero(self, aggregate_per_year):
+        """AC10: fuel withdrawn at copperplate EU by a heat-supplying CHP is not
+        counted; the copperplate location has no district heat."""
+        n = self._ac3_network(n_snapshots=2)
+        assert (n.links_t.p0["A urban central coal CHP"] != 0).all()
+        assert n.buses.loc["EU coal", "location"] == COPPERPLATE_LOCATION
+        values = self._values(n, aggregate_per_year=aggregate_per_year)
+        assert COPPERPLATE_LOCATION in values.index
+        assert (values.loc[[COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
 
     def test_independent_of_supply_efficiency(self):
         """AC7: changing the CHP efficiency leaves the result unchanged."""
@@ -1293,7 +1310,13 @@ class TestFinalEnergyByCarrierCoal:
         n.snapshot_weightings.loc[:, :] = 1.0
         _add_bus(n, "AA1", "AC", "MWh_el", "AA1")
         _add_bus(n, "AA2", "AC", "MWh_el", "AA2")
-        _add_bus(n, "EU coal", "coal", "MWh_LHV", "EU")
+        _add_bus(
+            n,
+            f"{COPPERPLATE_LOCATION} coal",
+            "coal",
+            "MWh_LHV",
+            COPPERPLATE_LOCATION,
+        )
         if with_coal:
             _add_bus(n, "AA1 coal for industry", "coal for industry", "MWh_LHV", "AA1")
             _add_bus(n, "AA2 coal for industry", "coal for industry", "MWh_LHV", "AA2")
@@ -1324,7 +1347,7 @@ class TestFinalEnergyByCarrierCoal:
 
     @pytest.mark.parametrize("aggregate_per_year", [True, False])
     def test_format_and_every_location(self, aggregate_per_year):
-        """AC1 / AC2 / AC6: C6 format; AA2 (zero withdrawal) and EU kept with 0.0."""
+        """AC1 / AC2 / AC6: C6 format; AA2 (zero withdrawal) and copperplate kept with 0.0."""
         n = self._network()
         result = Final_Energy_by_Carrier__Coal(
             n,
@@ -1333,8 +1356,8 @@ class TestFinalEnergyByCarrierCoal:
         )
         _check_c6_format(result, n, aggregate_per_year)
         values = result.droplevel("unit")
-        assert set(values.index) == {"AA1", "AA2", "EU"}
-        assert (values.loc[["AA2", "EU"]] == 0.0).all(axis=None)
+        assert set(values.index) == {"AA1", "AA2", COPPERPLATE_LOCATION}
+        assert (values.loc[["AA2", COPPERPLATE_LOCATION]] == 0.0).all(axis=None)
 
     def test_ac3_without_non_energy_use(self):
         """AC3: kappa = 0 and share 0 gives 20."""
