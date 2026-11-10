@@ -1,8 +1,8 @@
 # Shared definitions for variable specs
 
-Status: reviewed
+Status: reviewed (G1, G2, D1–D8); draft (D9)
 
-Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D8 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
+Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D9 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
@@ -171,3 +171,24 @@ Implemented by `utils.decentral_heat_split(n, aggregate_per_year)` (PR #138, 202
 - **CO2 ports.** Bus carriers whose name contains `co2` are neither an input nor a CHP output. CO2 bus carriers are always named `co2…`; a check of the bus unit (`t_co2`) is not required.
 - **Storage.** Components whose carrier matches `water tanks`, `water pits` or `heat vent` are neither input nor demand; `Store` and `StorageUnit` are never demand. PyPSA-AT has no `StorageUnit` on decentral heat buses, but the code is prepared for it.
 - **Input without demand.** A location with `I_b(l) > 0` and no heat demand on `b` gets `σ_b,x(l) = 0` (step 3), so its input is in no sector. This does not occur in valid networks (heat supply follows heat demand), so no `WARNING` is logged.
+
+## D9 Demand-weighted price of an industry Load `P[c](l)`
+Owner decision 2026-11-05 (spec session for milestone 2 "Implement Infra-Enshure Coupling Variables"): the `Price|Final Energy|Industry|…` variables are the **marginal price at the bus of the industry Load, weighted by the Load's withdrawal, including the CO2 price**. This is the price the industry demand pays in the model; it is the formula of pypsa-de `price_load` (`export_ariadne_variables.py` l.3378-3402, commit `a5baa7e9`). Cost-based prices (`costs_gen_links`, `get_weighted_costs_links`, l.3442-3516) are not used, also where pypsa-de uses them for the same variable (deviation recorded in the variable spec).
+
+CO2 price (owner decision 2026-11-06, after the merge of PR #148; reverses the PR #148 review decision "prices without CO2 price"): the CO2 part of the bus marginal price stays in the price; nothing is subtracted. A variant without CO2 price is a later, optional extension (#163; separate variables or config switch: #162). Reason: the direct-only removal of the PR #148 version (`λ_b − γ(b)`, `γ` = CO2 cost booked at the supplying Link) is inconsistent across carriers, because CO2 costs in the input price of the supplying Link (e.g. of gas power plants in the electricity price) and the dual of national CO2 limits stay in the price (#163, notebook #160).
+
+For a Load carrier `c` and location `l` (Loads attributed per D1.1), with `L[c](l)` the withdrawal of the Loads with carrier `c` at `l` (notation at the top of this file):
+
+1. **Weight** `w[c](l) = L[c](l)` (C6.12 `weight` row). If `l` has no Load with carrier `c` (or `c` is not in `n`), the weight is NaN; if the Load exists, the weight is its withdrawal, also when that is `0.0` (C6.13).
+2. **Cost** `K[c](l)` = Σ over the Loads of `p_t·λ_b,t`, with `p` the Load withdrawal and `λ_b` = `n.buses_t.marginal_price` of the Load's bus. Same time convention as `w` (C6.10, C6.12).
+3. **Value** `P[c](l) = K[c](l) / w[c](l)`; if `w[c](l)` is `0.0` or NaN, the value is NaN (C6.12, A-5): `0.0` would be a valid price. With `aggregate_per_year=False` this holds per snapshot: `P_t = K_t / w_t`, so a snapshot without withdrawal has the value NaN.
+
+Consistency with C6.12: the yearly value equals `Σₜ vₜ·wₜ·gₜ / Σₜ wₜ·gₜ` of the snapshot values, because `vₜ·wₜ = K_t` (snapshots with `w_t = 0` contribute nothing).
+
+CO2 in the bus price, measured 2026-11-06 (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, pypsa 1.1.2): `co2 atmosphere` has the marginal price −312.35 EUR/t (dual of `CO2Limit-upper`), the `co2 stored` and `process emissions` buses −260 to −333 EUR/t. Per snapshot, the PyPSA nodal balance of a supplying Link (`bus1 = b`) gives `η_1·λ_b = λ_0 + marginal_cost − Σ_{k≥2} η_k·λ_k` while the Link is not at a capacity bound; it holds for `DE1 coal for industry` (residual 2·10⁻⁶) and `AT11 naphtha for industry` (7·10⁻¹⁵). CO2 part of the yearly mean price (CO2 ports of the supplying Link only): `DE1 coal for industry` 105.0 of 111.3 EUR/MWh, `AT11 gas for industry` 61.9 of 98.2, `AT11 naphtha for industry` 10.1 of 54.8 (A-8). National CO2 limits add a further term: the 2040 network has a binding `co2_limit-AT` GlobalConstraint (dual −65.4 EUR/t), which acts on the flows of `AT…` Links with a `co2 atmosphere` port (pypsa-de `additional_functionality.py::add_national_co2_budgets`), not on a bus; it is part of `λ_b` as well (notebook #160, PR #161). `λ_b` includes all of these terms, as intended.
+
+`pypsa.statistics` route (checked 2026-11-05, pypsa 1.1.2, same network, carrier `gas for industry`): `−n.statistics.revenue(components=["Load"], carrier=c, groupby=["location", "unit"], nice_names=False)` equals `Σ p·λ·g` and `n.statistics.withdrawal(…)` with the same arguments equals `w`; `−Σ revenue / Σ withdrawal` = 85.0805 EUR/MWh, identical to the manual `Σ p·λ·g / Σ p·g`, i.e. to D9. This is a yearly check over all locations; the per-location, per-snapshot proof required by P6.4 is open (variable specs, section 4). `revenue` labels its rows with the **bus unit** (e.g. `MWh_LHV`), not a currency: the function MUST set the `unit` label of value and weight rows to the price unit itself (C6.12: weight rows carry the unit label of their value row; OQ-34).
+
+Measured on the same network (yearly, all 51 locations, EUR/MWh): `industry electricity` 100.61, `gas for industry` 85.08, `H2 for industry` 72.06, `solid biomass for industry` 68.14, `coal for industry` 111.94, `naphtha for industry` 53.99; `industry methanol` 121.13 (not evaluated further, OQ-35). All seven Load carriers have one Load on a regional bus per location (no copperplate bus), bus units `MWh_el` (`industry electricity`) and `MWh_LHV` (the others).
+
+Code that implements `P[c](l)` MUST live in `utils.py` (P4); each `Price|Final Energy|Industry|…` function calls it with its carrier(s). With several carriers (e.g. `c ∈ {coal for industry, …}` later), `K` and `w` are summed over the carriers before dividing.
