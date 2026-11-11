@@ -10,6 +10,7 @@ from pypsa_validation_processing.utils import (
     REGION_MAPPING,
     UNITS_MAPPING,
     apply_coke_correction,
+    MissingInputError,
     apply_domestic_share,
     attribute_locations,
     decentral_heat_split,
@@ -344,9 +345,9 @@ class TestApplyDomesticShare:
         assert apply_domestic_share(flows, totals, "aviation").tolist() == [0.0]
 
     def test_missing_country_with_demand_raises(self, totals):
-        """D4: a non-zero location whose country has no row raises ValueError naming it."""
+        """D4: a non-zero location whose country has no row raises MissingInputError naming it."""
         flows = self._flows({"AT11": 1.0, "CH": 1.0})
-        with pytest.raises(ValueError, match="CH"):
+        with pytest.raises(MissingInputError, match="CH"):
             apply_domestic_share(flows, totals, "aviation")
 
     def test_zero_rows_need_no_lookup(self, totals):

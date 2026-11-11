@@ -2235,6 +2235,24 @@ network_results_path: {tmp_path}
         assert energy_totals.index.name == "country"
         assert energy_totals.loc["AT", "total domestic aviation"] == 2.0
 
+    def test_energy_totals_nan_countries_dropped(self, tmp_path: Path, caplog):
+        """C2.4: a country with NaN in a D4 column is dropped, one WARNING names it."""
+        table = _energy_totals_meta()
+        table["index"].append("XK")
+        table["data"].append([None, 0.196, None, None])
+        meta = {
+            "wildcards": {"planning_horizons": 2030},
+            "resources": {"energy_totals": table},
+        }
+        with caplog.at_level(logging.WARNING):
+            processor = self._make_processor(
+                tmp_path, [MockPyPSANetwork(meta=meta)], ["n_2030.nc"]
+            )
+        energy_totals = processor.network_inputs[0]["energy_totals"]
+        assert list(energy_totals.index) == ["AT", "DE"]
+        warnings = [r.message for r in caplog.records if "NaN" in r.message]
+        assert len(warnings) == 1 and "XK" in warnings[0]
+
     def test_config_file_not_a_mapping_is_unavailable(self, tmp_path: Path, caplog):
         configs_dir = tmp_path / "configs"
         configs_dir.mkdir()
@@ -3074,8 +3092,15 @@ network_results_path: {tmp_path}
     def test_no_init_warning_if_no_function_declares_shares(
         self, tmp_path: Path, caplog
     ):
+        mapping = tmp_path / "mapping.yaml"
+        mapping.write_text(
+            "Final Energy [by Carrier]|Electricity: "
+            "Final_Energy_by_Carrier__Electricity\n"
+        )
         with caplog.at_level(logging.WARNING):
-            processor = self._make_processor(tmp_path)
+            processor = self._make_processor(
+                tmp_path, extra=f"mapping_path: {mapping}"
+            )
         assert not processor._selected_functions_declare("industry_non_energy_shares")
         assert not any(
             "No industry non-energy shares" in r.message for r in caplog.records
