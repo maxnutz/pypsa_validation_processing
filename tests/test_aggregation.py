@@ -442,7 +442,7 @@ class TestIntensiveAggregation:
         assert out.to_dict() == {("Price", "AT1", "EUR/MWh"): 30.0}
 
     def test_extra_level_and_zero_weight(self, tmp_path: Path):
-        """C8-AC7: weighted mean over 'carrier'; all weights 0 → 0.0, not NaN."""
+        """C8-AC7: weighted mean over 'carrier'; all weights 0 → NaN, not 0.0 (A-5)."""
         result = _intensive(
             [
                 ("AT1", "EUR/MWh", "gas", 20.0, 1.0),
@@ -452,10 +452,8 @@ class TestIntensiveAggregation:
             extra="carrier",
         )
         out = self._run(tmp_path, result, aggregation_level="region")
-        assert out.to_dict() == {
-            ("Price", "AT1", "EUR/MWh"): 20.0,
-            ("Price", "AT2", "EUR/MWh"): 0.0,
-        }
+        assert out[("Price", "AT1", "EUR/MWh")] == 20.0
+        assert pd.isna(out[("Price", "AT2", "EUR/MWh")])
 
     def test_weights_need_not_sum_to_one(self, tmp_path: Path):
         """C8.2: Σ vᵢ·wᵢ / Σ wᵢ normalises itself; scaling all weights keeps the mean."""

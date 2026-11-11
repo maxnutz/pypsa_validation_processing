@@ -854,7 +854,7 @@ class TestEnsureAllLocations:
         assert added.index.get_level_values("component").isna().all()
 
     def test_quantity_level_adds_value_and_weight(self):
-        """Intensive results get a ``value`` and a ``weight`` row (C6.12, C6.13)."""
+        """Intensive results get NaN ``value`` and ``weight`` rows (C6.12, C6.13)."""
         n = _network(["AT1", "AT2"])
         index = pd.MultiIndex.from_tuples(
             [("AT1", "EUR/MWh", "value"), ("AT1", "MWh_el", "weight")],
@@ -870,4 +870,4 @@ class TestEnsureAllLocations:
 
         added = out.xs("AT2", level="location")
         assert set(added.index.get_level_values("quantity")) == {"value", "weight"}
-        assert (added == 0.0).all()
+        assert added.isna().all()

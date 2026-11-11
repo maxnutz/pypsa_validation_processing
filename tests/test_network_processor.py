@@ -2807,10 +2807,10 @@ def test_default_mapping_names_existing_functions():
         Path(statistics_functions.__file__).parent / "configs" / "mapping.default.yaml"
     )
     mapping = yaml.safe_load(mapping_path.read_text())
+    # long form {function: …, aggregation: …} (C4.1)
+    functions = [e["function"] if isinstance(e, dict) else e for e in mapping.values()]
     missing = [
-        f
-        for f in mapping.values()
-        if not callable(getattr(statistics_functions, f, None))
+        f for f in functions if not callable(getattr(statistics_functions, f, None))
     ]
     assert missing == []
 
