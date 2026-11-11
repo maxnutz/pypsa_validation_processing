@@ -18,11 +18,11 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Final Energy [by Sector]\|Industry` | [Final_Energy_by_Sector__Industry.md](Final_Energy_by_Sector__Industry.md) | semantic | reviewed |
 | `Final Energy [by Sector]\|Agriculture` | [Final_Energy_by_Sector__Agriculture.md](Final_Energy_by_Sector__Agriculture.md) | exact | reviewed |
 | `Final Energy [by Sector]\|Residential and Commercial` | [Final_Energy_by_Sector__Residential_and_Commercial.md](Final_Energy_by_Sector__Residential_and_Commercial.md) | exact | reviewed |
-| `Price\|Final Energy\|Industry\|Electricity` | [Price__Final_Energy__Industry__Electricity.md](Price__Final_Energy__Industry__Electricity.md) | exact | draft |
-| `Price\|Final Energy\|Industry\|Gases` | [Price__Final_Energy__Industry__Gases.md](Price__Final_Energy__Industry__Gases.md) | semantic | draft |
-| `Price\|Final Energy\|Industry\|Hydrogen` | [Price__Final_Energy__Industry__Hydrogen.md](Price__Final_Energy__Industry__Hydrogen.md) | exact | draft |
-| `Price\|Final Energy\|Industry\|Solids\|Biomass` | [Price__Final_Energy__Industry__Solids__Biomass.md](Price__Final_Energy__Industry__Solids__Biomass.md) | exact | draft |
-| `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | draft |
-| `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | draft |
+| `Price\|Final Energy\|Industry\|Electricity` | [Price__Final_Energy__Industry__Electricity.md](Price__Final_Energy__Industry__Electricity.md) | exact | reviewed |
+| `Price\|Final Energy\|Industry\|Gases` | [Price__Final_Energy__Industry__Gases.md](Price__Final_Energy__Industry__Gases.md) | semantic | reviewed |
+| `Price\|Final Energy\|Industry\|Hydrogen` | [Price__Final_Energy__Industry__Hydrogen.md](Price__Final_Energy__Industry__Hydrogen.md) | exact | reviewed |
+| `Price\|Final Energy\|Industry\|Solids\|Biomass` | [Price__Final_Energy__Industry__Solids__Biomass.md](Price__Final_Energy__Industry__Solids__Biomass.md) | exact | reviewed |
+| `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | reviewed |
+| `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | reviewed |
 
-Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76 (`industry methanol`, a separate variable per owner decision 2026-11-06; `low-temperature heat for industry`; OQ-35).
+Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
