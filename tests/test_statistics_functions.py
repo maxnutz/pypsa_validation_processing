@@ -20,6 +20,12 @@ from pypsa_validation_processing.statistics_functions import (
     Final_Energy_by_Sector__Transportation,
     Net_Imports__Electricity,
     Net_Imports__Oil,
+    Price__Final_Energy__Industry__Electricity,
+    Price__Final_Energy__Industry__Gases,
+    Price__Final_Energy__Industry__Hydrogen,
+    Price__Final_Energy__Industry__Solids__Biomass,
+    Price__Final_Energy__Industry__Solids__Coal,
+    Price__Final_Energy__Industry__Liquids__Oil,
 )
 
 from pypsa_validation_processing.utils import (
@@ -2121,3 +2127,205 @@ class TestAggregatePerYearFalse:
             assert result is None
             return
         assert not result.empty
+
+
+# ---------------------------------------------------------------------------
+# Tests for the Price|Final Energy|Industry|… functions (D9)
+# ---------------------------------------------------------------------------
+
+
+class _PriceTests:
+    """AC1-AC8 shared by the six price specs (D9); subclasses set the Load."""
+
+    func = None
+    CARRIER = ""
+    BUS_CARRIER = ""
+    BUS_UNIT = "MWh_LHV"
+    UNIT = "EUR_2020/MWh"
+
+    def _network(
+        self,
+        p: list[float] | None = (10.0, 30.0),
+        price: list[float] = (50.0, 100.0),
+        weighting: float = 1.0,
+    ) -> pypsa.Network:
+        """AC3: Load at ``A`` (none if *p* is None), location ``B`` without Load."""
+        n = _real_network()
+        n.snapshot_weightings.loc[:, :] = weighting
+        for loc in ("A", "B"):
+            _add_bus(n, f"{loc} bus", self.BUS_CARRIER, self.BUS_UNIT, loc)
+        n.buses_t.marginal_price["A bus"] = list(price)
+        n.buses_t.marginal_price["B bus"] = [70.0, 70.0]
+        if p is not None:
+            _add_dispatched(
+                n,
+                "Load",
+                f"A {self.CARRIER}",
+                {"p": list(p)},
+                bus="A bus",
+                carrier=self.CARRIER,
+            )
+        return n
+
+    def _get(self, result, location: str, quantity: str):
+        return result.xs((location, self.UNIT, quantity))
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_format(self, aggregate_per_year: bool):
+        """AC1/AC2: C6 format, quantity value/weight paired, unit label."""
+        n = self._network()
+        result = self.func(n, aggregate_per_year=aggregate_per_year)
+        _check_c6_format(result, n, aggregate_per_year)
+        assert result.index.names == ["location", "unit", "quantity"]
+        assert set(result.index.get_level_values("unit")) == {self.UNIT}
+        assert set(result.index.get_level_values("location")) == {"A", "B"}
+        for loc in ("A", "B"):
+            assert set(result.xs(loc).index.get_level_values("quantity")) == {
+                "value",
+                "weight",
+            }
+
+    def test_ac3_yearly(self):
+        """AC3: yearly value 3500 / 40, weight 40; B NaN."""
+        result = self.func(self._network(), aggregate_per_year=True)
+        assert self._get(result, "A", "value") == pytest.approx(87.5)
+        assert self._get(result, "A", "weight") == pytest.approx(40.0)
+        assert result.xs("B").isna().all()
+
+    def test_ac3_snapshots(self):
+        """AC3: snapshot values = bus prices, weights = withdrawal; B NaN."""
+        result = self.func(self._network(), aggregate_per_year=False)
+        assert list(self._get(result, "A", "value")) == [50.0, 100.0]
+        assert list(self._get(result, "A", "weight")) == [10.0, 30.0]
+        assert result.xs("B").isna().all().all()
+
+    def test_ac3a_weighting(self):
+        """AC3a: weighting 2 doubles the yearly weight, not the value or snapshots."""
+        n = self._network(weighting=2.0)
+        yearly = self.func(n, aggregate_per_year=True)
+        series = self.func(n, aggregate_per_year=False)
+        assert self._get(yearly, "A", "value") == pytest.approx(87.5)
+        assert self._get(yearly, "A", "weight") == pytest.approx(80.0)
+        assert list(self._get(series, "A", "weight")) == [10.0, 30.0]
+
+    def test_ac4_consistency(self):
+        """AC4 / C6-AC3 (intensive): yearly = weighted mean of snapshot values."""
+        n = self._network(weighting=3.0)
+        yearly = self.func(n, aggregate_per_year=True)
+        series = self.func(n, aggregate_per_year=False)
+        g = n.snapshot_weightings.objective
+        v, w = self._get(series, "A", "value"), self._get(series, "A", "weight")
+        assert self._get(yearly, "A", "weight") == pytest.approx((w * g).sum())
+        assert self._get(yearly, "A", "value") == pytest.approx(
+            (v * w * g).sum() / (w * g).sum()
+        )
+
+    def test_ac5_negative_price(self):
+        """AC5: negative marginal prices pass."""
+        n = self._network(price=[-20.0, 100.0])
+        assert self._get(
+            self.func(n, aggregate_per_year=True), "A", "value"
+        ) == pytest.approx(70.0)
+        assert (
+            self._get(self.func(n, aggregate_per_year=False), "A", "value").iloc[0]
+            == -20.0
+        )
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_ac6_carrier_missing(self, aggregate_per_year: bool):
+        """AC6 / C6-AC6: no Load → value and weight NaN at every location."""
+        n = self._network(p=None)
+        result = self.func(n, aggregate_per_year=aggregate_per_year)
+        _check_c6_format(result, n, aggregate_per_year)
+        assert len(result) == 4
+        assert result.isna().all() if aggregate_per_year else result.isna().all().all()
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_ac6_zero_withdrawal(self, aggregate_per_year: bool):
+        """AC6: Load with p = [0, 0] → value NaN, weight 0.0."""
+        result = self.func(self._network(p=[0.0, 0.0]), aggregate_per_year)
+        value = self._get(result, "A", "value")
+        weight = self._get(result, "A", "weight")
+        assert pd.isna(value).all() if not aggregate_per_year else pd.isna(value)
+        assert (weight == 0.0).all() if not aggregate_per_year else weight == 0.0
+
+    def test_ac6_zero_snapshot(self):
+        """AC6: p = [10, 0] → snapshot values [50, NaN], yearly value 50."""
+        n = self._network(p=[10.0, 0.0])
+        series = self._get(self.func(n, aggregate_per_year=False), "A", "value")
+        assert series.iloc[0] == 50.0 and pd.isna(series.iloc[1])
+        assert self._get(
+            self.func(n, aggregate_per_year=True), "A", "value"
+        ) == pytest.approx(50.0)
+
+    def test_ac7_ac8_other_components_ignored(self):
+        """AC7/AC8: a supplying Link with CO2 port and capital cost changes nothing."""
+        n = self._network()
+        _add_bus(n, "co2 atmosphere", "co2", "t_co2", "EU")
+        n.buses_t.marginal_price["co2 atmosphere"] = [-100.0, -100.0]
+        _add_bus(n, "A source", "AC", "MWh_el", "A")
+        _add_dispatched(
+            n,
+            "Link",
+            "A supply",
+            {"p0": [10.0, 30.0], "p1": [-10.0, -30.0], "p2": [-2.0, -6.0]},
+            bus0="A source",
+            bus1="A bus",
+            bus2="co2 atmosphere",
+            efficiency2=0.2,
+            carrier=self.CARRIER,
+            capital_cost=1000.0,
+        )
+        yearly = self.func(n, aggregate_per_year=True)
+        series = self.func(n, aggregate_per_year=False)
+        assert self._get(yearly, "A", "value") == pytest.approx(87.5)
+        assert list(self._get(series, "A", "value")) == [50.0, 100.0]
+
+
+class TestPriceFinalEnergyIndustryElectricity(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Electricity.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Electricity)
+    CARRIER = "industry electricity"
+    BUS_CARRIER = "low voltage"
+    BUS_UNIT = "MWh_el"
+
+
+class TestPriceFinalEnergyIndustryGases(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Gases.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Gases)
+    CARRIER = "gas for industry"
+    BUS_CARRIER = "gas for industry"
+
+
+class TestPriceFinalEnergyIndustryHydrogen(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Hydrogen.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Hydrogen)
+    CARRIER = "H2 for industry"
+    BUS_CARRIER = "H2 for industry"
+
+
+class TestPriceFinalEnergyIndustrySolidsBiomass(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Solids__Biomass.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Solids__Biomass)
+    CARRIER = "solid biomass for industry"
+    BUS_CARRIER = "solid biomass for industry"
+
+
+class TestPriceFinalEnergyIndustrySolidsCoal(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Solids__Coal.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Solids__Coal)
+    CARRIER = "coal for industry"
+    BUS_CARRIER = "coal for industry"
+
+
+class TestPriceFinalEnergyIndustryLiquidsOil(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Liquids__Oil.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Liquids__Oil)
+    CARRIER = "naphtha for industry"
+    BUS_CARRIER = "naphtha for industry"

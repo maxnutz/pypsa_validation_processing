@@ -16,3 +16,9 @@ Final Energy [by Sector]|Transportation: Final_Energy_by_Sector__Transportation
 Final Energy [by Sector]|Industry: Final_Energy_by_Sector__Industry
 Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 Final Energy [by Sector]|Residential and Commercial: Final_Energy_by_Sector__Residential_and_Commercial
+Price|Final Energy|Industry|Electricity: {function: Price__Final_Energy__Industry__Electricity, aggregation: intensive}
+Price|Final Energy|Industry|Gases: {function: Price__Final_Energy__Industry__Gases, aggregation: intensive}
+Price|Final Energy|Industry|Hydrogen: {function: Price__Final_Energy__Industry__Hydrogen, aggregation: intensive}
+Price|Final Energy|Industry|Solids|Biomass: {function: Price__Final_Energy__Industry__Solids__Biomass, aggregation: intensive}
+Price|Final Energy|Industry|Solids|Coal: {function: Price__Final_Energy__Industry__Solids__Coal, aggregation: intensive}
+Price|Final Energy|Industry|Liquids|Oil: {function: Price__Final_Energy__Industry__Liquids__Oil, aggregation: intensive}
