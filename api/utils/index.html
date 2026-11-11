@@ -642,17 +642,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.utils.get_energy_totals_domestic_share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_energy_totals_domestic_share
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pypsa_validation_processing.utils.create_location_index_from_copperplate" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -880,17 +869,6 @@
     <span class="md-ellipsis">
       
         remap_unit_index
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypsa_validation_processing.utils.get_energy_totals_domestic_share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_energy_totals_domestic_share
       
     </span>
   </a>
@@ -1170,94 +1148,6 @@ direct comparison of input-output flows.</p>
             <td>
               <div class="doc-md-description">
                 <p>A series with a MultiIndex with a <code>unit</code> level remapped.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pypsa_validation_processing.utils.get_energy_totals_domestic_share" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_energy_totals_domestic_share</span><span class="p">(</span><span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return the domestic share of energy totals for a given kind.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>energy_totals</code>
-            </td>
-            <td>
-                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Energy totals of one year, indexed by <code>country</code>.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>kind</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The kind of energy totals to calculate the factor for.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The share of national aviation or navigation per country.</p>
               </div>
             </td>
           </tr>
@@ -1853,9 +1743,19 @@ columns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <em>energy_totals</em> is <code>None</code>, <em>kind</em> is not supported, or a row
-with non-zero Energy statistics belongs to a country without a row in
-<em>energy_totals</em>.</p>
+                <p>If <em>energy_totals</em> is <code>None</code> or <em>kind</em> is not supported.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="MissingInputError (pypsa_validation_processing.utils.MissingInputError)" href="#pypsa_validation_processing.utils.MissingInputError">MissingInputError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a row with non-zero Energy statistics belongs to a country without
+a row in <em>energy_totals</em>; <code>Network_Processor</code> then skips the
+variable.</p>
               </div>
             </td>
           </tr>

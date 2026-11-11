@@ -1277,14 +1277,18 @@ the same location do not exist by model design.</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Coal" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">industry_non_energy_shares</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extracts Final Energy [by Carrier]|Coal from the PyPSA Network.</p>
+        <p>Extract Final Energy [by Carrier]|Coal from a PyPSA Network.</p>
+<p><code>FE(l) = E(l) · (1 − κ) + E(l) · κ / 1.366</code> with
+<code>E(l) = L[coal for industry](l) − NE_coal(l)</code>: the <code>coal for industry</code>
+Load minus its non-energy use (D5), with the coke correction (D6). Coal for
+power plants and CHPs is transformation, not final energy.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1332,6 +1336,24 @@ the same location do not exist by model design.</p>
                   <code>True</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>industry_non_energy_shares</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eurostat non-energy shares, index (<code>country</code>, <code>carrier</code>), column
+<code>non_energy_share</code> (C2.5). Without industry production data in the
+network, <code>κ = 0</code> (Eurostat fallback, D6).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1351,26 +1373,15 @@ the same location do not exist by model design.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
-
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>This function includes only the Final Energy consumption of coal. This excludes
-coal for electricity or CHP, but only focuses on the carrier <code>coal for industry</code>
-as Final Energy of Coal. If this carrier is not present in the network, every
-location gets <code>0.0</code> with unit <code>MWh</code> (C6.13).</p>
-</details>
 
     </div>
 
@@ -1380,16 +1391,22 @@ location gets <code>0.0</code> with unit <code>MWh</code> (C6.13).</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Oil" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Oil</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Oil</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">energy_totals</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">industry_non_energy_shares</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extract fossil final-energy oil demand from a PyPSA Network.</p>
-<p>Returns the final energy from oil carriers after removing an estimated
-renewable-oil share.</p>
+        <p>Extract Final Energy [by Carrier]|Oil from a PyPSA Network.</p>
+<p><code>FE(l) = f_oil · (L[agriculture machinery oil](l) + W[oil, decentral oil
+boilers](l) + L[land transport oil](l) + d_aviation(c) · s_ker(l) ·
+L[kerosene for aviation](l) + d_navigation(c) · L[shipping oil](l)
++ L[naphtha for industry](l) − NE_naphtha(l))</code>: the fossil share (D2) of
+the oil consumed by the sectors. Boilers are located per D1, domestic
+shares per country (D4), non-energy use per D5. <code>s_ker</code> is the yearly
+oil-based share of the kerosene supply at <code>l</code>. <code>shipping methanol</code> is
+not oil. Units are returned as pypsa reports them (D7).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1437,6 +1454,42 @@ renewable-oil share.</p>
                   <code>True</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>energy_totals</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Energy totals of one year, indexed by <code>country</code> (C2.4), for the
+domestic shares of aviation and navigation (D4). Required if the
+network has a <code>kerosene for aviation</code> or <code>shipping oil</code> Load.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>industry_non_energy_shares</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eurostat non-energy shares, index (<code>country</code>, <code>carrier</code>), column
+<code>non_energy_share</code> (C2.5). Required if the network has a
+<code>naphtha for industry</code> Load.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1456,11 +1509,9 @@ renewable-oil share.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Fossil oil final energy with MultiIndex including <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -1468,29 +1519,33 @@ Network_Processor._aggregate_to_country() if configured.</p>
     </table>
 
 
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>Total oil final energy is built from:
-- agriculture machinery oil (Load),
-- residential/commercial oil boiler demand (rural + urban decentral),
-- land transport oil (Load).</p>
-<p><code>naphtha for industry</code> is intentionally excluded because it is treated
-as non-energy use and therefore not part of Final Energy variables.</p>
-<p>Regionalization from the copperplate topology is performed by deriving a
-region code from demand- or production-bus names and applying
-:func:<code>create_location_index_from_copperplate</code> before regrouping to
-<code>kwargs["groupby"]</code>.</p>
-<p>The renewable-oil fraction is computed per region as:</p>
-<p><code>renewable oil production in region / total oil demand in region</code>.</p>
-<p>Renewable production is based on supply from selected renewable-oil
-carriers, while total oil demand is based on withdrawals from oil-using
-carriers. If the fraction exceeds 1 (i.e., renewable production is larger
-than regional oil demand), it is clipped to 1, so the fossil share becomes
-zero in that region. Cross-regional export/import effects of renewable oil
-are not represented in this statistic.</p>
-<p><code>UNITS_MAPPING</code> is applied inside this function to enable multiplication
-with demand-side units of the renewable-oil fraction.</p>
-</details>
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a carrier other than <code>kerosene for aviation</code> and
+<code>methanol-to-kerosene</code> supplies a <code>kerosene for aviation</code> bus;
+if <em>energy_totals</em> is <code>None</code> and the network has a
+<code>kerosene for aviation</code> or <code>shipping oil</code> Load; or if
+<em>industry_non_energy_shares</em> is <code>None</code> and the network has a
+<code>naphtha for industry</code> Load.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 
@@ -1507,9 +1562,12 @@ with demand-side units of the renewable-oil fraction.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Extract net oil imports from a PyPSA Network.</p>
-<p>Calculates the net imports of oil by computing the difference between
-imports to and exports from each location based on Link components.</p>
+        <p>Extract net imports of oil from a PyPSA Network.</p>
+<p><code>NI(l) = f_oil · (Σ_c W[oil, c](l) + ΔE_store(l)) − S[oil, oil refining](l)</code>:
+the fossil part of the oil withdrawn by Links (location per D1) and of the
+net withdrawal of <code>oil</code> Stores, minus the fossil production of the
+location (D2). Positive = net import. The copperplate <code>EU</code>, which holds
+the refining, is negative; the yearly sum over all locations is 0.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1576,9 +1634,9 @@ imports to and exports from each location based on Link components.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with net oil imports indexed by location
-and unit.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -1588,14 +1646,14 @@ and unit.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>All oil is distributed from cupperplate at "EU oil" bus. Oil link know both
-direction and multiple carriers are covered by these links, as these links are
-not just representing transmission, but also technologies with efficiencies.</p>
-<p>Locations are derived from bus names and assigned to the respective bus columns.</p>
-<p>The evaluation pathway in this function strongly depends on the input of the
-parameter <code>aggregate_per_year</code>. Non-aggregated data (with <code>aggregate_per_year</code> is <code>False</code>)
-are processed as :class:<code>pandas.DataFrame</code> in long-format, aggregated data
-(with <code>aggregate_per_year</code> is <code>True</code>) are processed as they come.</p>
+  <p>The result counts only oil the model consumes. Energy statistics
+(Eurostat <code>IMP − EXP</code>, Statistik Austria) count all net imports of oil,
+including oil for non-energy use and refinery own use. PyPSA-AT models
+neither, except <code>naphtha for industry</code>. So the result is lower than
+statistics by about non-energy use minus naphtha plus refinery own use.
+For AT 2024 (Eurostat), that is 65.6 − 13.7 + 23.1 ≈ 75 PJ, about 17 % of
+net imports. Take this into account in comparisons with statistics or
+other models.</p>
 </details>
 
     </div>
@@ -1606,17 +1664,19 @@ are processed as :class:<code>pandas.DataFrame</code> in long-format, aggregated
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Carrier__Natural_Gas" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Natural_Gas</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Carrier__Natural_Gas</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">industry_non_energy_shares</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extract natural-gas final energy from a PyPSA Network.</p>
-<p>Returns the total final energy demand supplied by natural gas across
-residential and commercial buildings and industry, while subtracting the
-estimated non-fossil share of gas consumption.</p>
+        <p>Extract Final Energy [by Carrier]|Natural Gas from a PyPSA Network.</p>
+<p><code>FE(l) = f_gas · (W[gas, decentral gas boilers](l) + L[gas for
+industry](l) − NE_gas(l))</code>: the fossil share (D3) of the gas withdrawn by
+decentral boilers (location per D1) and of the energy part of the
+<code>gas for industry</code> Load (non-energy use per D5). Central boilers, CHPs,
+power plants and SMR are transformation, not final energy.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1664,6 +1724,23 @@ estimated non-fossil share of gas consumption.</p>
                   <code>True</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>industry_non_energy_shares</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eurostat non-energy shares, index (<code>country</code>, <code>carrier</code>), column
+<code>non_energy_share</code> (C2.5).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1683,29 +1760,15 @@ estimated non-fossil share of gas consumption.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex including
-<code>location</code> and <code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
-
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>The function combines residential and commercial gas withdrawals with
-industry gas demand, then scales the total by the fossil fraction of gas.
-The fossil fraction is estimated from the ratio of non-fossil gas
-production to total gas usage, excluding pipeline flows and limiting the
-non-fossil share to at most 1.
-Industry gas demand is reduced by a fixed non-energy-use share for EU-27 based on
-Eurostat energy balance data.</p>
-</details>
 
     </div>
 
@@ -1870,9 +1933,15 @@ component with an unknown carrier withdraws from such a bus.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Extract transportation-sector final energy from a PyPSA Network.</p>
-<p>Returns the total energy consumed by the Transportation sector
-(excluding transmission / distribution losses) across the pypsa-network.</p>
+        <p>Extract Final Energy [by Sector]|Transportation from a PyPSA Network.</p>
+<p><code>FE(l) = W[low voltage, BEV charger](l) − S[low voltage, V2G](l)
++ L[electricity for rail](l) + L[land transport fuel cell](l)
++ L[land transport oil](l) + d_aviation(c) · L[kerosene for aviation](l)
++ d_navigation(c) · (L[shipping oil](l) + L[shipping methanol](l))</code>.
+The <code>BEV charger</code> withdrawal already includes charging losses and is
+not divided by an efficiency; the <code>V2G</code> feed-in is subtracted per
+snapshot, without clipping. Units are returned as pypsa reports them
+(incl. <code>land transport</code>, D7); <code>Network_Processor</code> normalises them.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1929,11 +1998,8 @@ component with an unknown carrier withdraws from such a bus.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Energy totals of the investment year, indexed by <code>country</code>
-used to determine domestic shares for aviation and
-navigation liquid fuels via :func:<code>get_energy_totals_domestic_share</code>.
-Passed by <code>Network_Processor</code>; the variable is skipped if no energy
-totals are available.</p>
+                <p>Energy totals of one year, indexed by <code>country</code> (C2.4), for the
+domestic shares of aviation and navigation (D4).</p>
               </div>
             </td>
             <td>
@@ -1959,57 +2025,9 @@ totals are available.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex including <code>location</code>
-and <code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>Sums transportation final energy from electricity, hydrogen, and liquid
-fuels:
-- Electricity demand from BEV charging loads.
-- Additional EV charging losses computed from BEV charger link flows and
-  adjusted for V2G participation.
-- Hydrogen demand from fuel-cell land transport.
-- Liquid fuels for aviation and navigation scaled by domestic fractions,
-  plus land-transport oil.</p>
-</details>
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="ValueError">ValueError</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If BEV charging flow sign conventions are violated.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="TypeError">TypeError</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If intermediate statistics return mixed result types.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -2025,16 +2043,21 @@ fuels:
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Industry" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Industry</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Industry</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">industry_non_energy_shares</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extract Industry-sector final energy from a PyPSA Network.</p>
-<p>Returns the total energy consumed by the Industry sector (excluding
-transmission / distribution losses)</p>
+        <p>Extract Final Energy [by Sector]|Industry from a PyPSA Network.</p>
+<p>Industry excluding non-energy use: <code>industry electricity</code>,
+<code>low-temperature heat for industry</code> on <code>urban central heat</code> buses,
+the industrial share of the decentral heat input (D8), <code>solid biomass
+for industry</code> and the <code>gas</code>, <code>H2</code>, <code>naphtha</code> and <code>coal for
+industry</code> Loads minus their non-energy use (D5); coal with the coke
+correction (D6). <code>industry methanol</code> and supply-link losses are not
+counted.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2074,12 +2097,31 @@ transmission / distribution losses)</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>True</code> (default), aggregate over all snapshots and return a
-:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
 :class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
               </div>
             </td>
             <td>
                   <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>industry_non_energy_shares</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eurostat non-energy shares, index (<code>country</code>, <code>carrier</code>), column
+<code>non_energy_share</code> (C2.5). Required if the network has <code>gas</code>,
+<code>naphtha</code> or <code>coal for industry</code> Loads; <code>Network_Processor</code>
+skips the variable if the table is not available.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -2101,12 +2143,33 @@ transmission / distribution losses)</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+(<code>MWh</code>) and every location of the network (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>industry_non_energy_shares</em> is <code>None</code> and the network has a
+<code>gas</code>, <code>naphtha</code> or <code>coal for industry</code> Load.</p>
               </div>
             </td>
           </tr>
@@ -2116,10 +2179,23 @@ Network_Processor._aggregate_to_country() if configured.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Includes all carriers directly connected to loads in the industry sector. Same Carrier
-names are also attached to some links, so components-grouping is needed!
-efficiency losses directly supplying industry loads for gas, biomass and coal carbon capture
-are included extra.</p>
+  <p>The non-energy use <code>NE_x(l)</code> (feedstocks) is determined with the
+Eurostat fallback (D5, C2.5), because the networks do not carry industry
+production data for the physical method of pypsa-de yet:</p>
+<ul>
+<li><code>NE_x(l) = S[c, x] · L[x for industry](l)</code>, with <code>S</code> the share
+  <code>FC_IND_NE / (FC_IND_E + FC_IND_NE)</code> of the Eurostat energy balance
+  (<code>FC_NE</code> for coal) and <code>c</code> the country of location <code>l</code> (first two
+  characters). <code>x</code> maps the Loads <code>gas</code>, <code>naphtha</code> and <code>coal for
+  industry</code> to the Eurostat carriers <code>Natural Gas</code>, <code>Oil</code> and
+  <code>Coal</code>.</li>
+<li>A country without a share gets the mean share of all countries for
+  that carrier, with a <code>WARNING</code>.</li>
+<li><code>NE_H2 = 0</code> (Eurostat has no hydrogen share), with a <code>WARNING</code>.</li>
+<li>The coke correction of coal uses <code>κ = 0</code> (D6), with a <code>WARNING</code>.</li>
+</ul>
+<p>See :func:<code>~pypsa_validation_processing.utils.non_energy_use</code> and
+:func:<code>~pypsa_validation_processing.utils.apply_coke_correction</code>.</p>
 </details>
 
     </div>
@@ -2137,9 +2213,10 @@ are included extra.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Extract agriculture-sector final energy from a PyPSA Network.</p>
-<p>Returns the total energy consumed by the transportation sector (excluding
-transmission / distribution losses) across the pypsa-network.</p>
+        <p>Extract Final Energy [by Sector]|Agriculture from a PyPSA Network.</p>
+<p><code>FE(l) = L[agriculture electricity](l) + L[agriculture machinery
+electric](l) + L[agriculture machinery oil](l) + D8_agr(l)</code>. Losses of
+the machinery oil supply Links are not final energy.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2179,7 +2256,7 @@ transmission / distribution losses) across the pypsa-network.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>True</code> (default), aggregate over all snapshots and return a
-:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
 :class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
               </div>
             </td>
@@ -2206,12 +2283,32 @@ transmission / distribution losses) across the pypsa-network.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+(<code>MWh</code>) and every location of the network (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If an <code>agriculture heat</code> Load sits on an <code>urban central heat</code> bus.</p>
               </div>
             </td>
           </tr>
@@ -2221,13 +2318,12 @@ Network_Processor._aggregate_to_country() if configured.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Includes carriers ['agriculture electricity','agriculture heat','agriculture machinery electric',
-'agriculture machinery oil'] executed on Load-Components. Agriculture machinery oil is also carrier
-of Links and Buses, as Demand is assumed fixed. <em>Time series of Agriculture demand are assumed
-to be constant in PyPSA-EUR.</em>
-Theoretically, machinery oil is a single bus with load and links for energy flow. This bus could be
-sourced by a bus representing oil usage with carbon capture in agriculture. Therefore the "efficiency
-loss" of this link must be added.</p>
+  <p>Agricultural heat is produced decentrally on the <code>rural heat</code> bus, so
+it is not reported as heat in final energy. Instead, the final energy is
+the input carriers of the decentral heat supply (e.g. biomass, electricity
+of heat pumps, CHP heat output), allocated to agriculture by its share of
+the <code>rural heat</code> demand (D8, <code>decentral_heat_split</code>). The
+<code>agriculture heat</code> Load itself is therefore not counted.</p>
 </details>
 
     </div>
@@ -2238,16 +2334,21 @@ loss" of this link must be added.</p>
 
 
 <h3 id="pypsa_validation_processing.statistics_functions.Final_Energy_by_Sector__Residential_and_Commercial" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Residential_and_Commercial</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+            <code class="highlight language-python"><span class="n">Final_Energy_by_Sector__Residential_and_Commercial</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Extract residential and commercial-sector final energy from a PyPSA Network.</p>
-<p>Returns the total energy consumed by the sector residentials and
-commercials across the pypsa-network.</p>
+        <p>Extract Final Energy [by Sector]|Residential and Commercial.</p>
+<p><code>FE(l) = Σ W[low voltage, c](l) + L[urban central heat](l) / (1 + λ)
++ D8_rc(l)</code>. The electricity term covers the <code>low voltage</code> consumers
+of the sector; it excludes industry, agriculture, transport (<code>rail</code>,
+<code>road</code>, <code>BEV charger</code>), storage chargers, the distribution grid,
+district-heat suppliers and every Link supplying a decentral heat bus,
+whose input enters only via the residential/commercial share of the
+decentral heat input (D8).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2287,12 +2388,29 @@ commercials across the pypsa-network.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>True</code> (default), aggregate over all snapshots and return a
-:class:<code>pandas.Series</code>.  If <code>False</code>, return a
+:class:<code>pandas.Series</code>. If <code>False</code>, return a
 :class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
               </div>
             </td>
             <td>
                   <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Network config; <code>λ</code> is
+<code>config["sector"]["district_heating"]["district_heating_loss"]</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -2314,12 +2432,9 @@ commercials across the pypsa-network.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pandas Series (<code>aggregate_per_year=True</code>) or DataFrame
-(<code>aggregate_per_year=False</code>) with MultiIndex of <code>location</code> and
-<code>unit</code>.
-Returns data at regional level as provided by the PyPSA network.
-Country-level aggregation is handled by
-Network_Processor._aggregate_to_country() if configured.</p>
+                <p>Series (<code>aggregate_per_year=True</code>) or DataFrame
+(<code>aggregate_per_year=False</code>) with MultiIndex <code>location</code>, <code>unit</code>
+(<code>MWh</code>) and every location of the network (C6.13).</p>
               </div>
             </td>
           </tr>
@@ -2327,12 +2442,28 @@ Network_Processor._aggregate_to_country() if configured.</p>
     </table>
 
 
-<details class="note" open>
-  <summary>Notes</summary>
-  <p>excludes EV-charging, as covered by Sector Transportation. Concerning Carrier heat, the Function distinguishes between
-central heating systems (Final Energy is Heat) and decentral heating systems (Final Energy is Electricity, Gas, Liquids
-or Solids).</p>
-</details>
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="MissingInputError (pypsa_validation_processing.utils.MissingInputError)" href="../utils/#pypsa_validation_processing.utils.MissingInputError">MissingInputError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the district heating loss is missing in <em>config</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 
