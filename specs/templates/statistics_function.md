@@ -72,7 +72,7 @@ If the source is `pypsa.statistics`, either
 | pypsa-de evaluation compared | `<pypsa-de function/expression, ported per this spec>` |
 | `pypsa.statistics` evaluation | `<full expression that gives the same quantity, with groupby_time=False and round=False>`; e.g. for a flow `n.statistics.withdrawal(components=[…], carrier=…, groupby=["location", "unit"], nice_names=False, groupby_time=False, round=False)`, for a Load-weighted price `−revenue / withdrawal` of the same arguments. Any `n.statistics` metric MAY be used; these are examples only |
 | Network, pypsa version, date | `<resources/…/networks/….nc>`, `<1.1.2>`, `<YYYY-MM-DD>` |
-| Result | `<equal at all N locations × T snapshots, max. absolute / relative difference …; K locations non-zero>` (tolerance P6.4: `numpy.isclose(a, b, rtol=1e-9, atol=1e-9)`; an all-zero comparison is not a proof) |
+| Result | `<equal at all N locations × T snapshots, max. absolute / relative difference …; K locations non-zero>` (tolerance P6.4: `numpy.isclose(a, b, rtol=1e-9, atol=1e-9, equal_nan=True)`; an all-zero or all-NaN comparison is not a proof) |
 | Code lines (port / `pypsa.statistics`) | `<n> / <m>` (without docstrings, comments, blank lines) |
 
 ## 5. Match type
