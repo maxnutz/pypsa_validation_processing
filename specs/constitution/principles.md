@@ -1,6 +1,6 @@
 # Principles
 
-Status: reviewed; draft (P6 rules 1 and 4)
+Status: reviewed
 
 Hard rules for all specs and code changes. Contracts in [contracts.md](../contracts.md) refine them.
 
