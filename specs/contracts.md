@@ -1,6 +1,6 @@
 # Contracts
 
-Status: reviewed
+Status: draft
 
 Contracts between the components of `pypsa_validation_processing`. Each contract lists the requirements, the sources it is based on, and acceptance criteria (AC) that can become unit tests in `tests/`. Spec-vs-code differences are referenced as `SC-n`, open questions as `OQ-n`, assumptions as `A-n` (all in [open_questions.md](open_questions.md)).
 
@@ -212,7 +212,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
 7. The result MUST contain at least one row (A-4). Item 13 states how a function meets this when none of its carriers is present.
 8. A result is invalid **only if its structure is incorrect**, i.e. it violates one of items 1, 2, 4–7 and the structural parts of items 10–12 (presence and values of the `quantity` level). Values themselves (zero, NaN, sign, magnitude) are not checked here, with the exception of negative weights (item 12).
 9. `Network_Processor` MUST validate every result against item 8. An invalid result MUST abort the run with an exception whose message names the variable and the violation (P5, owner decision). (SC-8)
-10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings (`n.snapshot_weightings.objective`, as applied by `n.statistics` with `groupby_time=True`). With `aggregate_per_year=False`, each snapshot column MUST hold the values as returned by `n.statistics(…, groupby_time=False)`, i.e. **not** multiplied by the snapshot weighting, and the `unit` labels MUST be kept as pypsa returns them (e.g. `MWh_el`) (owner decision, 2026-10-07; resolves OQ-13). Reason: the output units must match the units of the common definitions (`sister_packages/energy-scenarios-at-workflow/definitions/`, out of scope, P3).
+10. **`flow`**: the yearly value is the sum over all snapshots, weighted by the snapshot weightings (`n.snapshot_weightings.objective`, as applied by `n.statistics` with `groupby_time=True`). Note: pypsa 1.1.2 weights `n.statistics.energy_balance(…, groupby_time=True)` with `n.snapshot_weightings.generators`, not `.objective`; both are identical in PyPSA-AT networks (A-9), so a function MAY use `groupby_time=True` and MUST NOT weight by hand (PR #146 review, 2026-11-10). With `aggregate_per_year=False`, each snapshot column MUST hold the values as returned by `n.statistics(…, groupby_time=False)`, i.e. **not** multiplied by the snapshot weighting, and the `unit` labels MUST be kept as pypsa returns them (e.g. `MWh_el`) (owner decision, 2026-10-07; resolves OQ-13). Reason: the output units must match the units of the common definitions (`sister_packages/energy-scenarios-at-workflow/definitions/`, out of scope, P3).
     - Note: for snapshot weightings ≠ 1 these values are power per snapshot (`MW`) although labelled `MWh_*` (pypsa docs for `groupby_time`: "With False the time series is given in MW"; checked 2026-10-07 with pypsa 1.1.2 on a 6-hourly network). This is intended and MUST NOT be corrected by the function or by `Network_Processor`.
     - The result MUST NOT have a `quantity` level.
 11. **`stock`**: the yearly value is the end-of-year value of the investment year, typically read from static component data (e.g. `p_nom_opt`) and not summed over snapshots. With `aggregate_per_year=False`, each snapshot column holds the value at that snapshot if time-variant data is available; otherwise every column holds the yearly value. The result MUST NOT have a `quantity` level.
@@ -241,7 +241,7 @@ Example: `resources/AT_KN2040/` (contains `configs/`, `networks/`, `resources/en
   - has only `location` values contained in `n.buses.location` of the mock network and none empty.
 - C6-AC2 (per statistics function): with `aggregate_per_year=False` the result
   - is a `pd.DataFrame` (not a `pd.Series`) with a `pd.MultiIndex` and `{"location", "unit"} ⊆ set(result.index.names)`;
-  - has columns that are a subset of `n.snapshots`, at least one row, and only numeric column dtypes;
+  - has exactly the snapshots of `n` as columns, in the order of `n.snapshots` (C6.2, C6.13), at least one row, and only numeric column dtypes (tests: `_check_c6_format` since PR #154 and PR #158);
   - fulfils the `unit` and `location` checks of C6-AC1.
 - C6-AC3: For one function and the same network, the `True` result follows from the `False` result according to the class (per statistics function, in `tests/test_statistics_functions.py`):
   - `flow`: the sum over the columns of the `False` result, each column multiplied by its snapshot weighting (`n.snapshot_weightings.objective`), equals the `True` result (C6.10), tested on a network with snapshot weighting ≠ 1;

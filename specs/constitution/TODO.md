@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -42,21 +42,20 @@ One PR per function. Order: few dependencies first, so the framework is exercise
 Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run workflow_test` with the line `Net Imports|Oil: Net_Imports__Oil` of `configs/mapping.default.yaml` commented out locally; this change is never committed (owner 2026-11-05). The `Net Imports|Oil` PR runs it with the line active.
 - [x] Spec PR: test config setups in `specs/configuration.md` "Test configs" (#129; owner, PR #127 review 2026-11-03; location `pypsa_validation_processing/configs/test/`, not versioned because they refer to local data, owner 2026-11-04 and PR #141 review).
 - [x] PR #143: test configs (#129): `pixi.toml` `workflow_test` runs the setups of `specs/configuration.md` "Test configs" on `resources/electricity_network_0p3`; `README.md` l.79, l.109 updated; the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` removed (SC-47, CT-AC5). The configs themselves are created locally (not versioned). `CLAUDE.md` "Full local check" in PR #144 (owner request 2026-11-05). Result (PR #143, owner 2026-11-05): all six setups abort on `Net Imports|Oil` (location `co2`, C6.6; SC-31); with that variable commented out in the mapping, all six setups and `pytest` pass. The slow first run of `country-timeseries-AT` (~28 min) did not reproduce; no progress logging is added (owner 2026-11-05). Moved from WP3 (2026-11-04): first item of WP4, so that every function PR and the deep review of the WP3 helpers can run on workflow data.
-- [ ] Net Imports|Electricity (none; SC-30; #70)
-- [ ] Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
-- [ ] Final Energy [by Carrier]|Electricity (D1; SC-38; #43)
-- [ ] Final Energy [by Carrier]|Coal (D5, D6; #44)
-- [ ] Net Imports|Oil (D1, D2; SC-31; #69); fixes the C6.6 abort of `workflow_test` (location `co2`), so later PRs run `workflow_test` with the full mapping
-- [ ] Final Energy [by Carrier]|Natural Gas (D1, D3, D5; SC-23, SC-27; #45, #61, #97)
-- [ ] Final Energy [by Sector]|Agriculture (D8; SC-34; #13)
-- [ ] Final Energy [by Sector]|Residential and Commercial (D1, D8; SC-35; #14)
-- [ ] Final Energy [by Sector]|Transportation (D1, D4, D7; SC-32; #15). PR #156 also implements SC-49: energy totals countries with NaN in a D4 column dropped with `WARNING` (C2.4), missing country with demand → `utils.MissingInputError`, variable skipped (D4).
-- [ ] Final Energy [by Carrier]|Oil (D1, D2, D4, D5, D7; SC-28; #46, #53)
-- [ ] Final Energy [by Sector]|Industry (D5, D6, D8; SC-33; #12, #74)
-- [ ] All functions return every location (C6.13; SC-26) — checked in each PR above.
-- [ ] Deep review of the WP3 helpers after WP4, together with the statistics functions that use them, on workflow data (`pixi run workflow_test` and the test configs of #129); covers `attribute_locations` on real networks (owner, PR #132 and PR #138 reviews 2026-11-04).
-- [ ] Spec review after WP4: research the D6 coke factor `1.366` MWh coal per MWh coke (`MWH_COAL_PER_MWH_COKE` in `utils.py`, taken from pypsa-de `get_final_energy` l.2208–2225) in more depth and check it against the PyPSA code that preprocesses the industry data (owner, PR #137 review 2026-11-04).
-- [ ] Spec review after WP4: D8 tells CHP heat and solar thermal heat on decentral heat buses apart; the result carrier is `b` for both today (owner, PR #141 review 2026-11-04).
+- [x] PR #146: Net Imports|Electricity (none; SC-30; #70)
+- [x] PR #147: Final Energy [by Carrier]|District Heat (none; SC-29; #63, #73)
+- [x] PR #150: Final Energy [by Carrier]|Electricity (D1; SC-38; #43)
+- [x] PR #151: Final Energy [by Carrier]|Coal (D5, D6; #44)
+- [x] PR #152: Net Imports|Oil (D1, D2; SC-31; #69); fixes the C6.6 abort of `workflow_test` (location `co2`), so later PRs run `workflow_test` with the full mapping
+- [x] PR #153: Final Energy [by Carrier]|Natural Gas (D1, D3, D5; SC-23, SC-27; #45, #61, #97)
+- [x] PR #154: Final Energy [by Sector]|Agriculture (D8; SC-34; #13)
+- [x] PR #155: Final Energy [by Sector]|Residential and Commercial (D1, D8; SC-35; #14)
+- [x] PR #156: Final Energy [by Sector]|Transportation (D1, D4, D7; SC-32; #15). PR #156 also implements SC-49: energy totals countries with NaN in a D4 column dropped with `WARNING` (C2.4), missing country with demand → `utils.MissingInputError`, variable skipped (D4).
+- [x] PR #157: Final Energy [by Carrier]|Oil (D1, D2, D4, D5, D7; SC-28; #46, #53)
+- [x] PR #158: Final Energy [by Sector]|Industry (D5, D6, D8; SC-33; #12, #74)
+- [x] All functions return every location (C6.13; SC-26): `utils.ensure_all_locations` (PR #146; keeps further index levels and the `quantity` level since the PR #146 review), used by every function above.
+- [x] All WP4 PRs merged as a stack on 2026-11-10/11. Validated against Eurostat 2024 for AT 2025 with the override-carrying runs `20261020_carbon_accounting_run` and `wind-buildout-sensitivities/WIND_150_aut` (owner 2026-11-06; results in each PR description): Coal, Industry and Transportation within 10 %; model-driven gaps in Net Imports|Electricity, District Heat, Natural Gas, Net Imports|Oil (spec PR #167) and Agriculture.
+- [x] Spec review after WP4 (2026-11-11): TODO ticks; SC-23, SC-26–SC-35, SC-38 resolved; C6.10 note on pypsa's generator weighting and A-9 (PR #146 review); C6-AC2 requires exactly the snapshots of `n` as columns (PR #154, PR #158 reviews); D4 and `Final Energy [by Carrier]|Electricity` (V2G in `AT_KN2040`, home battery round-trip loss, PR #150 review) updated. The follow-ups of WP4 are in WP7.
 
 ## WP5 Config, units and output (C1, C9, C10) — independent, parallel to WP3/WP4
 - [x] PR #122: config validation and defaults (SC-1–5, SC-18, SC-19). Decisions taken in the PR without asking: OQ-31 (case-sensitive codes, confirmed 2026-11-03); OQ-30 (`null` for optional keys, rejected 2026-11-03 → SC-44); OQ-4 (`XK` rejected; owner 2026-11-03: accept `XK` → SC-45).
@@ -67,14 +66,22 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [x] PR #139: follow-up from the WP2/WP5 spec review: `null` for an optional config key = not set, default applies (C1.4, C1-AC3c; SC-44); a bracketed definition unit without comma is a list, `"[TJ]"` → `TJ`, `"[]"` → `ValueError` (C9.3, C9-AC3b; SC-43); `country: XK` accepted, pypsa-eur notation (C1.6, C1-AC2; SC-45). A unit with the same name as a carrier of `n` is valid; only non-empty keys of `UNITS_MAPPING` are checked (C6.5, C9.1; SC-46). Remove the unreachable warn-and-skip branch for a missing function in `_execute_function_for_variable` (missing functions raise at initialisation, C4; SC-6; owner, PR #130 review 2026-11-03).
 - [x] Spec review after WP2/WP5 (2026-11-03): TODO ticks, SCs resolved, C6.5, C8.2, C8.7, C9.1, C10.5 aligned with the owner decisions in the reviews of #118–#125; OQ-29–OQ-32 added and decided by the owner in the PR #127 review (2026-11-03), SC-43, SC-44; OQ-4 decided 2026-11-03 (SC-45).
 
-## WP6 Infra-Enshure coupling variables (milestone 2) — independent, parallel to WP4
+## WP6 Infra-Enshure coupling variables (milestone 2) — next after WP4; WP7 runs in parallel (owner 2026-11-11)
 - [x] Spec PR #148: D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
-- [ ] Spec PR: prices including the CO2 price (owner decision 2026-11-06 after PR #148): D9 without the CO2 subtraction `γ`, the six price specs adapted (AC8: a CO2 port of a supplying Link does not change the result). Removing the CO2 price consistently is a later, optional extension (#163); exposure as separate variables or config switch: #162.
+- [x] Spec PR #164: prices including the CO2 price (owner decision 2026-11-06 after PR #148): D9 without the CO2 subtraction `γ`, the six price specs adapted (AC8: a CO2 port of a supplying Link does not change the result). Removing the CO2 price consistently is a later, optional extension (#163); exposure as separate variables or config switch: #162.
 - [ ] Before implementation: OQ-33 (definitions, made in another repository and imported later; discussed in parallel), OQ-34 (unit label, currency year), OQ-35 (heat; scope of #76). `industry methanol` needs a separate variable (owner, PR #148 review 2026-11-06), no issue yet.
-- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) accepts only the levels `location` and `unit`, so it needs an extension or a D9-specific fill (value and weight NaN, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR.
+- [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) adds a `value` and a `weight` row for a missing location; check that its fill values match C6.12/C6.13 (value NaN; weight NaN or `0.0` as the variable spec states, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR.
 - [ ] Code PR(s): the other five prices (#100–#104, low prio).
 - [ ] Validation of the price variables against pypsa-de results: pypsa-de sets prices ≥ 1e4 EUR/MWh to NaN in `get_weighted_costs_links` (`export_ariadne_variables.py` l.3515, used for `…|Liquids|Oil` and `…|Gases`); D9 has no cut-off (owner, PR #148 review 2026-11-06).
 - [ ] Spec PR: investments (#106, OQ-36).
+
+## WP7 Post-WP4 review — depends on WP4, parallel to WP6
+Moved from WP4 (2026-11-11). No fixed order (owner 2026-11-11).
+- [ ] Deep review of the WP3 helpers after WP4, together with the statistics functions that use them, on workflow data (`pixi run workflow_test` and the test configs of #129); covers `attribute_locations` on real networks (owner, PR #132 and PR #138 reviews 2026-11-04).
+- [ ] Spec PR: research the D6 coke factor `1.366` MWh coal per MWh coke (`MWH_COAL_PER_MWH_COKE` in `utils.py`, taken from pypsa-de `get_final_energy` l.2208–2225) in more depth and check it against the PyPSA code that preprocesses the industry data (owner, PR #137 review 2026-11-04). Open with it: spec PR #165 (closed unmerged 2026-11-06, branch `spec/coke-correction-overrides` kept): AT locations with Eurostat-valid `industrial_demand_overrides` get no coke correction; the Eurostat check of WP4 gives κ = 0 as correct for these runs.
+- [ ] Spec PR: D8 tells CHP heat and solar thermal heat on decentral heat buses apart; the result carrier is `b` for both today (owner, PR #141 review 2026-11-04).
+- [ ] Spec PR: helper that warns about carriers in `n` that belong to a function's carrier family but are not evaluated (hard-coded carrier lists, #166; owner, PR #151 review 2026-11-10).
+- [ ] Spec PR #167 (draft): scope note of `Net Imports|Oil` (non-energy use and refinery own use not modelled); open: wider Eurostat tolerance for this variable?
 
 ## Later (need specs first)
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).
