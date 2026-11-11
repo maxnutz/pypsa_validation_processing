@@ -50,7 +50,7 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [ ] Final Energy [by Carrier]|Natural Gas (D1, D3, D5; SC-23, SC-27; #45, #61, #97)
 - [ ] Final Energy [by Sector]|Agriculture (D8; SC-34; #13)
 - [ ] Final Energy [by Sector]|Residential and Commercial (D1, D8; SC-35; #14)
-- [ ] Final Energy [by Sector]|Transportation (D1, D4, D7; SC-32; #15)
+- [ ] Final Energy [by Sector]|Transportation (D1, D4, D7; SC-32; #15). PR #156 also implements SC-49: energy totals countries with NaN in a D4 column dropped with `WARNING` (C2.4), missing country with demand → `utils.MissingInputError`, variable skipped (D4).
 - [ ] Final Energy [by Carrier]|Oil (D1, D2, D4, D5, D7; SC-28; #46, #53)
 - [ ] Final Energy [by Sector]|Industry (D5, D6, D8; SC-33; #12, #74)
 - [ ] All functions return every location (C6.13; SC-26) — checked in each PR above.
