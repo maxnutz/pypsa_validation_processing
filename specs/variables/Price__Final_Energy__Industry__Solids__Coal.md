@@ -19,7 +19,7 @@ Function name derived per `README.md` "Naming Convention": `|` → `__`, space �
 | GitHub issue | #103 (milestone "Implement Infra-Enshure Coupling Variables"; umbrella #76 "Prices of carriers for industry demand") |
 | Variable name | `Price\|Final Energy\|Industry\|Solids\|Coal` (issue title and IAMC name; owner decision 2026-11-05: singular `Price` and sector level `Industry` as in pypsa-de and #76) |
 | Description | Prices of Final Energy\|Coal per unit (#103) |
-| Unit | not given in the issue (OQ-34) |
+| Unit | not given in the issue; `EUR_2020/MWh` (OQ-34, owner 2026-11-11) |
 | Contained in a definitions folder? | no. `sister_packages/energy-scenarios-at-workflow/definitions/variable/` has no `Price` variable (searched 2026-11-05) (OQ-33) |
 
 ```yaml
@@ -32,8 +32,8 @@ Issue title and IAMC name are identical: #103 was renamed from `Prices|Final Ene
 | Item | Value | Source |
 |---|---|---|
 | PyPSA unit(s) | marginal price of the Load's bus, currency per `MWh_LHV`; `n.statistics.revenue` labels it `MWh_LHV` | D9 |
-| Unit label returned by the function | `EUR/MWh` for `value` and `weight` rows (C6.12) | D9, OQ-34 |
-| Normalised unit (`utils.UNITS_MAPPING`) | `EUR/MWh` (key to be added with the first `intensive` variable, SC-21) | C9.1 |
+| Unit label returned by the function | `EUR_2020/MWh` for `value` and `weight` rows (C6.12) | D9, OQ-34 |
+| Normalised unit (`utils.UNITS_MAPPING`) | `EUR_2020/MWh` (key `EUR_2020/MWh` → `EUR_2020/MWh`, added with the first `intensive` variable, SC-21; parsed by `iam_units`) | C9.1 |
 | Target unit | not part of the variable spec: conversion to the unit of a definitions folder is done with `pyam` in `Network_Processor` (C9), not in the function | C9 |
 | Conversion | none in the function (C9) | C9 |
 
@@ -82,7 +82,7 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 | `industry_non_energy_shares` | no | – | – |
 
 ## 9. Return format
-- `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit, quantity]`, `quantity ∈ {value, weight}`; value = weighted mean over snapshots, weight = weighted withdrawal in `MWh` (C6.12). Both rows carry the unit label `EUR/MWh`.
+- `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit, quantity]`, `quantity ∈ {value, weight}`; value = weighted mean over snapshots, weight = weighted withdrawal in `MWh` (C6.12). Both rows carry the unit label `EUR_2020/MWh`.
 - `aggregate_per_year=False`: `pd.DataFrame`, same MultiIndex, columns = snapshots of `n`; value = `K_t / w_t` (NaN where `w_t` is `0.0` or NaN), weight = unweighted withdrawal per snapshot (C6.12).
 - No country aggregation inside the function (C6, C8).
 
@@ -97,7 +97,7 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 | network without `n.buses_t.marginal_price` (not solved) | out of scope: C2 requires solved networks |
 
 ## 11. Acceptance criteria
-- AC1: With `aggregate_per_year=True`, the result fulfils C6-AC1, has an index level `quantity` with exactly `value` and `weight`, every value row has its weight row (C6.12), and every row has the unit label `EUR/MWh`.
+- AC1: With `aggregate_per_year=True`, the result fulfils C6-AC1, has an index level `quantity` with exactly `value` and `weight`, every value row has its weight row (C6.12), and every row has the unit label `EUR_2020/MWh`.
 - AC2: With `aggregate_per_year=False`, the result fulfils C6-AC2 and the `quantity` checks of AC1.
 - AC3: Mock network, locations `A`, `B`; one `coal for industry` Load at `A` with `p = [10, 30]` MW, bus marginal price `λ = [50, 100]` EUR/MWh, 2 snapshots, weighting 1. Yearly: `(A, value) = 87.5` (= 3500 / 40), `(A, weight) = 40`. Snapshots: `(A, value) = [50, 100]`, `(A, weight) = [10, 30]`. `B` (no Load): value and weight NaN.
 - AC3a: As AC3 with snapshot weighting 2: yearly `(A, value) = 87.5`, `(A, weight) = 80`; snapshot rows unchanged (C6.12).
@@ -108,8 +108,8 @@ Measured (`resources/20261020_carbon_accounting_run/networks/solved_2040.nc`, 20
 - AC8 (CO2 price included): as AC3, plus one Link supplying the Load's bus with `efficiency = 1`, `p0 = [10, 30]` and `bus2` on a bus with carrier `co2`, `efficiency2 = 0.2`, marginal price `[−100, −100]` EUR/t: the result equals AC3 (snapshot values `[50, 100]`, yearly value `87.5`); the CO2 port of the supplying Link is not evaluated (D9).
 
 ## 12. Open questions
-- OQ-33: the variable is not in the definitions; it is evaluated only with `definitions_path: false` until it is added there. The definitions of the Infra-Enshure coupling variables are made in another repository and imported later (owner, PR #148 review 2026-11-06).
-- OQ-34: unit label and currency year.
+- ~~OQ-33~~ resolved (owner, 2026-11-11): the variable is evaluated only with `definitions_path: false` (C3.2, no unit conversion) until the definitions of the Infra-Enshure coupling variables, made in another repository, are imported (PR #148 review 2026-11-06).
+- ~~OQ-34~~ resolved (owner, 2026-11-11): unit label `EUR_2020/MWh` (section 3).
 
 ## 13. Sources
 - #103, #76, milestone "Implement Infra-Enshure Coupling Variables"

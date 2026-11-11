@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11, reviewed on 2026-11-11)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11, reviewed on 2026-11-11; WP6 gate 2026-11-11)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -69,9 +69,11 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 ## WP6 Infra-Enshure coupling variables (milestone 2) — next after WP4; WP7 runs in parallel (owner 2026-11-11)
 - [x] Spec PR #148: D9 and `Price|Final Energy|Industry|{Electricity, Gases, Hydrogen, Solids|Biomass, Solids|Coal, Liquids|Oil}` (#99–#104, umbrella #76); owner decisions 2026-11-05: IAMC names with `Price|…|Industry|…`, Load-weighted marginal price (D9), investments (#106) in a later spec PR.
 - [x] Spec PR #164: prices including the CO2 price (owner decision 2026-11-06 after PR #148): D9 without the CO2 subtraction `γ`, the six price specs adapted (AC8: a CO2 port of a supplying Link does not change the result). Removing the CO2 price consistently is a later, optional extension (#163); exposure as separate variables or config switch: #162.
-- [ ] Before implementation: OQ-33 (definitions, made in another repository and imported later; discussed in parallel), OQ-34 (unit label, currency year), OQ-35 (heat; scope of #76). `industry methanol` needs a separate variable (owner, PR #148 review 2026-11-06), no issue yet.
+- [x] Before implementation (owner, 2026-11-11): OQ-33 → `definitions_path: false` until the definitions are imported; OQ-34 → `EUR_2020/MWh`; OQ-35 → `industry methanol` price (#172) and aggregates `…|Liquids`, `…|Solids` (#173) as new variables, heat not in scope. D9 and the six price specs reviewed in the WP6 gate spec PR.
 - [ ] Code PR: D9 helper in `utils.py`, `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) adds a `value` and a `weight` row for a missing location; check that its fill values match C6.12/C6.13 (value NaN; weight NaN or `0.0` as the variable spec states, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR.
 - [ ] Code PR(s): the other five prices (#100–#104, low prio).
+- [ ] Spec PR: `industry methanol` price (#172).
+- [ ] Spec PR: aggregates `Price|Final Energy|Industry|Liquids` and `…|Solids` (#173; depends on #172).
 - [ ] Validation of the price variables against pypsa-de results: pypsa-de sets prices ≥ 1e4 EUR/MWh to NaN in `get_weighted_costs_links` (`export_ariadne_variables.py` l.3515, used for `…|Liquids|Oil` and `…|Gases`); D9 has no cut-off (owner, PR #148 review 2026-11-06).
 - [ ] Spec PR: investments (#106, OQ-36).
 
