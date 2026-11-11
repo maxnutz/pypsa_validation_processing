@@ -175,12 +175,14 @@ class MockPyPSANetwork:
             },
             index=["bev_charger_at1", "bev_charger_at2", "other_link_at1"],
         )
+        self.loads = pd.DataFrame({"carrier": pd.Series(dtype=str)})
         # Add carriers attribute with empty index by default
         self.carriers = pd.DataFrame(index=[])
         # Locations and snapshots used by result validation (C6.2, C6.6)
         locations = ["AT1", "AT2", "AT3", "DE1", "DE2", "FR1"]
         self.buses = pd.DataFrame(
-            {"location": locations}, index=[f"{loc} bus" for loc in locations]
+            {"location": locations, "carrier": "AC"},
+            index=[f"{loc} bus" for loc in locations],
         )
         self.snapshots = pd.date_range(
             "2019-01-01", periods=4, freq="6h", name="snapshot"
@@ -270,17 +272,3 @@ network_results_path: /tmp/network_results
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_content)
     return config_file
-
-
-@pytest.fixture
-def energy_totals_df() -> pd.DataFrame:
-    """Fixture providing minimal one-year energy totals indexed by ``country`` (C2.4)."""
-    return pd.DataFrame(
-        {
-            "total domestic aviation": [30.0],
-            "total international aviation": [70.0],
-            "total domestic navigation": [20.0],
-            "total international navigation": [80.0],
-        },
-        index=pd.Index(["AT"], name="country"),
-    )

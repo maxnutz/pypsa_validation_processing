@@ -1,6 +1,6 @@
 # `Final Energy [by Carrier]|Electricity`
 
-Status: reviewed
+Status: draft
 Implementing PR: –
 
 ## 1. Variable and function name
@@ -76,7 +76,8 @@ All carriers exist in `resources/carriers_bus_carriers_components.csv` (local an
   `FE_el(l) = L[agriculture electricity](l) + L[agriculture machinery electric](l) + Σ W[low voltage, c](l) for c in the residential/commercial set + W[low voltage, BEV charger](l) − S[low voltage, V2G](l) + L[industry electricity](l) + W[AC, DAC](l)`
 - Sign convention: withdrawals counted positive; the `V2G` feed-in is subtracted per snapshot, without clipping. Snapshot values MAY be negative (exception to G2); yearly values MUST be ≥ 0 (G2).
 - Weighting: per C6.10.
-- Special cases: `V2G` (above). The measured networks have no `V2G` Links (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
+- Special cases: `V2G` (above). `20261020_carbon_accounting_run` 2040 and `electricity_network_0p3` 2025 have no `V2G` Links; `AT_KN2040` has a `V2G` feed-in of 75–105 TWh/yr in 2030–2050 (measured 2026-11-05, WP4).
+- Home battery: charger and discharger are not counted (section 5). The `home battery` Stores are cyclic (`e_initial = 0`), so the charger withdrawal minus the discharger supply is exactly the round-trip loss, charger · (1 − η²) with η = 0.98; this loss is not in the result. Largest measured loss: 3.05 TWh in `AT_KN2040_1H` 2040, 0.06 % of the `low voltage` withdrawal (every network in `resources/`, PR #150 review 2026-11-10).
 
 ## 8. Optional kwargs
 | Kwarg | Used? | Purpose | Behaviour if unavailable |

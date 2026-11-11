@@ -1,6 +1,6 @@
 # Shared definitions for variable specs
 
-Status: reviewed (G1, G2, D1–D8); draft (D9)
+Status: reviewed (G1, G2, D1–D3, D5–D8); draft (D4, D9)
 
 Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D9 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
@@ -81,16 +81,16 @@ d_k(c) = total domestic k / (total domestic k + total international k)
 ```
 
 - The values are read from the `energy_totals` table (C2.4: from `n.meta`, else from `energy_totals.csv`), columns `total domestic aviation`, `total international aviation`, `total domestic navigation`, `total international navigation`, row `country == c`.
-- The share MUST be determined per country, not one value for all locations (the old `utils.get_energy_totals_domestic_share` uses `AT` for all, OQ-1; it is removed in the WP4 PRs of Transportation and Oil, which use D4).
+- The share MUST be determined per country, not one value for all locations (the old `utils.get_energy_totals_domestic_share` used `AT` for all, OQ-1; removed in PR #156, Transportation and Oil use D4).
 - The year is the energy totals year of the model run (`n.meta["energy"]["energy_totals_year"]` or `config["energy"]["energy_totals_year"]`, C2.4; OQ-1 resolved). The table passed holds that year only.
 - The lookup is made only for locations with non-zero demand in a term weighted by `d_k`. A location whose weighted terms are all 0 (e.g. the pseudo-location `EU`, C6.13) gets 0 for them without a lookup.
-- A location with non-zero weighted demand whose country has no row → `ValueError` naming the country. Measured: the `energy_totals` tables hold all 34 countries of the networks, and aviation and navigation Loads exist only at country locations, none at `EU` (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
+- A location with non-zero weighted demand whose country has no row (absent from the table, or dropped for NaN values per C2.4) → `utils.MissingInputError` naming the countries. `Network_Processor` MUST skip the variable for that network with a `WARNING` (as for a missing config key, C2.3); all other variables MUST be evaluated, the run MUST NOT abort (owner decision 2026-11-09, PR #156 review; SC-49; C2-AC6e). Previously: `ValueError`. Measured: the `energy_totals` tables hold all 34 countries of the networks, and aviation and navigation Loads exist only at country locations, none at `EU` (`20261020_carbon_accounting_run` 2040, `electricity_network_0p3` 2025).
 - A denominator of 0 → `d_k(c) = 0`.
 - Energy totals not available → the variable is skipped per C2.4 / P5.
 
 Source: `export_ariadne_variables.py::get_final_energy` l.2453-2474 (`international_*_fraction`; `d_k = 1 − international fraction`); `resources/AT_KN2040/resources/energy_totals.csv`.
 
-Implemented by `utils.apply_domestic_share(energy_stats, energy_totals, kind)` (PR #135, 2026-11-04): multiplies each row by `d_k` of its country; rows that are 0 in every snapshot get no lookup.
+Implemented by `utils.apply_domestic_share(energy_stats, energy_totals, kind)` (PR #135, 2026-11-04): multiplies each row by `d_k` of its country; rows that are 0 in every snapshot get no lookup. Since PR #156 (commit `7f7c0ac`) it raises `utils.MissingInputError` instead of `ValueError` for a country with non-zero demand and no row, and `Network_Processor._get_energy_totals` drops countries with NaN in a D4 column (SC-49).
 
 ## D5 Non-energy use `NE_x(l)`
 Non-energy use of carrier `x ∈ {gas, naphtha, H2, coal}` in industry at location `l`. The sector definition excludes non-energy use: "industrial sector excluding non-energy use (e.g.feedstocks)" (`definitions/variable/tag_sector.yaml`). So final energy variables that contain industry demand of these carriers MUST subtract `NE_x(l)`.

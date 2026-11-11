@@ -10,9 +10,11 @@ from pypsa_validation_processing.utils import (
     REGION_MAPPING,
     UNITS_MAPPING,
     apply_coke_correction,
+    MissingInputError,
     apply_domestic_share,
     attribute_locations,
     decentral_heat_split,
+    ensure_all_locations,
     fossil_gas_share,
     fossil_oil_share,
     non_energy_use,
@@ -343,9 +345,9 @@ class TestApplyDomesticShare:
         assert apply_domestic_share(flows, totals, "aviation").tolist() == [0.0]
 
     def test_missing_country_with_demand_raises(self, totals):
-        """D4: a non-zero location whose country has no row raises ValueError naming it."""
+        """D4: a non-zero location whose country has no row raises MissingInputError naming it."""
         flows = self._flows({"AT11": 1.0, "CH": 1.0})
-        with pytest.raises(ValueError, match="CH"):
+        with pytest.raises(MissingInputError, match="CH"):
             apply_domestic_share(flows, totals, "aviation")
 
     def test_zero_rows_need_no_lookup(self, totals):
@@ -761,3 +763,111 @@ class TestDecentralHeatSplit:
         n.set_snapshots(pd.date_range("2025-01-01", periods=2, freq="3h"))
         assert decentral_heat_split(n).empty
         assert decentral_heat_split(n, aggregate_per_year=False).empty
+
+
+class TestEnsureAllLocations:
+    """Tests for ensure_all_locations (C6.13)."""
+
+    @staticmethod
+    def _index(locations: list[str], unit: str = "MWh_el") -> pd.MultiIndex:
+        """Return a (location, unit) MultiIndex with one *unit* for all rows."""
+        return pd.MultiIndex.from_arrays(
+            [locations, [unit] * len(locations)], names=["location", "unit"]
+        )
+
+    def test_adds_missing_locations_series(self):
+        """Series: missing locations get 0.0; buses without location are ignored."""
+        n = _network(["AT1", "AT2", "EU"])
+        n.add("Bus", "no location", carrier="AC")
+        result = pd.Series([5.0], index=self._index(["AT1"]))
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=True)
+
+        assert isinstance(out, pd.Series)
+        assert out[("AT1", "MWh_el")] == 5.0
+        assert out[("AT2", "MWh")] == 0.0
+        assert out[("EU", "MWh")] == 0.0
+        assert len(out) == 3
+
+    def test_adds_missing_locations_dataframe(self):
+        """DataFrame: missing locations get 0.0 in every snapshot column."""
+        n = _network(["AT1", "AT2"])
+        result = pd.DataFrame(
+            [[1.0, 2.0]], index=self._index(["AT1"]), columns=n.snapshots
+        )
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=False)
+
+        assert isinstance(out, pd.DataFrame)
+        assert list(out.columns) == list(n.snapshots)
+        assert (out.loc[("AT2", "MWh")] == 0.0).all()
+
+    @pytest.mark.parametrize("aggregate_per_year", [True, False])
+    def test_empty_result_gives_every_location(self, aggregate_per_year):
+        """An empty result becomes all-zero rows for every location, in both modes."""
+        n = _network(["AT1", "AT2"])
+
+        out = ensure_all_locations(
+            pd.Series(dtype=float), n, unit="MWh", aggregate_per_year=aggregate_per_year
+        )
+
+        expected_type = pd.Series if aggregate_per_year else pd.DataFrame
+        assert isinstance(out, expected_type)
+        assert set(out.index) == {("AT1", "MWh"), ("AT2", "MWh")}
+        assert (out == 0.0).all(axis=None)
+
+    def test_complete_result_is_unchanged(self):
+        """A result already covering all locations is returned unchanged."""
+        n = _network(["AT1"])
+        result = pd.Series([0.0], index=self._index(["AT1"]))
+
+        out = ensure_all_locations(result, n, unit="MWh", aggregate_per_year=True)
+
+        pd.testing.assert_series_equal(out, result)
+
+    def test_missing_index_level_raises(self):
+        """A result without a ``unit`` level raises a ValueError (C6.1)."""
+        n = _network(["AT1"])
+        index = pd.MultiIndex.from_tuples(
+            [("Link", "AT1")], names=["component", "location"]
+        )
+
+        with pytest.raises(ValueError, match="Index levels"):
+            ensure_all_locations(
+                pd.Series([1.0], index=index), n, unit="MWh", aggregate_per_year=True
+            )
+
+    def test_extra_index_levels_are_kept(self):
+        """Extra levels are allowed (C6.3); added rows get NaN there."""
+        n = _network(["AT1", "AT2"])
+        index = pd.MultiIndex.from_tuples(
+            [("Link", "AT1", "MWh_el")], names=["component", "location", "unit"]
+        )
+
+        out = ensure_all_locations(
+            pd.Series([1.0], index=index), n, unit="MWh", aggregate_per_year=True
+        )
+
+        assert list(out.index.names) == ["component", "location", "unit"]
+        added = out.xs("AT2", level="location")
+        assert len(added) == 1 and (added == 0.0).all()
+        assert added.index.get_level_values("component").isna().all()
+
+    def test_quantity_level_adds_value_and_weight(self):
+        """Intensive results get a ``value`` and a ``weight`` row (C6.12, C6.13)."""
+        n = _network(["AT1", "AT2"])
+        index = pd.MultiIndex.from_tuples(
+            [("AT1", "EUR/MWh", "value"), ("AT1", "MWh_el", "weight")],
+            names=["location", "unit", "quantity"],
+        )
+
+        out = ensure_all_locations(
+            pd.Series([50.0, 2.0], index=index),
+            n,
+            unit="EUR/MWh",
+            aggregate_per_year=True,
+        )
+
+        added = out.xs("AT2", level="location")
+        assert set(added.index.get_level_values("quantity")) == {"value", "weight"}
+        assert (added == 0.0).all()
