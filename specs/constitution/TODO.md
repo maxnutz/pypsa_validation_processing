@@ -80,4 +80,5 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).
 - New variables: Final Energy #71, Ambient Heat #75, Net Imports Biomass/Coal/Natural Gas #66–68. Investments #106 and prices #76, #99–104: WP6.
 - Physical method for non-energy use (C2.5) once PyPSA-AT stores industry production in `n.meta`.
+- `Net Imports|Oil` vs. Eurostat: the model lacks oil non-energy use (except `naphtha for industry`) and refinery own use, about 75 PJ for AT 2025 (−16.5 % / −19.6 %; `specs/variables/Net_Imports__Oil.md` section 7, scope note). A solution is needed; how is open (owner, PR #167 review 2026-11-11). Also open: a wider Eurostat tolerance for this variable until then.
 - Other: metadata #26, cache #52, documentation #82.
