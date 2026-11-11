@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11, reviewed on 2026-11-11)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -80,8 +80,8 @@ Moved from WP4 (2026-11-11). No fixed order (owner 2026-11-11).
 - [ ] Deep review of the WP3 helpers after WP4, together with the statistics functions that use them, on workflow data (`pixi run workflow_test` and the test configs of #129); covers `attribute_locations` on real networks (owner, PR #132 and PR #138 reviews 2026-11-04).
 - [ ] Spec PR: research the D6 coke factor `1.366` MWh coal per MWh coke (`MWH_COAL_PER_MWH_COKE` in `utils.py`, taken from pypsa-de `get_final_energy` l.2208–2225) in more depth and check it against the PyPSA code that preprocesses the industry data (owner, PR #137 review 2026-11-04). Open with it: spec PR #165 (closed unmerged 2026-11-06, branch `spec/coke-correction-overrides` kept): AT locations with Eurostat-valid `industrial_demand_overrides` get no coke correction; the Eurostat check of WP4 gives κ = 0 as correct for these runs.
 - [ ] Spec PR: D8 tells CHP heat and solar thermal heat on decentral heat buses apart; the result carrier is `b` for both today (owner, PR #141 review 2026-11-04).
+- [x] Spec PR #167 (merged 2026-11-11): scope note of `Net Imports|Oil` (non-energy use and refinery own use not modelled); the follow-up (solution, Eurostat tolerance) is in "Later".
 - [ ] Spec PR: helper that warns about carriers in `n` that belong to a function's carrier family but are not evaluated (hard-coded carrier lists, #166; owner, PR #151 review 2026-11-10).
-- [ ] Spec PR #167 (draft): scope note of `Net Imports|Oil` (non-energy use and refinery own use not modelled); open: wider Eurostat tolerance for this variable?
 
 ## Later (need specs first)
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).

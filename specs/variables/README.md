@@ -7,7 +7,7 @@ Rules and quantities used by several variables (final energy measured at the con
 ## Index
 | IAMC variable | Spec | Match type | Status |
 |---|---|---|---|
-| `Final Energy [by Carrier]\|Electricity` | [Final_Energy_by_Carrier__Electricity.md](Final_Energy_by_Carrier__Electricity.md) | exact | draft |
+| `Final Energy [by Carrier]\|Electricity` | [Final_Energy_by_Carrier__Electricity.md](Final_Energy_by_Carrier__Electricity.md) | exact | reviewed |
 | `Final Energy [by Carrier]\|Coal` | [Final_Energy_by_Carrier__Coal.md](Final_Energy_by_Carrier__Coal.md) | semantic | reviewed |
 | `Final Energy [by Carrier]\|Natural Gas` | [Final_Energy_by_Carrier__Natural_Gas.md](Final_Energy_by_Carrier__Natural_Gas.md) | semantic | reviewed |
 | `Final Energy [by Carrier]\|Oil` | [Final_Energy_by_Carrier__Oil.md](Final_Energy_by_Carrier__Oil.md) | semantic | reviewed |
