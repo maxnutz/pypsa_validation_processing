@@ -21,6 +21,7 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Electricity,
     Net_Imports__Oil,
     Price__Final_Energy__Industry__Electricity,
+    Price__Final_Energy__Industry__Gases,
 )
 
 from pypsa_validation_processing.utils import (
@@ -2284,3 +2285,11 @@ class TestPriceFinalEnergyIndustryElectricity(_PriceTests):
     CARRIER = "industry electricity"
     BUS_CARRIER = "low voltage"
     BUS_UNIT = "MWh_el"
+
+
+class TestPriceFinalEnergyIndustryGases(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Gases.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Gases)
+    CARRIER = "gas for industry"
+    BUS_CARRIER = "gas for industry"
