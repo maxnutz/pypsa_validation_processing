@@ -1280,7 +1280,7 @@ class Network_Processor:
 
         ``flow`` and ``stock`` variables are summed. ``intensive`` variables
         (C4.5) are aggregated as weighted mean Σ vᵢ·wᵢ / Σ wᵢ using their
-        ``weight`` rows; a group with Σ wᵢ = 0 gets ``0.0``. The ``quantity``
+        ``weight`` rows; a group with Σ wᵢ = 0 gets NaN (A-5). The ``quantity``
         level and the ``weight`` rows are dropped (C8.2, C8.6). NaN values
         and weights (e.g. a carrier missing in a region) count as ``0.0``.
 
@@ -1311,8 +1311,8 @@ class Network_Processor:
             weights = result.xs("weight", level="quantity").reindex(values.index)
             weighted = self._sum_over_groups(variable, values * weights)
             total = self._sum_over_groups(variable, weights)
-            # weighted mean; a group without weight gets 0.0 (C8.2, A-5)
-            return (weighted / total).where(total != 0, 0.0)
+            # weighted mean; a group without weight gets NaN (C8.2, A-5)
+            return weighted / total.where(total != 0)
         return self._sum_over_groups(variable, result)
 
     def _sum_over_groups(self, variable: str, result: pd.DataFrame) -> pd.DataFrame:

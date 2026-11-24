@@ -14,3 +14,4 @@
         - Final_Energy_by_Sector__Industry
         - Final_Energy_by_Sector__Agriculture
         - Final_Energy_by_Sector__Residential_and_Commercial
+        - Price__Final_Energy__Industry__Electricity
