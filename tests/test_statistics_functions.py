@@ -2149,9 +2149,14 @@ class _PriceTests:
         price: list[float] = (50.0, 100.0),
         weighting: float = 1.0,
     ) -> pypsa.Network:
-        """AC3: Load at ``A`` (none if *p* is None), location ``B`` without Load."""
+        """AC3: Load at ``A`` (none if *p* is None), location ``B`` without Load.
+
+        Only the ``objective`` weighting is set to *weighting*; ``generators``
+        and ``stores`` get ``1.0``, so a wrong weighting column fails AC3a/AC4.
+        """
         n = _real_network()
-        n.snapshot_weightings.loc[:, :] = weighting
+        n.snapshot_weightings.loc[:, :] = 1.0
+        n.snapshot_weightings["objective"] = weighting
         for loc in ("A", "B"):
             _add_bus(n, f"{loc} bus", self.BUS_CARRIER, self.BUS_UNIT, loc)
         n.buses_t.marginal_price["A bus"] = list(price)
