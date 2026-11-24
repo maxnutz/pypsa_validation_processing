@@ -19,3 +19,4 @@
         - Price__Final_Energy__Industry__Hydrogen
         - Price__Final_Energy__Industry__Solids__Biomass
         - Price__Final_Energy__Industry__Solids__Coal
+        - Price__Final_Energy__Industry__Liquids__Oil

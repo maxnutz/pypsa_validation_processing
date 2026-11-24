@@ -25,6 +25,7 @@ from pypsa_validation_processing.statistics_functions import (
     Price__Final_Energy__Industry__Hydrogen,
     Price__Final_Energy__Industry__Solids__Biomass,
     Price__Final_Energy__Industry__Solids__Coal,
+    Price__Final_Energy__Industry__Liquids__Oil,
 )
 
 from pypsa_validation_processing.utils import (
@@ -2320,3 +2321,11 @@ class TestPriceFinalEnergyIndustrySolidsCoal(_PriceTests):
     func = staticmethod(Price__Final_Energy__Industry__Solids__Coal)
     CARRIER = "coal for industry"
     BUS_CARRIER = "coal for industry"
+
+
+class TestPriceFinalEnergyIndustryLiquidsOil(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Liquids__Oil.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Liquids__Oil)
+    CARRIER = "naphtha for industry"
+    BUS_CARRIER = "naphtha for industry"
