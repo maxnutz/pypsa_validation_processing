@@ -687,7 +687,10 @@ def ensure_all_locations(
     unit: str,
     aggregate_per_year: bool,
 ) -> pd.Series | pd.DataFrame:
-    """Add every location of *n* missing in *result* with ``0.0`` (C6.13).
+    """Add every location of *n* missing in *result* (C6.13).
+
+    Added rows are ``0.0``; for ``intensive`` results (``quantity`` level,
+    C6.12) they are NaN.
 
     Parameters
     ----------
@@ -712,9 +715,10 @@ def ensure_all_locations(
         *result* plus one row per missing location with ``0.0``
         (``aggregate_per_year=False``: in every snapshot column of *n*). If
         *result* has a ``quantity`` level (``intensive``, C6.12), two rows
-        ``value`` and ``weight`` are added, both NaN: the weighted quantity
-        does not exist at a missing location (C6.13, A-5). Further index
-        levels of *result* are NaN in the added rows; C8 aggregates them away.
+        ``value`` and ``weight`` are added instead, both NaN, not ``0.0``: the
+        weighted quantity does not exist at a missing location (C6.13, A-5).
+        Further index levels of *result* are NaN in the added rows; C8
+        aggregates them away.
 
     Raises
     ------
@@ -724,19 +728,17 @@ def ensure_all_locations(
     """
     locations = n.buses["location"]
     locations = pd.Index(locations[locations.notna() & (locations != "")].unique())
-    if result.empty:
-        names = list(result.index.names)
-        if not set(statistics_grouping_index) <= set(names):
-            names = statistics_grouping_index
-        present = pd.Index([])
-    elif not set(statistics_grouping_index) <= set(result.index.names):
-        raise ValueError(
-            f"Index levels must contain {statistics_grouping_index}, "
-            f"got: {list(result.index.names)}"
-        )
-    else:
-        names = list(result.index.names)
-        present = result.index.get_level_values("location")
+    names = list(result.index.names)
+    if not set(statistics_grouping_index) <= set(names):
+        if not result.empty:
+            raise ValueError(
+                f"Index levels must contain {statistics_grouping_index}, "
+                f"got: {names}"
+            )
+        names = statistics_grouping_index
+    present = (
+        pd.Index([]) if result.empty else result.index.get_level_values("location")
+    )
     missing = locations.difference(present)
     quantities = ["value", "weight"] if "quantity" in names else [None]
     rows = [
@@ -750,10 +752,8 @@ def ensure_all_locations(
         filled = pd.DataFrame(fill, index=index, columns=n.snapshots)
     else:
         filled = pd.Series(fill, index=index)
-    if result.empty:
-        return filled
-    if missing.empty:
-        return result
+    if result.empty or missing.empty:
+        return filled if result.empty else result
     return pd.concat([result, filled])
 
 
