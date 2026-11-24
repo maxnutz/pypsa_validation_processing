@@ -18,3 +18,4 @@ Final Energy [by Sector]|Agriculture: Final_Energy_by_Sector__Agriculture
 Final Energy [by Sector]|Residential and Commercial: Final_Energy_by_Sector__Residential_and_Commercial
 Price|Final Energy|Industry|Electricity: {function: Price__Final_Energy__Industry__Electricity, aggregation: intensive}
 Price|Final Energy|Industry|Gases: {function: Price__Final_Energy__Industry__Gases, aggregation: intensive}
+Price|Final Energy|Industry|Hydrogen: {function: Price__Final_Energy__Industry__Hydrogen, aggregation: intensive}

@@ -22,6 +22,7 @@ from pypsa_validation_processing.statistics_functions import (
     Net_Imports__Oil,
     Price__Final_Energy__Industry__Electricity,
     Price__Final_Energy__Industry__Gases,
+    Price__Final_Energy__Industry__Hydrogen,
 )
 
 from pypsa_validation_processing.utils import (
@@ -2293,3 +2294,11 @@ class TestPriceFinalEnergyIndustryGases(_PriceTests):
     func = staticmethod(Price__Final_Energy__Industry__Gases)
     CARRIER = "gas for industry"
     BUS_CARRIER = "gas for industry"
+
+
+class TestPriceFinalEnergyIndustryHydrogen(_PriceTests):
+    """Spec Price__Final_Energy__Industry__Hydrogen.md AC1-AC8."""
+
+    func = staticmethod(Price__Final_Energy__Industry__Hydrogen)
+    CARRIER = "H2 for industry"
+    BUS_CARRIER = "H2 for industry"

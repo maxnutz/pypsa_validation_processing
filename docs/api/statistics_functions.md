@@ -16,3 +16,4 @@
         - Final_Energy_by_Sector__Residential_and_Commercial
         - Price__Final_Energy__Industry__Electricity
         - Price__Final_Energy__Industry__Gases
+        - Price__Final_Energy__Industry__Hydrogen
