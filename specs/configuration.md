@@ -6,7 +6,7 @@ The package config is a YAML file passed via `--config <path>`; without `--confi
 
 "Packaged config" below means the value in `configs/config.default.yaml`; "Default" means the value used when an optional key is absent or `null` (C1.4). Both can differ.
 
-`configs/config.default.yaml` and the coupling config `configs/config.coupling.yaml` (section `definitions_path`, "Coupling definitions") are the only versioned configs. The test configs used by `pixi run workflow_test` are local files only (section "Test configs"; #129). They replace the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml`, which are removed: they are no longer needed (owner, PR #142 review 2026-11-04).
+`configs/config.default.yaml` is the only versioned config; the coupling config `configs/config.coupling.yaml` is local (section `definitions_path`, "Coupling definitions"). The test configs used by `pixi run workflow_test` are local files only (section "Test configs"; #129). They replace the earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml`, which are removed: they are no longer needed (owner, PR #142 review 2026-11-04).
 
 ## Keys
 
@@ -38,10 +38,12 @@ Expected structure: `networks/*.nc` (required), `configs/config*<year>.yaml` (op
 ### `definitions_path`
 Default choice and packaged config: `sister_packages/energy-scenarios-at-workflow/definitions` (the common definitions). Any other `definitions/` folder MAY be set, as long as it is a valid IAMC variable definition readable by `nomenclature.DataStructureDefinition` (owner decision, kick-off review). The key is required even when definitions are not used: then it MUST be set to `false` explicitly.
 
-**Coupling definitions** (owner 2026-11-25; OQ-41). The Infra-Ensure coupling variables (`Secondary Energy|…`, `Price|Final Energy|Industry|…`, D9–D11) are defined in [infra-ensure/coupling-variables](https://github.com/infra-ensure/coupling-variables), not in the common definitions (OQ-33). Its `definitions/` folder (`variable/`, `region/` with `Austria` only) is a valid `nomenclature.DataStructureDefinition` folder. It is used through extra configs whose `definitions_path` points to it; `definitions_path` stays one folder, and the two definitions folders are never merged in one run. A run with the coupling definitions evaluates the mapped variables defined there and converts to their units (C3.1, C9); a run with the common definitions is unchanged.
-- Local folder: `sister_packages/coupling-variables` = a clone of the repository (not versioned, `.gitignore` `sister_packages/*`, like every sister package). Path in the configs: `sister_packages/coupling-variables/definitions`.
-- Versioned coupling config `pypsa_validation_processing/configs/config.coupling.yaml`: the keys of `config.default.yaml` with `definitions_path: sister_packages/coupling-variables/definitions`, `country: AT`, `aggregation_level: country`, `map_country_codes_to_names: true` (output region `Austria`, the only region of the coupling definitions). Versioning needs a `.gitignore` exception as for `config.default.yaml` (l.76-78; code PR).
-- Test setups: `coupling-year-AT` and `coupling-timeseries-AT` (section "Test configs").
+**Coupling definitions** (owner 2026-11-25, PR #213; OQ-41). The Infra-Ensure coupling variables (`Secondary Energy|…`, `Price|Final Energy|Industry|…`, D9–D11) are defined in [infra-ensure/coupling-variables](https://github.com/infra-ensure/coupling-variables), not in the common definitions (OQ-33). Its `definitions/` folder (`variable/`, `region/` with `Austria` only) is a valid `nomenclature.DataStructureDefinition` folder.
+- Local folder: `sister_packages/coupling-variables`, a clone of the repository (not versioned, `.gitignore` `sister_packages/*`, like every sister package). Path in a config: `sister_packages/coupling-variables/definitions`.
+- Coupling config: `pypsa_validation_processing/configs/config.coupling.yaml`, a local, non-versioned file like the test configs (`.gitignore` l.76). Keys of `config.default.yaml` with `definitions_path: sister_packages/coupling-variables/definitions`, `country: AT`, `aggregation_level: country`, `map_country_codes_to_names: true` (output region `Austria`, the only region of the coupling definitions).
+- `definitions_path` stays one folder; a run uses either the common or the coupling definitions, never both. With the coupling definitions, the mapped variables defined there are evaluated and converted to their units (C3.1, C9); this includes the six price variables (`definitions/variable/price.yaml`), so OQ-33 (`definitions_path: false` for prices) applies only to runs with the common definitions (intended, owner 2026-11-25).
+
+**Definitions never change the code** (owner 2026-11-25, PR #213). A definitions folder only selects which mapped variables are evaluated and the target units (C3, C9). Statistics functions, helpers in `utils.py` and the evaluation workflow are the same for every config and MUST NOT depend on a definitions folder: no definitions-specific code path, constant or carrier list. Definitions folders are used to specify and implement the evaluation functions (variable names, descriptions, units in the variable specs), not by them. Tests in `tests/` MUST NOT read a definitions folder; they test the code and evaluation functions of this repository only (as today: `nomenclature.DataStructureDefinition` is mocked). There is no test setup with the coupling definitions (section "Test configs").
 
 ### `country`
 `all` keeps every country (or region) of the network. A specific code selects all locations whose label starts with that code (C8). Packaged config: `all`. `EU` selects the locations of the 27 EU member states, not the copperplate pseudo-location `EU` of the networks, which is never part of the output (C8.7, C8.8).
@@ -83,7 +85,6 @@ Owner decisions: #129 and PR #127 review (2026-11-03); location and versioning 2
 
 **Local data (preconditions).** Not part of the repository:
 - `resources/electricity_network_0p3/`: PyPSA-AT run `AT_KN2040` (measured 2026-11-04): networks `base_s_adm__none_{2025,2030,2040,2050}.nc`, 365 snapshots with weighting 24 h, 77 locations (35 Austrian NUTS3 regions `AT111`…`AT342`, `DE1`…`DE5`, `GB0`, `GB1`, `CH`, `XK`, the copperplate `EU` and further European countries). `n.meta` holds the run config, `wildcards.planning_horizons` and `resources.energy_totals`; `configs/config.base_s_adm__none_<year>.yaml` and `resources/energy_totals.csv` exist as well.
-- `sister_packages/coupling-variables/`: a clone of [infra-ensure/coupling-variables](https://github.com/infra-ensure/coupling-variables), for the `coupling-*` setups (OQ-41).
 - The industry non-energy shares file of `eurostat-energy-balance_processing`, `../eurostat-energy-balance_processing/resources/industry_non_energy_shares_2026.csv` (relative to the repository root; carriers `Coal`, `Natural Gas`, `Oil`; years up to 2024, incl. 2020).
 
 **Keys common to all setups.** `network_results_path: resources/electricity_network_0p3`; `model_name: "PyPSA-AT electricity_network_0p3"`; `scenario_name: <setup>`; `output_path: outputs/test`. Exception: `minimal` sets only the five required keys.
@@ -95,11 +96,9 @@ Owner decisions: #129 and PR #127 review (2026-11-03); location and versioning 2
 | `country-year-EU` | `country` | `true` | `EU` | common definitions | `true` | `true` | shares file | `latest` | `EU` = 27 member states, copperplate `EU` dropped (C8.7, C8.8); label `European Union` |
 | `region-year-AT` | `region` | `true` | `AT` | common definitions | `false` | `true` | shares file | `2020` | NUTS3 regions with names (`REGION_MAPPING`); no unit conversion; fixed shares year |
 | `region-timeseries-all` | `region` | `false` | `all` | `false` | – (no effect) | `false` | shares file | `latest` | every mapped variable without definitions (C3); all regions as time series |
-| `coupling-year-AT` | `country` | `true` | `AT` | coupling definitions | `true` | `true` | shares file | `latest` | coupling variables (D9–D11) with unit conversion to `TWh` and `EUR_2020/MWh`; region `Austria` (OQ-41) |
-| `coupling-timeseries-AT` | `country` | `false` | `AT` | coupling definitions | `true` | `true` | shares file | `latest` | coupling variables as time series, one file per year |
 | `minimal` | – (`country`) | – (`true`) | `AT` | common definitions | – (`true`) | – (`false`) | – (not set) | – | only the five required keys, defaults apply (C1.3); output in `resources/` (C10-AC1); variables needing the shares file skipped (C2.5) |
 
-"Common definitions" = `sister_packages/energy-scenarios-at-workflow/definitions`; "coupling definitions" = `sister_packages/coupling-variables/definitions`. "–" = key absent; the default is in brackets.
+"Common definitions" = `sister_packages/energy-scenarios-at-workflow/definitions`. "–" = key absent; the default is in brackets.
 
 **Acceptance criteria**
 - CT-AC1: Each setup exits without error and writes its output per C10: a yearly file (`aggregate_per_year: true`) or a time series folder with one file per investment year 2025, 2030, 2040, 2050.
