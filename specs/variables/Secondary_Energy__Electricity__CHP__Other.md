@@ -78,6 +78,14 @@ Measured with the D10 classification (`resources/20261020_carbon_accounting_run/
 
 AT 2025: 8 `biogas CHP` Links (595 MW fuel input) supply 0.000 TWh, no H2 CHP; 2040: `urban central H2 CHP` 0.001 TWh (9 Links, 1 MW), no `biogas CHP` in AT. All locations 2040: 172.14 TWh, mainly H2 CHPs. No unclassified carrier on either network (D10 rule 4). These values are a plausibility check for the implementing PR, not acceptance criteria.
 
+Plausibility against official data (owner, PR #214 review 2026-11-25): model AT 2025 vs. the Eurostat energy balance `nrg_bal_c`, AT, 2024, unit `GWH` (latest published year: 2025 is not published, Eurostat API checked 2026-11-25, dataset updated 2026-08-27). Balance: `GEP_MAPCHP` + `GEP_APCHP` (CHP plants, main activity and autoproducer); SIEC: `R5300` (biogases), `H8000` (heat), `N900H` (nuclear), `RA200` (geothermal), `RA500` (other renewables), `R5210P`, `R5220P`, `R5230P`, `R5290` (liquid biofuels), `X9900` (other); only `R5300` and `H8000` are non-zero for AT 2024.
+
+| | Model AT 2025 | Eurostat AT 2024 | Deviation |
+|---|---|---|---|
+| `Secondary Energy\|Electricity\|CHP\|Other` [TWh] | 0.000 | 0.129 | -100 % |
+
+Eurostat: biogas CHP 0.129 TWh; the model's 8 AT `biogas CHP` Links do not dispatch in 2025. Eurostat reports gross production (incl. the plants' own use), the model net supply (D10); the difference is a few percent for thermal plants and negligible for wind and PV. A comparison of one model year with the previous calendar year is a plausibility check only, not an acceptance criterion.
+
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = E[CHP|Other](l) = Σ_{c ∈ C_el} S[{AC, low voltage}, c](l)` with `C_el` = `urban central H2 CHP`, `urban central H2 retrofit CHP`, `biogas CHP` (D10).
 - Sign convention: supply, `≥ 0` at every location and snapshot (D10 rule 5); no negative per-snapshot supply measured on either network.
@@ -127,6 +135,7 @@ None.
 - #201, milestone "Implement Infra-Enshure Coupling Variables"
 - `sister_packages/coupling-variables/definitions/variable/secondary-energy.yaml` (commit `30202ec`)
 - `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.1548-1558, l.1648-1659, l.1744-1751 (commit `a5baa7e9`)
+- Eurostat `nrg_bal_c` (AT, 2024, `GWH`), local copy `eurostat-energy-balance_processing/resources/estat_nrg_bal_c.tsv`; `nrg_bal_peh` (`RA130`) via the Eurostat API (2026-11-25)
 - PyPSA statistics accessor (`supply`): https://docs.pypsa.org/latest/api/networks/statistics/
 - measurement on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2040}.nc` and port order on all 13 networks in `resources/*/networks/` (2026-11-25)
 - D1, D10, D11 in [shared_definitions.md](shared_definitions.md); C4.5, C6.10, C6.13, C8, C9 in [../contracts.md](../contracts.md); OQ-37–OQ-40 in [../open_questions.md](../open_questions.md)
