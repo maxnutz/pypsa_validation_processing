@@ -33,5 +33,11 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Secondary Energy\|Electricity w/o CHP\|Biomass` | [Secondary_Energy__Electricity_wo_CHP__Biomass.md](Secondary_Energy__Electricity_wo_CHP__Biomass.md) | semantic | draft |
 | `Secondary Energy\|Electricity w/o CHP\|Waste` | [Secondary_Energy__Electricity_wo_CHP__Waste.md](Secondary_Energy__Electricity_wo_CHP__Waste.md) | semantic | draft |
 | `Secondary Energy\|Electricity w/o CHP\|Other` | [Secondary_Energy__Electricity_wo_CHP__Other.md](Secondary_Energy__Electricity_wo_CHP__Other.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Coal` | [Secondary_Energy__Electricity__CHP__Coal.md](Secondary_Energy__Electricity__CHP__Coal.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Oil` | [Secondary_Energy__Electricity__CHP__Oil.md](Secondary_Energy__Electricity__CHP__Oil.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Gas Grid Mix` | [Secondary_Energy__Electricity__CHP__Gas_Grid_Mix.md](Secondary_Energy__Electricity__CHP__Gas_Grid_Mix.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Waste` | [Secondary_Energy__Electricity__CHP__Waste.md](Secondary_Energy__Electricity__CHP__Waste.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Biomass` | [Secondary_Energy__Electricity__CHP__Biomass.md](Secondary_Energy__Electricity__CHP__Biomass.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|CHP\|Other` | [Secondary_Energy__Electricity__CHP__Other.md](Secondary_Energy__Electricity__CHP__Other.md) | semantic | draft |
 
-Not yet specified: the 17 `Secondary Energy|Electricity|CHP|…`, `Secondary Energy|District Heating|…`, `Secondary Energy|District Heating w/o CHP|…` and `Secondary Energy|District Heating|CHP|…` variables (#196–#212, WP8; shared definitions D10, D11); `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
+Not yet specified: the 11 `Secondary Energy|District Heating|…`, `Secondary Energy|District Heating w/o CHP|…` and `Secondary Energy|District Heating|CHP|…` variables (#202–#212, WP8; shared definition D11); `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
