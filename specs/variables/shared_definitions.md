@@ -1,8 +1,8 @@
 # Shared definitions for variable specs
 
-Status: reviewed
+Status: draft
 
-Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D9 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
+Rules and quantities used by more than one variable spec. Variable specs reference them as G1, G2 and D1–D11 instead of repeating them, so that copies cannot diverge (same reasoning as for [../constitution/principles.md](../constitution/principles.md), see [../README.md](../README.md)). Code that implements a shared quantity MUST live in `pypsa_validation_processing/utils.py` (P4).
 
 Measurements cited below were made on 2026-10-22 with pypsa 1.1.2 on `resources/AT_KN2040/networks/base_s_adm__none_2020.nc` and `…_2040.nc` (54 locations, 1460 snapshots, snapshot weighting 6 h).
 
@@ -16,7 +16,7 @@ Owner decision 2026-10-23. Every `Final Energy` variable measures energy where t
 - inputs of end-use technologies at the consumer (decentral boilers and heat pumps, `BEV charger`, …; D8);
 - heat received by consumers from heat networks: from `urban central heat` (Loads, `Final Energy [by Carrier]|District Heat`) and, in D8, the heat that consumers on a decentral heat bus receive from heat-only sources without an input at the consumer (decentral solar thermal) and from CHPs.
 
-Outputs of conversion technologies (power plants, CHPs, refineries, fuel-supply Links, solar thermal, …) never count as final energy. Where D8 uses the heat supply of a CHP or a solar thermal Generator at a decentral bus, this is only because that bus has no losses, so the heat received by its consumers equals that supply; the quantity measured is still the heat received at the consumer. Production-side variables (e.g. `Secondary Energy|…`, not yet specified) count outputs: CHP heat output counts towards heat variables, CHP electricity output towards electricity variables, and a variable that combines both counts both. Supply flows used only to compute shares or imports (D2, D3, `Net Imports|Oil`) are not final energy and are not affected.
+Outputs of conversion technologies (power plants, CHPs, refineries, fuel-supply Links, solar thermal, …) never count as final energy. Where D8 uses the heat supply of a CHP or a solar thermal Generator at a decentral bus, this is only because that bus has no losses, so the heat received by its consumers equals that supply; the quantity measured is still the heat received at the consumer. Production-side variables (`Secondary Energy|…`, D10, D11) count outputs: CHP heat output counts towards heat variables, CHP electricity output towards electricity variables, and a variable that combines both counts both. Supply flows used only to compute shares or imports (D2, D3, `Net Imports|Oil`) are not final energy and are not affected.
 
 ## G2 Final energy is never negative
 Owner decision 2026-10-28 (on #97: "Final Energy - variables must stay positive or equal to Zero (= must NOT become negative. Never). Ever."). Every `Final Energy` variable MUST be `≥ 0` at every location: the yearly value for `aggregate_per_year=True` and every snapshot column for `aggregate_per_year=False`. Subtracted corrections (non-energy use D5, coke D6, distribution losses) MUST NOT make a location negative. Results are not clipped; a negative value is a spec or implementation error.
@@ -194,3 +194,67 @@ Measured on the same network (yearly, all 51 locations, EUR/MWh): `industry elec
 Price unit (OQ-34, owner 2026-11-11): `EUR_2020/MWh`. The networks store no currency year (`n.meta["config"]["costs"]["year"]` is `null`, no currency key; `solved_2040.nc`). The costs come from technology-data (`n.meta["data"]["costs"] = {source: primary, version: latest}`), and the pypsa-at `data/versions.csv` (local checkout `2899f6330`, 2026-10-06) resolves `primary`/`latest supported` to `v0.14.0-2020-v2`, a release in currency year 2020. pypsa-de also reports `EUR2020/MWh` (`export_ariadne_variables.py` l.5752-5753). The unit is parsed by `iam_units` (`EUR_2020/MWh` → `EUR_2020/GJ` checked 2026-11-11).
 
 Code that implements `P[c](l)` MUST live in `utils.py` (P4): `utils.load_weighted_price(n, carriers, aggregate_per_year)`, unit label `utils.PRICE_UNIT` (PR #178); each `Price|Final Energy|Industry|…` function calls it with its carrier(s). With several carriers (e.g. `c ∈ {coal for industry, …}` later), `K` and `w` are summed over the carriers before dividing.
+
+## D10 Electricity supply by source `E[v](l)`
+Used by the 15 `Secondary Energy|Electricity|…` variables (#187–#201). Definitions: `infra-ensure/coupling-variables`, `definitions/variable/secondary-energy.yaml` (commit `97bcf66`; header and descriptions). Owner decisions there: electricity of CHPs is reported only under `Secondary Energy|Electricity|CHP|<fuel>`, never under the fuel of the CHP (2026-11-11, 2026-11-16); `Biomass` is solid biomass only, biogas is in `Other`; `Gas Grid Mix` is all methane from the `gas` bus, whatever its origin; no totals. `Electricity|Other` = all other sources, excluding electricity storage (owner 2026-11-25, correcting the definition text "from all sources").
+
+Quantity (production side, G1 last paragraph): `E[v](l) = Σ_{c ∈ C_el(v)} S[{AC, low voltage}, c](l)`, the supply to buses with bus carrier `AC` or `low voltage` of the components with carrier `c`, i.e. the output after conversion losses (net of the efficiency; the model has no own consumption of power plants, so gross = net output). Source of the quantity: pypsa-de `get_secondary_energy`, `electricity_supply = n.statistics.supply(bus_carrier=["low voltage", "AC"], …)` (`export_ariadne_variables.py` l.1548-1558, commit `a5baa7e9`). Location: D1.2 (Links: location of the bus at the evaluated port); Generators and StorageUnits: location of their bus. `flow` per C6.10. Unit `MWh_el` → `MWh` (`UNITS_MAPPING`) → `TWh` (definition).
+
+Classification `C_el(v)` (component in brackets; measured on all 13 networks in `resources/*/networks/` on 2026-11-25, pypsa 1.1.2: every carrier with supply to `AC` or `low voltage` in at least one network is listed, either in a variable or as excluded):
+
+| Variable `v` | Carriers `C_el(v)` | pypsa-de (l.1559-1664) |
+|---|---|---|
+| `Electricity\|Coal` | `coal`, `lignite` (Link) | `Coal` = `filter(like="coal")` + `filter(like="lignite")`, which also contains the coal and lignite CHPs |
+| `Electricity\|Oil` | `oil` (Link) | `filter(like="oil")`, also contains `urban central oil CHP` |
+| `Electricity\|Gas Grid Mix` | `CCGT`, `OCGT` (Link) | `Gas` = `CCGT`, `OCGT`, `urban central gas CHP`, `… CC` |
+| `Electricity\|Solar` | `solar`, `solar rooftop`, `solar-hsat` (Generator) | `filter(like="solar")` |
+| `Electricity\|Wind` | `onwind`, `offwind-ac`, `offwind-dc` (Generator) | `Wind` = `filter(like="offwind")` + `onwind` |
+| `Electricity\|Hydro` | `ror` (Generator), `hydro` (StorageUnit), `hydro discharger` (Link) | `hydro`, `ror`; `PHS` excluded as storage |
+| `Electricity\|Biomass` | `solid biomass` (Link) | part of `Biomass\|Solid`, which also contains the solid biomass CHPs |
+| `Electricity\|Waste` | none: every waste-fired plant in PyPSA-AT is a CHP; `0.0` at every location (C6.13) | `filter(like="waste CHP")` |
+| `Electricity\|Other` | `nuclear`, `biogas`, `H2 CCGT`, `H2 OCGT`, `H2 retrofit CCGT`, `H2 retrofit OCGT`, `H2 turbine`, `H2 Fuel Cell` (OQ-37), `CCGT methanol`, `CCGT methanol CC`, `OCGT methanol`, `allam methanol` (Link) | `Nuclear`, `Hydrogen`, `Biomass\|Gaseous and Liquid` (`biogas`); methanol plants not evaluated |
+| `Electricity\|CHP\|Coal` | `urban central coal CHP`, `urban central lignite CHP` (Link) | in `Coal` |
+| `Electricity\|CHP\|Oil` | `urban central oil CHP` (Link) | in `Oil` |
+| `Electricity\|CHP\|Gas Grid Mix` | `urban central gas CHP`, `urban central gas CHP CC` (Link) | in `Gas` |
+| `Electricity\|CHP\|Waste` | `waste CHP`, `waste CHP CC` (Link) | `Waste` |
+| `Electricity\|CHP\|Biomass` | `urban central solid biomass CHP`, `urban central solid biomass CHP CC` (Link) | in `Biomass` |
+| `Electricity\|CHP\|Other` | `urban central H2 CHP`, `urban central H2 retrofit CHP`, `biogas CHP` (Link) | in `Hydrogen`; `biogas CHP` not evaluated |
+| excluded | transport: `AC` (Line), `DC`, `electricity distribution grid` (Link); storage: `PHS` (StorageUnit), `PHS discharger`, `battery discharger`, `home battery discharger`, `V2G` (Link); `electricity` (Load with negative withdrawal, OQ-38) | the same transport carriers dropped (l.1554-1557); storage excluded in the `isclose` check (l.1744-1751) |
+
+Rules:
+1. A CHP is a Link whose carrier contains `CHP`. Its fuel is the bus carrier of its `bus0` (measured: `coal`, `lignite`, `oil`, `gas`, `non-sequestered HVC` (waste), `solid biomass`, `H2`, `biogas`); electricity is its output at `bus1` (`AC`), heat at `bus2` (`urban central heat`; `rural heat` for `biogas CHP`, D11). CCS variants (`… CC`) belong to the variable of their fuel.
+2. `Coal` contains lignite, as pypsa-de `Secondary Energy|Electricity|Coal` (l.1567-1570).
+3. `hydro discharger` is the reservoir outlet of a `hydro` bus fed only by `hydro inflow` (Generator) and `hydro store` (Store), without pumping (measured on `electricity_network_0p3` and `20261020_carbon_accounting_run` 2040); it is generation, not storage. `PHS` is storage.
+4. Completeness: the 15 variables together equal the supply of all carriers minus the excluded ones, at every location and snapshot. A carrier with supply to `AC` or `low voltage` that is neither in a variable nor excluded is not evaluated silently: OQ-39.
+5. `≥ 0` at every location and snapshot (supply is non-negative by definition of `n.statistics.supply`).
+
+Code that implements `E[v](l)` MUST live in `utils.py` (P4), with the classification as one shared table, so that the 15 functions cannot diverge.
+
+## D11 District heat supply by source `H[v](l)`
+Used by the 11 `Secondary Energy|District Heating|…` variables (#202–#212). Definitions as in D10 (same file and commit). Owner decisions there: heat supplied to district heating grids (`urban central heat`), as pypsa-de `Secondary Energy|Heat|…`; the heat-only variables `District Heating|{Electricity, Oil, Gas Grid Mix, Biomass, Other}` MUST NOT contain heat of CHPs; heat of CHPs is reported under `District Heating|CHP|<fuel>` with the same fuels as D10 (2026-11-11); thermal storage is excluded; no totals.
+
+Quantity: `H[v](l) = Σ_{c ∈ C_dh(v)} S[urban central heat, c](l)`, the heat output to buses with bus carrier `urban central heat`. Source: pypsa-de `get_secondary_energy`, `heat_supply = n.statistics.supply(bus_carrier=["urban central heat"], …)` (l.1753-1764; "rural and urban decentral heat do not produce secondary energy", l.1757). Location: D1.2 (location of the `urban central heat` bus) and the bus of a Generator. `flow` per C6.10. Unit `MWh_th` → `MWh` → `TWh`.
+
+Classification `C_dh(v)` (measured as in D10, all 13 networks):
+
+| Variable `v` | Carriers `C_dh(v)` | pypsa-de (l.1766-1807) |
+|---|---|---|
+| `District Heating\|Electricity` | `urban central air heat pump`, `urban central resistive heater` (Link) | `Heat\|Electricity` = `filter(like="heat pump")` + `filter(like="resistive heater")` |
+| `District Heating\|Oil` | none: no oil boiler on `urban central heat` in any network; `0.0` at every location (C6.13) | `filter(like="urban central oil")`, i.e. only the oil CHP |
+| `District Heating\|Gas Grid Mix` | `urban central gas boiler` (Link) | `filter(like="gas")`, also contains the gas CHPs |
+| `District Heating\|Biomass` | none: no solid biomass boiler on `urban central heat` in any network; `0.0` at every location (C6.13) | `filter(like="biomass")`, i.e. only the solid biomass CHPs |
+| `District Heating\|Other` | `urban central solar thermal` (Generator); `Fischer-Tropsch`, `Haber-Bosch`, `Sabatier`, `methanolisation`, `H2 Electrolysis`, `H2 Fuel Cell` (OQ-37) (Link) | `Solar` (`filter(like="solar thermal")`) and `Other` = `Fischer-Tropsch`, `H2 Fuel Cell`, `H2 Electrolysis`, `Sabatier`, `methanolisation`; `Haber-Bosch` not evaluated |
+| `District Heating\|CHP\|Coal` | `urban central coal CHP`, `urban central lignite CHP` (Link) | `Coal` |
+| `District Heating\|CHP\|Oil` | `urban central oil CHP` (Link) | `Oil` |
+| `District Heating\|CHP\|Gas Grid Mix` | `urban central gas CHP`, `urban central gas CHP CC` (Link) | in `Gas` |
+| `District Heating\|CHP\|Waste` | `waste CHP`, `waste CHP CC` (Link) | `Waste` |
+| `District Heating\|CHP\|Biomass` | `urban central solid biomass CHP`, `urban central solid biomass CHP CC` (Link) | `Biomass` |
+| `District Heating\|CHP\|Other` | `urban central H2 CHP`, `urban central H2 retrofit CHP` (Link) | `Hydrogen` (`filter(like="urban central H2")`) |
+| excluded | thermal storage: `urban central water pits discharger`, `urban central water tanks discharger` (Link) | `discharger` excluded in the `isclose` check (l.1820-1823) |
+
+Rules:
+1. CHP and fuel as in D10 rule 1; the heat output is at `bus2`. `biogas CHP` supplies `rural heat`, not `urban central heat` (measured 2026-11-25, `20261020_carbon_accounting_run` 2040: `bus2` carrier `rural heat`), so it contributes to no `District Heating` variable; its electricity is in `Electricity|CHP|Other` (D10).
+2. `Haber-Bosch` waste heat is in `Other`: it is waste heat of fuel synthesis (definition of `District Heating|Other`), and it is 6.6 TWh in `20261020_carbon_accounting_run` 2040 (all locations). pypsa-de does not evaluate it (its `isclose` check, l.1820-1823, would then fail for this network); deviation listed in the variable spec.
+3. Completeness and sign as D10 rules 4 and 5, with `urban central heat` and the excluded carriers above.
+
+Code that implements `H[v](l)` MUST live in `utils.py` (P4), with the classification as one shared table.
