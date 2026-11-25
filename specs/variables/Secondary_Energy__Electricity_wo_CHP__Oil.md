@@ -76,6 +76,14 @@ Measured with the D10 classification (`resources/20261020_carbon_accounting_run/
 
 AT has no oil power plant in this run (0 `oil` Links with `bus1` in AT; 52 elsewhere, 0.43 TWh at all locations in 2025). No unclassified carrier on either network (D10 rule 4). These values are a plausibility check for the implementing PR, not acceptance criteria.
 
+Plausibility against official data (owner, PR #214 review 2026-11-25): model AT 2025 vs. the Eurostat energy balance `nrg_bal_c`, AT, 2024, unit `GWH` (latest published year: 2025 is not published, Eurostat API checked 2026-11-25, dataset updated 2026-08-27). Balance: `GEP_MAPE` + `GEP_APE` (electricity-only plants, main activity and autoproducer); SIEC: `O4000XBIO` (oil and petroleum products, excl. biofuel portion).
+
+| | Model AT 2025 | Eurostat AT 2024 | Deviation |
+|---|---|---|---|
+| `Secondary Energy\|Electricity w/o CHP\|Oil` [TWh] | 0.000 | 0.002 | -100 % |
+
+Plausible: both close to zero. Eurostat reports gross production (incl. the plants' own use), the model net supply (D10); the difference is a few percent for thermal plants and negligible for wind and PV. A comparison of one model year with the previous calendar year is a plausibility check only, not an acceptance criterion.
+
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = E[w/o CHP|Oil](l) = Σ_{c ∈ C_el} S[{AC, low voltage}, c](l)` with `C_el` = `oil` (D10).
 - Sign convention: supply, `≥ 0` at every location and snapshot (D10 rule 5); no negative per-snapshot supply measured on either network (the negative `electricity` Loads are excluded, OQ-38).
@@ -122,6 +130,7 @@ None.
 - #188, milestone "Implement Infra-Enshure Coupling Variables"; infra-ensure/coupling-variables#8 (rename, PR #9)
 - `sister_packages/coupling-variables/definitions/variable/secondary-energy.yaml` (commit `30202ec`)
 - `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.1548-1558, l.1572-1574 (commit `a5baa7e9`)
+- Eurostat `nrg_bal_c` (AT, 2024, `GWH`), local copy `eurostat-energy-balance_processing/resources/estat_nrg_bal_c.tsv`; `nrg_bal_peh` (`RA130`) via the Eurostat API (2026-11-25)
 - PyPSA statistics accessor (`supply`): https://docs.pypsa.org/latest/api/networks/statistics/
 - measurement on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2040}.nc` (2026-11-25)
 - D1, D10 in [shared_definitions.md](shared_definitions.md); C4.5, C6.10, C6.13, C8, C9 in [../contracts.md](../contracts.md); OQ-37–OQ-40 in [../open_questions.md](../open_questions.md)

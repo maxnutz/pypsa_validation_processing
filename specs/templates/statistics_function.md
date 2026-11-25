@@ -86,6 +86,12 @@ If the source is `pypsa.statistics`, either
 
 Every carrier, bus carrier and component MUST exist in `resources/carriers_bus_carriers_components.csv` or be justified by a source.
 
+Plausibility against official data (owner, PR #214 review 2026-11-25): compare the AT value of the first model year of a solved network in `resources/` with official AT data of the latest published year, e.g. the Eurostat energy balance `nrg_bal_c` (as processed by `eurostat-energy-balance_processing`). Name the dataset, year, balance and product codes (e.g. `nrg_bal`, `siec`), the model run and year, both values and the relative deviation, and explain each large deviation as model result, model limitation or evaluation error. The comparison is also reported in the spec PR description. It is a plausibility check, not an acceptance criterion.
+
+| | Model AT `<year>` | `<dataset>` AT `<year>` | Deviation |
+|---|---|---|---|
+| `<IAMC variable>` [`<unit>`] | `<value>` | `<value>` | `<±n %>` |
+
 ## 7. Accounting rule and sign convention
 - Formula: `<value = Σ … − Σ …>`
 - Sign convention: <e.g. withdrawal from bus counted positive; result MUST be ≥ 0>
