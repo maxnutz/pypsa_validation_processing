@@ -1,0 +1,130 @@
+# `Secondary Energy|Electricity|CHP|Biomass`
+
+Status: draft
+Implementing PR: –
+
+## 1. Variable and function name
+| Item | Value |
+|---|---|
+| IAMC variable | `Secondary Energy\|Electricity\|CHP\|Biomass` |
+| Function name | `Secondary_Energy__Electricity__CHP__Biomass` |
+| Mapping file(s) | `pypsa_validation_processing/configs/mapping.default.yaml`, short form `Secondary Energy\|Electricity\|CHP\|Biomass: Secondary_Energy__Electricity__CHP__Biomass` (C4.1) |
+| Aggregation class | `flow` (C4.5, default) |
+
+Function name derived per `README.md` "Naming Convention": `|` → `__`, space → `_`, other special characters removed.
+
+## 2. Definition source
+| Item | Value |
+|---|---|
+| GitHub issue | #200 (milestone "Implement Infra-Enshure Coupling Variables") |
+| Variable name | `Secondary Energy\|Electricity\|CHP\|Biomass` |
+| Description | Total net generation of electricity by solid biomass combined heat and power plants (CHPs) |
+| Unit | `TWh` |
+| Contained in a definitions folder? | `sister_packages/coupling-variables/definitions/variable/secondary-energy.yaml` (commit `30202ec`). Not in the common definitions (no `Secondary Energy\|Electricity\|CHP\|…` variable). |
+
+```yaml
+- Secondary Energy|Electricity|CHP|Biomass:
+    description: Total net generation of electricity by solid biomass combined heat and power plants (CHPs)
+    unit: TWh
+```
+
+The issue cites commit `97bcf66`; the entry above is from commit `30202ec` (unchanged since `97bcf66`).
+
+## 3. Unit
+| Item | Value | Source |
+|---|---|---|
+| PyPSA unit(s) returned by the function | `MWh_el` (unit of the `AC` and `low voltage` buses) | `n.statistics.supply(bus_carrier=["AC", "low voltage"], groupby=[…, "unit"])`; D10 |
+| Normalised unit (`utils.UNITS_MAPPING`) | `MWh` (key `MWh_el`) | `utils.py::UNITS_MAPPING` |
+| Target unit | `TWh` (definition) | C9 |
+| Conversion | `MWh` → `TWh`, factor `1e-6`, in `Network_Processor` (C9), not in the function | C9 |
+
+## 4. Implementation source
+| Item | Value |
+|---|---|
+| Source | `export_ariadne_variables.py` (via the D10 helper in `utils.py`) |
+| pypsa-de function | `get_secondary_energy` |
+| pypsa-de line range | `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py:L1548-L1558` (supply), `:L1609-L1611` (variable) |
+| pypsa-de variable name | `Secondary Energy\|Electricity\|Biomass\|Solid` (l.1609-1611), CHP part |
+| pypsa-de commit | `a5baa7e9` |
+
+Changes to the ported logic, only as far as needed for the function contract:
+- Region = location (D10, D1.2: location of the `AC`/`low voltage` bus at the supplying port of the CHP) instead of `.filter(like=region)` on the component name; per-location values are aggregated to the country by C8. A CHP fed from a copperplate fuel bus (e.g. `EU coal`) is attributed to its `AC` bus, which is regional.
+- Carrier lists from the shared D10 table in `utils.py` instead of `filter(like=…)` on carrier names (D10, P4). CHPs are classified by carrier, electricity is selected by the bus carrier of the port, never by port number (D10 rule 1).
+- Time series for `aggregate_per_year=False` (`groupby_time=False`, C6.10); pypsa-de reports yearly values only.
+- Unclassified carriers give a `WARNING` (D10 rule 4, OQ-39); pypsa-de checks completeness with an `isclose` assertion (l.1744-1751).
+
+Deviations decided by the owner (P6.1):
+- Only the CHPs `urban central solid biomass CHP`, `urban central solid biomass CHP CC` (definition; owner 2026-11-11/16; D10). `solid biomass` is in `Secondary Energy|Electricity w/o CHP|Biomass`; `biogas CHP` is in `…|CHP|Other`.
+
+## 5. Match type
+- Match type: `semantic`
+- Reasoning: pypsa-de `Secondary Energy|Electricity|Biomass|Solid` (`filter(like="solid biomass")`, l.1609-1611) contains `solid biomass` and the two solid biomass CHPs. This variable is its CHP part; the rest is `Electricity w/o CHP|Biomass` (#193). Biogas CHPs are in `CHP|Other` (definition). Semantic match (P6.2; owner 2026-11-25).
+
+## 6. Components, carriers, bus carriers
+| Component | Carrier(s) | Bus carrier(s) | Port / direction | Included? | Source |
+|---|---|---|---|---|---|
+| Link | `urban central solid biomass CHP`, `urban central solid biomass CHP CC` | `AC`, `low voltage` | supply at the port(s) with bus carrier `AC` or `low voltage`, whatever its port number; fuel input `solid biomass` | yes | D10 table and rule 1; all 13 networks in `resources/*/networks/` (2026-11-25): electricity at `bus1` (`AC`) for every CHP carrier |
+| Link | same carriers | heat bus carriers (`urban central heat`, `rural heat`) | heat output | no (in `District Heating\|CHP\|…`, D11) | D10 rule 1 |
+| Link | non-CHP plants of the same fuel (D10 table) | `AC`, `low voltage` | supply | no (in `Electricity w/o CHP\|…`) | D10 |
+| Line, Link, StorageUnit, Load | D10 excluded row (transport, storage, `electricity` Load) | `AC`, `low voltage` | – | no | D10 |
+
+Measured with the D10 classification (`resources/20261020_carbon_accounting_run/networks/solved_{2025,2040}.nc`, pypsa 1.1.2, 2026-11-25; yearly supply, snapshot weighting applied):
+
+| | AT 2025 | AT 2040 | all locations 2025 | all locations 2040 |
+|---|---|---|---|---|
+| `Secondary Energy\|Electricity\|CHP\|Biomass` [TWh] | 0.303 | 0.498 | 40.69 | 33.24 |
+
+AT 2025: `urban central solid biomass CHP` 0.303 TWh (15 Links), `… CC` 0.000; 2040: 0.498 TWh and 0.000. No unclassified carrier on either network (D10 rule 4). These values are a plausibility check for the implementing PR, not acceptance criteria.
+
+## 7. Accounting rule and sign convention
+- Formula: `value(l) = E[CHP|Biomass](l) = Σ_{c ∈ C_el} S[{AC, low voltage}, c](l)` with `C_el` = `urban central solid biomass CHP`, `urban central solid biomass CHP CC` (D10).
+- Sign convention: supply, `≥ 0` at every location and snapshot (D10 rule 5); no negative per-snapshot supply measured on either network.
+- Weighting: `flow` per C6.10 (yearly: weighted sum over snapshots; time series: unweighted per-snapshot values).
+- Special cases ported from pypsa-de: none beyond section 4.
+
+## 8. Optional kwargs
+| Kwarg | Used? | Purpose | Behaviour if unavailable |
+|---|---|---|---|
+| `aggregate_per_year` | always | switch Series / DataFrame (C6) | – |
+| `config` | no | – | – |
+| `energy_totals` | no | – | – |
+| `industry_non_energy_shares` | no | – | – |
+
+## 9. Return format
+- `aggregate_per_year=True`: `pd.Series`, MultiIndex `[location, unit]`, values = weighted sum over snapshots in `MWh_el` (C6.10).
+- `aggregate_per_year=False`: `pd.DataFrame`, MultiIndex `[location, unit]`, columns = snapshots of `n`, values as returned by `n.statistics.supply(…, groupby_time=False)`, not multiplied by the snapshot weighting (C6.10).
+- No country aggregation inside the function (C6, C8).
+
+## 10. Edge cases
+| Case | Expected behaviour |
+|---|---|
+| none of the carriers present in a location | `0.0` for this location (every snapshot with `aggregate_per_year=False`), unit `MWh_el`; the location is not dropped (C6.13) |
+| none of the carriers present in the network | `0.0` for every location of `n.buses.location` (C6.13); `n.statistics.supply` returns an empty `pd.Series` in this case, which the function MUST turn into `0.0` rows |
+| only some carriers present in a location | absent carriers contribute `0.0` |
+| CHP with heat at `bus1` and `AC` at `bus2` (port order swapped) | same result as with `AC` at `bus1` (D10 rule 1); not observed on the 13 networks, where electricity is always at `bus1` |
+| CHP without heat port (`bus2` empty) | electricity counted as for any CHP of the carrier (D10 rule 1) |
+| copperplate pseudo-location `EU` | returned like any location (C6.13), dropped by `Network_Processor` (C8.7) |
+| time series and yearly results disagree | must not happen (C6-AC3) |
+
+## 11. Acceptance criteria
+- AC1: With `aggregate_per_year=True`, the result fulfils C6-AC1 (Series, MultiIndex with `location` and `unit`, ≥ 1 row, numeric dtype, valid units, locations in `n.buses.location`). All-zero values are valid.
+- AC2: With `aggregate_per_year=False`, the result fulfils C6-AC2 (DataFrame, not Series; exactly the snapshots of `n` as columns; otherwise as AC1).
+- AC3: Mock network, locations `A`, `B`, buses `A AC`, `B AC` (carrier `AC`), `A urban central heat`, `B urban central heat` (carrier `urban central heat`), fuel buses `A solid biomass` and `B solid biomass`; 2 snapshots, weighting 1. Link `urban central solid biomass CHP` from `A solid biomass` to `A AC` (`bus1`, `efficiency = 0.4`) and `A urban central heat` (`bus2`, `efficiency2 = 0.45`), `p0 = [100, 50]` MW; Link `urban central solid biomass CHP CC` from `B solid biomass` to `B AC` (`bus1`, `efficiency = 0.3`) and `B urban central heat` (`bus2`, `efficiency2 = 0.5`), `p0 = [0, 20]` MW. Yearly: `A` = 60, `B` = 6 (`MWh_el`). Snapshots: `A` = `[40, 20]`, `B` = `[0, 6]`. The heat output (`A`: `[45, 22.5]`) is not counted.
+- AC3a: As AC3 with snapshot weighting 2: yearly values doubled, snapshot values unchanged (C6.10).
+- AC4: The `True` and `False` results are consistent per C6-AC3 (`flow`); every value is `≥ 0` (D10 rule 5).
+- AC5: C6-AC6: in AC3, a location without any of the carriers (e.g. add location `C` with bus `C AC` only) is present with `0.0`; a mock network without any of the carriers returns `0.0` for every location of `n.buses.location`, not `None` and not zero rows.
+- AC6 (port order, D10 rule 1; promised in the PR #213 review): as AC3, but the Link `urban central solid biomass CHP` has `A urban central heat` at `bus1` (`efficiency = 0.45`) and `A AC` at `bus2` (`efficiency2 = 0.4`): the result equals AC3 (`A` = 60, snapshots `[40, 20]`).
+- AC7 (non-CHP plants excluded): adding a Link `solid biomass` from `A solid biomass` to `A AC` with `p0 = [10, 10]` MW does not change the result.
+- AC8 (excluded carriers): adding a `PHS` StorageUnit, a `battery discharger` Link, an `AC` Line and an `electricity` Load with negative `p_set` at `A` does not change the result (D10 excluded row, OQ-38).
+- AC9 (unclassified carrier): adding a Link with an unknown carrier containing `CHP` (e.g. `urban central methanol CHP`) that supplies `A AC` does not change the result and logs one `WARNING` naming the carrier and its yearly supply in TWh (D10 rule 4, OQ-39).
+
+## 12. Open questions
+None.
+
+## 13. Sources
+- #200, milestone "Implement Infra-Enshure Coupling Variables"
+- `sister_packages/coupling-variables/definitions/variable/secondary-energy.yaml` (commit `30202ec`)
+- `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.1548-1558, l.1609-1611, l.1744-1751 (commit `a5baa7e9`)
+- PyPSA statistics accessor (`supply`): https://docs.pypsa.org/latest/api/networks/statistics/
+- measurement on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2040}.nc` and port order on all 13 networks in `resources/*/networks/` (2026-11-25)
+- D1, D10, D11 in [shared_definitions.md](shared_definitions.md); C4.5, C6.10, C6.13, C8, C9 in [../contracts.md](../contracts.md); OQ-37–OQ-40 in [../open_questions.md](../open_questions.md)
