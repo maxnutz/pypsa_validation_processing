@@ -80,6 +80,7 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 Variables: `infra-ensure/coupling-variables` `definitions/variable/secondary-energy.yaml` (commit `6fe704e`), one issue per variable (#187–#212). Replaces the `industry methanol` price (#172) and the price aggregates (#173) as next step; both moved to "Later" (owner 2026-11-25).
 - [ ] Spec PR: shared definitions D10 (electricity supply by source) and D11 (district heat supply by source), coupling definitions config (local `configs/config.coupling.yaml`; definitions never change the code, configuration.md), OQ-37–OQ-41.
 - [ ] Spec PRs, stacked on it: `Secondary Energy|Electricity|…` (#187–#195), `…|Electricity|CHP|…` (#196–#201), `…|District Heating|…` (#202–#206), `…|District Heating|CHP|…` (#207–#212).
+- [ ] Local test config change (not versioned): `country-year-EU` with `definitions_path: false` (configuration.md "Test configs", CT-AC6; owner 2026-11-25). Every maintainer updates the local file.
 - [ ] Code PR: D10 and D11 helpers in `utils.py`, then one code PR per variable (#187–#212).
 
 ## WP7 Post-WP4 review — depends on WP4, parallel to WP6

@@ -93,9 +93,9 @@ Owner decisions: #129 and PR #127 review (2026-11-03); location and versioning 2
 |---|---|---|---|---|---|---|---|---|---|
 | `country-year-all` | `country` | `true` | `all` | common definitions | `true` | `false` | shares file | `latest` | baseline; one row per country incl. `XK`, `CH`, `GB` (C8); D5 mean for `CH` |
 | `country-timeseries-AT` | `country` | `false` | `AT` | common definitions | `true` | `false` | shares file | `latest` | time series output, one file per year, timestamps (C10.5) |
-| `country-year-EU` | `country` | `true` | `EU` | common definitions | `true` | `true` | shares file | `latest` | `EU` = 27 member states, copperplate `EU` dropped (C8.7, C8.8); label `European Union` |
+| `country-year-EU` | `country` | `true` | `EU` | `false` | – (no effect) | `true` | shares file | `latest` | `EU` = 27 member states, copperplate `EU` dropped (C8.7, C8.8); label `European Union`; every mapped variable as yearly values without definitions (C3; CT-AC6) |
 | `region-year-AT` | `region` | `true` | `AT` | common definitions | `false` | `true` | shares file | `2020` | NUTS3 regions with names (`REGION_MAPPING`); no unit conversion; fixed shares year |
-| `region-timeseries-all` | `region` | `false` | `all` | `false` | – (no effect) | `false` | shares file | `latest` | every mapped variable without definitions (C3); all regions as time series |
+| `region-timeseries-all` | `region` | `false` | `all` | `false` | – (no effect) | `false` | shares file | `latest` | every mapped variable without definitions (C3; CT-AC6); all regions as time series |
 | `minimal` | – (`country`) | – (`true`) | `AT` | common definitions | – (`true`) | – (`false`) | – (not set) | – | only the five required keys, defaults apply (C1.3); output in `resources/` (C10-AC1); variables needing the shares file skipped (C2.5) |
 
 "Common definitions" = `sister_packages/energy-scenarios-at-workflow/definitions`. "–" = key absent; the default is in brackets.
@@ -105,6 +105,7 @@ Owner decisions: #129 and PR #127 review (2026-11-03); location and versioning 2
 - CT-AC2: The outputs of all setups contain the configured model and scenario and no region for the copperplate `EU`.
 - CT-AC3: `minimal` logs one `WARNING` that the shares file is not set, if a mapped function declares `industry_non_energy_shares` (C2.5, C2-AC8); its other variables are written.
 - CT-AC4: `pixi run workflow_test` runs exactly the setups of this section, then `pytest tests/ -v`.
+- CT-AC6: At least one yearly setup (`aggregate_per_year: true`) and one time series setup (`false`) use `definitions_path: false`, so that every mapped variable is evaluated by `workflow_test`, independent of any definitions folder (today `country-year-EU` and `region-timeseries-all`; owner 2026-11-25, PR #213).
 - CT-AC5: The earlier example configs `configs/config.{country,region}-{year,timeseries}.yaml` are removed; no task, document or test refers to them (owner, PR #142 review 2026-11-04).
 
 Not covered by the test configs (covered by unit tests in `tests/`): networks without `n.meta` (fallback to `configs/` and `energy_totals.csv`, C2.3, C2.4), invalid configs (C1), `null` for optional keys (C1.4), unreadable shares files (C2.5).
