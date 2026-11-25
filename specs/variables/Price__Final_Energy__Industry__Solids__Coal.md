@@ -53,7 +53,7 @@ Changes to the ported logic, only as far as needed for the function contract:
 - `price_load` returns NaN for a total load < 1 MWh; here the value is NaN only for a weight of `0.0` or NaN (D9 item 3, A-5); a location with a weight between 0 and 1 MWh is evaluated normally.
 - Snapshot weighting per C6.10/C6.12: `price_load` does not weight snapshots; identical for constant gₜ (C6.12).
 
-P6.4 (switch to `pypsa.statistics`): not proven. The `−revenue / withdrawal` check in D9 compares yearly totals over all locations for `gas for industry` only; P6.4 requires a per-location, per-snapshot comparison (`aggregate_per_year=False`) for this carrier and both code line counts. Until then rule 1 applies and the function ports `price_load` (D9). The implementing PR MAY record the proof here and switch.
+P6.4 (switch to `pypsa.statistics`), PR #182 (2026-11-24): Same result: not run for `coal for industry`; proven for `industry electricity` with the same helper and the same `statistics` call (`Price__Final_Energy__Industry__Electricity.md`, section 4, PR #178). Shorter code: not met, `pypsa.statistics` draft 19 code lines vs. port 18 (`utils.load_weighted_price` incl. signature; the draft needs seven `statistics` kwargs, a branch for the empty `pd.Series` without such Loads that keeps the `quantity` level for C6.13, and still the `objective` weighting for yearly values, D9). Rule 1 applies: the function ports `price_load` (D9).
 
 ## 5. Match type
 - Match type: `exact`
