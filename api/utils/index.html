@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -740,6 +740,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.load_weighted_price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load_weighted_price
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -974,6 +985,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.utils.load_weighted_price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load_weighted_price
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1194,7 +1216,7 @@ a copperplate-carrier result must be mapped back to explicit regional labels.</p
                 <code>raw_input</code>
             </td>
             <td>
-                  <code><span title="pandas.Series">Series</span> or <span title="pandas.DataFrame">DataFrame</span></code>
+                  <code>Series or DataFrame</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1254,7 +1276,7 @@ The function preserves data values and index level order/names.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="pandas.Series">Series</span> or <span title="pandas.DataFrame">DataFrame</span></code>
+                  <code>Series or DataFrame</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2134,7 +2156,9 @@ to <code>MWh</code>, C6.5). Empty if no decentral heat bus is supplied.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Add every location of <em>n</em> missing in <em>result</em> with <code>0.0</code> (C6.13).</p>
+        <p>Add every location of <em>n</em> missing in <em>result</em> (C6.13).</p>
+<p>Added rows are <code>0.0</code>; for <code>intensive</code> results (<code>quantity</code> level,
+C6.12) they are NaN.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2237,10 +2261,12 @@ because <code>n.statistics</code> returns an empty <code>pd.Series</code> in bot
             </td>
             <td>
               <div class="doc-md-description">
-                <p><em>result</em> plus one row per missing location (two rows, <code>value</code> and
-<code>weight</code>, if <em>result</em> has a <code>quantity</code> level, C6.12), with
-<code>0.0</code> (<code>aggregate_per_year=False</code>: in every snapshot column of
-<em>n</em>). Further index levels of <em>result</em> are NaN in the added rows; C8
+                <p><em>result</em> plus one row per missing location with <code>0.0</code>
+(<code>aggregate_per_year=False</code>: in every snapshot column of <em>n</em>). If
+<em>result</em> has a <code>quantity</code> level (<code>intensive</code>, C6.12), two rows
+<code>value</code> and <code>weight</code> are added instead, both NaN, not <code>0.0</code>: the
+weighted quantity does not exist at a missing location (C6.13, A-5).
+Further index levels of <em>result</em> are NaN in the added rows; C8
 aggregates them away.</p>
               </div>
             </td>
@@ -2266,6 +2292,121 @@ aggregates them away.</p>
               <div class="doc-md-description">
                 <p>If a non-empty <em>result</em> lacks the index level <code>location</code> or
 <code>unit</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.utils.load_weighted_price" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">load_weighted_price</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">carriers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the Load-weighted marginal price <code>P[c](l)</code> per location (D9).</p>
+<p>Port of pypsa-de <code>price_load</code> (<code>export_ariadne_variables.py</code>
+l.3378-3402, commit <code>a5baa7e9</code>): weight <code>w</code> = withdrawal of the Loads
+with a carrier in <em>carriers</em>, cost <code>K</code> = Σ <code>p_t·λ_b,t</code> with <code>λ_b</code> the
+marginal price of the Load's bus (CO2 price included), value <code>K / w</code>.
+Loads are attributed to the location of their bus (D1.1); <code>K</code> and <code>w</code>
+are summed over all carriers before dividing.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Solved network to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>carriers</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Load carriers to price, e.g. <code>["industry electricity"]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code>, <code>w</code> and <code>K</code> are weighted with
+<code>n.snapshot_weightings.objective</code> and summed over the year
+(C6.12); if <code>False</code>, per snapshot and unweighted.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>[location, unit, quantity]</code>, <code>quantity</code> ∈
+<code>{value, weight}</code>, unit label <code>PRICE_UNIT</code> on both rows; only
+locations with at least one such Load. The value is NaN where the
+weight is <code>0.0</code> (per snapshot for <code>aggregate_per_year=False</code>).</p>
               </div>
             </td>
           </tr>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -712,6 +712,72 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Electricity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Electricity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Gases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Gases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Hydrogen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Hydrogen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Biomass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Solids__Biomass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Coal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Solids__Coal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Liquids__Oil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Liquids__Oil
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -968,6 +1034,72 @@
     <span class="md-ellipsis">
       
         Final_Energy_by_Sector__Residential_and_Commercial
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Electricity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Electricity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Gases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Gases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Hydrogen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Hydrogen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Biomass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Solids__Biomass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Coal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Solids__Coal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Liquids__Oil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price__Final_Energy__Industry__Liquids__Oil
       
     </span>
   </a>
@@ -2458,6 +2590,577 @@ decentral heat input (D8).</p>
             <td>
               <div class="doc-md-description">
                 <p>If the district heating loss is missing in <em>config</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Electricity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Electricity</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of electricity for industry from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>industry electricity</code> Load, weighted
+by its withdrawal, CO2 price included (D9; pypsa-de <code>price_load</code>).
+Aggregation class <code>intensive</code> (C6.12): the result holds a <code>value</code> and
+a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Gases" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Gases</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of <code>gas for industry</code> from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>gas for industry</code> Load, weighted by its
+withdrawal, CO2 price included (D9). Aggregation class <code>intensive</code>
+(C6.12): the result holds a <code>value</code> and a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Hydrogen" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Hydrogen</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of <code>H2 for industry</code> from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>H2 for industry</code> Load, weighted by its
+withdrawal, CO2 price included (D9). Aggregation class <code>intensive</code>
+(C6.12): the result holds a <code>value</code> and a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Biomass" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Solids__Biomass</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of <code>solid biomass for industry</code> from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>solid biomass for industry</code> Load, weighted by its
+withdrawal, CO2 price included (D9). Aggregation class <code>intensive</code>
+(C6.12): the result holds a <code>value</code> and a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Solids__Coal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Solids__Coal</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of <code>coal for industry</code> from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>coal for industry</code> Load, weighted by its
+withdrawal, CO2 price included (D9). Aggregation class <code>intensive</code>
+(C6.12): the result holds a <code>value</code> and a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pypsa_validation_processing.statistics_functions.Price__Final_Energy__Industry__Liquids__Oil" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Price__Final_Energy__Industry__Liquids__Oil</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n">pypsa</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span> <span class="n">aggregate_per_year</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract the price of <code>naphtha for industry</code> from a PyPSA Network.</p>
+<p>Marginal price at the bus of the <code>naphtha for industry</code> Load, weighted by its
+withdrawal, CO2 price included (D9). Aggregation class <code>intensive</code>
+(C6.12): the result holds a <code>value</code> and a <code>weight</code> row per location.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="pypsa.Network">Network</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PyPSA network to process.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate_per_year</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>True</code> (default), yearly Load-weighted price and weighted
+withdrawal as :class:<code>pandas.Series</code>. If <code>False</code>, a
+:class:<code>pandas.DataFrame</code> with snapshots as columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pandas.Series">Series</span> | <span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MultiIndex <code>location</code>, <code>unit</code> (<code>EUR_2020/MWh</code>), <code>quantity</code>
+and every location of the network. Value NaN where the withdrawal is
+<code>0.0</code>; value and weight NaN at locations without the Load (C6.13).</p>
               </div>
             </td>
           </tr>
