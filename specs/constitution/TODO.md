@@ -1,6 +1,6 @@
 # TODO
 
-Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11, reviewed on 2026-11-11; WP6 gate 2026-11-11, reviewed on 2026-11-11; post-WP6 spec review 2026-11-25, reviewed on 2026-11-25)
+Status: reviewed (created 2026-10-29 from the open GitHub issues and the SC items of `specs/open_questions.md`, reviewed on 2026-10-29; WP1 spec review 2026-10-30, reviewed review on 2026-10-30; WP2/WP5 spec review 2026-11-03, reviewed on 2026-11-03; post-SC-14 housekeeping 2026-11-03, reviewed on 2026-11-03; WP3 spec review 2026-11-04, reviewed on 2026-11-04; test configs spec 2026-11-04, reviewed on 2026-11-04; post-#129 cleanup 2026-11-05, reviewed on 2026-11-05; post-WP4 spec review 2026-11-11, reviewed on 2026-11-11; WP6 gate 2026-11-11, reviewed on 2026-11-11; post-WP6 spec review 2026-11-25, reviewed on 2026-11-25; WP8 Secondary Energy 2026-11-25, reviewed on 2026-11-25)
 
 Work packages (WP) in implementation order. The order follows the dependencies: a statistics function can only be tested against the specs once `Network_Processor` passes its inputs (C2, C5) and validates its result (C6, C8), and once the shared definitions it uses (D1–D8) exist as helpers in `utils.py`. Packages without mutual dependencies MAY run in parallel. One PR per item marked `PR`, so that every change stays small (`CLAUDE.md`, "Working Principles").
 
@@ -73,10 +73,15 @@ Until the `Net Imports|Oil` PR is merged, the WP4 PRs before it run `pixi run wo
 - [x] PR #178: D9 helper in `utils.py` (`load_weighted_price`, `PRICE_UNIT`), `UNITS_MAPPING` key for the price unit (SC-21), `Price|Final Energy|Industry|Electricity` (#99) as first `intensive` variable. C6.13 for results with a `quantity` level: `utils.ensure_all_locations` (PR #146) adds a `value` and a `weight` row for a missing location; check that its fill values match C6.12/C6.13 (value NaN; weight NaN or `0.0` as the variable spec states, A-5). Fix SC-48 (C8.2: group without weight → NaN) in the same PR. Done: `ensure_all_locations` fills value and weight NaN for `intensive` results; P6.4 same result proven, shorter code not met, port of `price_load` stays (PR #178 review 2026-11-24).
 - [x] PR #179–#183: the other five prices (#100–#104), one PR per variable, stacked on PR #178 (split from evaluation PR #176, closed); all merged 2026-11-24.
 - [x] Spec review after WP6 (2026-11-25): D9 names `utils.load_weighted_price` and records the P6.4 result; section 4 of the four exact-match price specs records it; SC-48 resolved.
-- [ ] Spec PR: `industry methanol` price (#172).
-- [ ] Spec PR: aggregates `Price|Final Energy|Industry|Liquids` and `…|Solids` (#173; depends on #172).
 - [ ] Validation of the price variables against pypsa-de results: pypsa-de sets prices ≥ 1e4 EUR/MWh to NaN in `get_weighted_costs_links` (`export_ariadne_variables.py` l.3515, used for `…|Liquids|Oil` and `…|Gases`); D9 has no cut-off (owner, PR #148 review 2026-11-06).
 - [ ] Spec PR: investments (#106, OQ-36).
+
+## WP8 Secondary Energy coupling variables (milestone 2) — next (owner 2026-11-25); WP7 parallel
+Variables: `infra-ensure/coupling-variables` `definitions/variable/secondary-energy.yaml` (commit `6fe704e`), one issue per variable (#187–#212). Replaces the `industry methanol` price (#172) and the price aggregates (#173) as next step; both moved to "Later" (owner 2026-11-25).
+- [ ] Spec PR: shared definitions D10 (electricity supply by source) and D11 (district heat supply by source), coupling definitions config (local `configs/config.coupling.yaml`; definitions never change the code, configuration.md), OQ-37–OQ-41.
+- [ ] Spec PRs, stacked on it: `Secondary Energy|Electricity|…` (#187–#195), `…|Electricity|CHP|…` (#196–#201), `…|District Heating|…` (#202–#206), `…|District Heating|CHP|…` (#207–#212).
+- [ ] Local test config change (not versioned): `country-year-EU` with `definitions_path: false` (configuration.md "Test configs", CT-AC6; owner 2026-11-25). Every maintainer updates the local file.
+- [ ] Code PR: D10 and D11 helpers in `utils.py`, then one code PR per variable (#187–#212).
 
 ## WP7 Post-WP4 review — depends on WP4, parallel to WP6
 Moved from WP4 (2026-11-11). No fixed order (owner 2026-11-11).
@@ -88,7 +93,7 @@ Moved from WP4 (2026-11-11). No fixed order (owner 2026-11-11).
 
 ## Later (need specs first)
 - Regions and country codes: #96, #39 (OQ-2, OQ-4, OQ-9).
-- New variables: Final Energy #71, Ambient Heat #75, Net Imports Biomass/Coal/Natural Gas #66–68. Investments #106 and prices #76, #99–104: WP6.
+- New variables: Final Energy #71, Ambient Heat #75, Net Imports Biomass/Coal/Natural Gas #66–68. Investments #106 and prices #76, #99–104: WP6. `industry methanol` price (#172) and the aggregates `Price|Final Energy|Industry|Liquids`, `…|Solids` (#173; depends on #172), moved from WP6 (owner 2026-11-25).
 - Physical method for non-energy use (C2.5) once PyPSA-AT stores industry production in `n.meta`.
 - `Net Imports|Oil` vs. Eurostat: the model lacks oil non-energy use (except `naphtha for industry`) and refinery own use, about 75 PJ for AT 2025 (−16.5 % / −19.6 %; `specs/variables/Net_Imports__Oil.md` section 7, scope note). A solution is needed; how is open (owner, PR #167 review 2026-11-11). Also open: a wider Eurostat tolerance for this variable until then.
 - Other: metadata #26, cache #52, documentation #82.

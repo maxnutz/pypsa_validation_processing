@@ -2,7 +2,7 @@
 
 One spec per IAMC variable, written from [../templates/statistics_function.md](../templates/statistics_function.md). File name: `<function_name>.md` (see [../README.md](../README.md) "Naming of spec files").
 
-Rules and quantities used by several variables (final energy measured at the consumer, final energy never negative, location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input, demand-weighted price of industry Loads) are specified once in [shared_definitions.md](shared_definitions.md) (G1, G2, D1–D9).
+Rules and quantities used by several variables (final energy measured at the consumer, final energy never negative, location attribution, fossil fuel shares, domestic transport shares, non-energy use, coke correction, unit of land transport, sector split of decentral heat input, demand-weighted price of industry Loads, electricity supply by source, district heat supply by source) are specified once in [shared_definitions.md](shared_definitions.md) (G1, G2, D1–D11).
 
 ## Index
 | IAMC variable | Spec | Match type | Status |
@@ -25,4 +25,4 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | reviewed |
 | `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | reviewed |
 
-Not yet specified: `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
+Not yet specified: the 26 `Secondary Energy|Electricity|…` and `Secondary Energy|District Heating|…` variables (#187–#212, WP8; shared definitions D10, D11); `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
