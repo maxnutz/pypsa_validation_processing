@@ -182,6 +182,8 @@ UNITS_MAPPING = {
     "land transport": "MWh",
     "t_co2": "t",
     "MWh": "MWh",
+    # price unit of the `Price|Final Energy|Industry|…` variables (D9, OQ-34)
+    "EUR_2020/MWh": "EUR_2020/MWh",
 }
 
 
@@ -685,7 +687,10 @@ def ensure_all_locations(
     unit: str,
     aggregate_per_year: bool,
 ) -> pd.Series | pd.DataFrame:
-    """Add every location of *n* missing in *result* with ``0.0`` (C6.13).
+    """Add every location of *n* missing in *result* (C6.13).
+
+    Added rows are ``0.0``; for ``intensive`` results (``quantity`` level,
+    C6.12) they are NaN.
 
     Parameters
     ----------
@@ -707,10 +712,12 @@ def ensure_all_locations(
     Returns
     -------
     pd.Series | pd.DataFrame
-        *result* plus one row per missing location (two rows, ``value`` and
-        ``weight``, if *result* has a ``quantity`` level, C6.12), with
-        ``0.0`` (``aggregate_per_year=False``: in every snapshot column of
-        *n*). Further index levels of *result* are NaN in the added rows; C8
+        *result* plus one row per missing location with ``0.0``
+        (``aggregate_per_year=False``: in every snapshot column of *n*). If
+        *result* has a ``quantity`` level (``intensive``, C6.12), two rows
+        ``value`` and ``weight`` are added instead, both NaN, not ``0.0``: the
+        weighted quantity does not exist at a missing location (C6.13, A-5).
+        Further index levels of *result* are NaN in the added rows; C8
         aggregates them away.
 
     Raises
@@ -721,16 +728,17 @@ def ensure_all_locations(
     """
     locations = n.buses["location"]
     locations = pd.Index(locations[locations.notna() & (locations != "")].unique())
-    if result.empty:
-        names, present = statistics_grouping_index, pd.Index([])
-    elif not set(statistics_grouping_index) <= set(result.index.names):
-        raise ValueError(
-            f"Index levels must contain {statistics_grouping_index}, "
-            f"got: {list(result.index.names)}"
-        )
-    else:
-        names = list(result.index.names)
-        present = result.index.get_level_values("location")
+    names = list(result.index.names)
+    if not set(statistics_grouping_index) <= set(names):
+        if not result.empty:
+            raise ValueError(
+                f"Index levels must contain {statistics_grouping_index}, "
+                f"got: {names}"
+            )
+        names = statistics_grouping_index
+    present = (
+        pd.Index([]) if result.empty else result.index.get_level_values("location")
+    )
     missing = locations.difference(present)
     quantities = ["value", "weight"] if "quantity" in names else [None]
     rows = [
@@ -739,15 +747,66 @@ def ensure_all_locations(
         for q in quantities
     ]
     index = pd.MultiIndex.from_frame(pd.DataFrame(rows, columns=names))
+    fill = float("nan") if "quantity" in names else 0.0
     if not aggregate_per_year:
-        filled = pd.DataFrame(0.0, index=index, columns=n.snapshots)
+        filled = pd.DataFrame(fill, index=index, columns=n.snapshots)
     else:
-        filled = pd.Series(0.0, index=index)
-    if result.empty:
-        return filled
-    if missing.empty:
-        return result
+        filled = pd.Series(fill, index=index)
+    if result.empty or missing.empty:
+        return filled if result.empty else result
     return pd.concat([result, filled])
+
+
+# D9: unit label of the value and weight rows of industry prices (OQ-34)
+PRICE_UNIT = "EUR_2020/MWh"
+
+
+def load_weighted_price(
+    n: pypsa.Network, carriers: list[str], aggregate_per_year: bool
+) -> pd.Series | pd.DataFrame:
+    """Return the Load-weighted marginal price ``P[c](l)`` per location (D9).
+
+    Port of pypsa-de ``price_load`` (``export_ariadne_variables.py``
+    l.3378-3402, commit ``a5baa7e9``): weight ``w`` = withdrawal of the Loads
+    with a carrier in *carriers*, cost ``K`` = Σ ``p_t·λ_b,t`` with ``λ_b`` the
+    marginal price of the Load's bus (CO2 price included), value ``K / w``.
+    Loads are attributed to the location of their bus (D1.1); ``K`` and ``w``
+    are summed over all carriers before dividing.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Solved network to evaluate.
+    carriers : list[str]
+        Load carriers to price, e.g. ``["industry electricity"]``.
+    aggregate_per_year : bool
+        If ``True``, ``w`` and ``K`` are weighted with
+        ``n.snapshot_weightings.objective`` and summed over the year
+        (C6.12); if ``False``, per snapshot and unweighted.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``[location, unit, quantity]``, ``quantity`` ∈
+        ``{value, weight}``, unit label ``PRICE_UNIT`` on both rows; only
+        locations with at least one such Load. The value is NaN where the
+        weight is ``0.0`` (per snapshot for ``aggregate_per_year=False``).
+    """
+    loads = n.loads.index[n.loads["carrier"].isin(carriers)]
+    buses = n.loads.loc[loads, "bus"]
+    p = n.loads_t.p[loads]
+    price = n.buses_t.marginal_price[buses].set_axis(loads, axis=1)
+    location = n.buses.loc[buses, "location"].to_numpy()
+    weight = p.T.groupby(location).sum()
+    cost = (p * price).T.groupby(location).sum()
+    if aggregate_per_year:
+        weighting = n.snapshot_weightings.objective
+        weight, cost = weight @ weighting, cost @ weighting
+    value = cost / weight.where(weight != 0)
+    result = pd.concat({"value": value, "weight": weight}, names=["quantity"])
+    result = pd.concat({PRICE_UNIT: result}, names=["unit"])
+    result.index = result.index.set_names("location", level=-1)
+    return result.reorder_levels(["location", "unit", "quantity"]).sort_index()
 
 
 def _decentral_heat_input(

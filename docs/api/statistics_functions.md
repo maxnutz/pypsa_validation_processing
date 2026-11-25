@@ -14,3 +14,9 @@
         - Final_Energy_by_Sector__Industry
         - Final_Energy_by_Sector__Agriculture
         - Final_Energy_by_Sector__Residential_and_Commercial
+        - Price__Final_Energy__Industry__Electricity
+        - Price__Final_Energy__Industry__Gases
+        - Price__Final_Energy__Industry__Hydrogen
+        - Price__Final_Energy__Industry__Solids__Biomass
+        - Price__Final_Energy__Industry__Solids__Coal
+        - Price__Final_Energy__Industry__Liquids__Oil

@@ -46,6 +46,8 @@ from pypsa_validation_processing.utils import (
     decentral_heat_split,
     DECENTRAL_HEAT_BUS_CARRIERS,
     apply_domestic_share,
+    load_weighted_price,
+    PRICE_UNIT,
 )
 
 logger = logging.getLogger(__name__)
@@ -1019,5 +1021,222 @@ def Final_Energy_by_Sector__Residential_and_Commercial(
     logger.debug(
         "Final Energy [by Sector]|Residential and Commercial finished. "
         f"Shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Electricity(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of electricity for industry from a PyPSA Network.
+
+    Marginal price at the bus of the ``industry electricity`` Load, weighted
+    by its withdrawal, CO2 price included (D9; pypsa-de ``price_load``).
+    Aggregation class ``intensive`` (C6.12): the result holds a ``value`` and
+    a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["industry electricity"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Electricity finished. Resulting shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Gases(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of ``gas for industry`` from a PyPSA Network.
+
+    Marginal price at the bus of the ``gas for industry`` Load, weighted by its
+    withdrawal, CO2 price included (D9). Aggregation class ``intensive``
+    (C6.12): the result holds a ``value`` and a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["gas for industry"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Gases finished. Resulting shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Hydrogen(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of ``H2 for industry`` from a PyPSA Network.
+
+    Marginal price at the bus of the ``H2 for industry`` Load, weighted by its
+    withdrawal, CO2 price included (D9). Aggregation class ``intensive``
+    (C6.12): the result holds a ``value`` and a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["H2 for industry"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Hydrogen finished. Resulting shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Solids__Biomass(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of ``solid biomass for industry`` from a PyPSA Network.
+
+    Marginal price at the bus of the ``solid biomass for industry`` Load, weighted by its
+    withdrawal, CO2 price included (D9). Aggregation class ``intensive``
+    (C6.12): the result holds a ``value`` and a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["solid biomass for industry"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Solids|Biomass finished. Resulting shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Solids__Coal(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of ``coal for industry`` from a PyPSA Network.
+
+    Marginal price at the bus of the ``coal for industry`` Load, weighted by its
+    withdrawal, CO2 price included (D9). Aggregation class ``intensive``
+    (C6.12): the result holds a ``value`` and a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["coal for industry"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Solids|Coal finished. Resulting shape: {result.shape}."
+    )
+    return result
+
+
+def Price__Final_Energy__Industry__Liquids__Oil(
+    n: pypsa.Network,
+    aggregate_per_year: bool = True,
+) -> pd.Series | pd.DataFrame:
+    """Extract the price of ``naphtha for industry`` from a PyPSA Network.
+
+    Marginal price at the bus of the ``naphtha for industry`` Load, weighted by its
+    withdrawal, CO2 price included (D9). Aggregation class ``intensive``
+    (C6.12): the result holds a ``value`` and a ``weight`` row per location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        PyPSA network to process.
+    aggregate_per_year : bool, optional
+        If ``True`` (default), yearly Load-weighted price and weighted
+        withdrawal as :class:`pandas.Series`. If ``False``, a
+        :class:`pandas.DataFrame` with snapshots as columns.
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        MultiIndex ``location``, ``unit`` (``EUR_2020/MWh``), ``quantity``
+        and every location of the network. Value NaN where the withdrawal is
+        ``0.0``; value and weight NaN at locations without the Load (C6.13).
+    """
+    result = load_weighted_price(n, ["naphtha for industry"], aggregate_per_year)
+    result = ensure_all_locations(
+        result, n, unit=PRICE_UNIT, aggregate_per_year=aggregate_per_year
+    )
+    logger.debug(
+        f"Price|Final Energy|Industry|Liquids|Oil finished. Resulting shape: {result.shape}."
     )
     return result
