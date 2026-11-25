@@ -1,6 +1,6 @@
 # `Price|Final Energy|Industry|Solids|Coal`
 
-Status: draft
+Status: reviewed
 Implementing PR: –
 
 ## 1. Variable and function name
