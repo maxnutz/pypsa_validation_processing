@@ -219,7 +219,7 @@ Classification `C_el(v)` (component in brackets; measured on all 13 networks in 
 | `Electricity\|CHP\|Waste` | `waste CHP`, `waste CHP CC` (Link) | `Waste` |
 | `Electricity\|CHP\|Biomass` | `urban central solid biomass CHP`, `urban central solid biomass CHP CC` (Link) | in `Biomass` |
 | `Electricity\|CHP\|Other` | `urban central H2 CHP`, `urban central H2 retrofit CHP`, `biogas CHP` (Link) | in `Hydrogen`; `biogas CHP` not evaluated |
-| excluded | transport: `AC` (Line), `DC`, `electricity distribution grid` (Link); storage: `PHS` (StorageUnit), `PHS discharger`, `battery discharger`, `home battery discharger`, `V2G` (Link); `electricity` (Load with negative withdrawal, OQ-38) | the same transport carriers dropped (l.1554-1557); storage excluded in the `isclose` check (l.1744-1751) |
+| excluded | transport: `AC` (Line), `DC`, `electricity distribution grid` (Link); storage: `PHS` (StorageUnit), `PHS discharger`, `battery discharger`, `home battery discharger`, `V2G` (Link); `electricity` (Load with negative withdrawal: PyPSA-AT artefact, at most about 1e-4 of the demand, OQ-38) | the same transport carriers dropped (l.1554-1557); storage excluded in the `isclose` check (l.1744-1751) |
 
 Rules:
 1. A CHP is a Link whose carrier contains `CHP`. Its fuel is the bus carrier of its `bus0` (measured: `coal`, `lignite`, `oil`, `gas`, `non-sequestered HVC` (waste), `solid biomass`, `H2`, `biogas`); electricity is its output at `bus1` (`AC`), heat at `bus2` (`urban central heat`; `rural heat` for `biogas CHP`, D11). CCS variants (`… CC`) belong to the variable of their fuel.
