@@ -225,7 +225,7 @@ Rules:
 1. A CHP is a Link whose carrier contains `CHP`. Its fuel is the bus carrier of its `bus0` (measured: `coal`, `lignite`, `oil`, `gas`, `non-sequestered HVC` (waste), `solid biomass`, `H2`, `biogas`); electricity is its output at `bus1` (`AC`), heat at `bus2` (`urban central heat`; `rural heat` for `biogas CHP`, D11). CCS variants (`… CC`) belong to the variable of their fuel.
 2. `Coal` contains lignite, as pypsa-de `Secondary Energy|Electricity|Coal` (l.1567-1570).
 3. `hydro discharger` is the reservoir outlet of a `hydro` bus fed only by `hydro inflow` (Generator) and `hydro store` (Store), without pumping (measured on `electricity_network_0p3` and `20261020_carbon_accounting_run` 2040); it is generation, not storage. `PHS` is storage.
-4. Completeness: the 15 variables together equal the supply of all carriers minus the excluded ones, at every location and snapshot. A carrier with supply to `AC` or `low voltage` that is neither in a variable nor excluded is not evaluated silently: OQ-39.
+4. Completeness: the 15 variables together equal the supply of all carriers minus the excluded ones, at every location and snapshot. A carrier with supply to `AC` or `low voltage` that is neither in a variable nor excluded MUST give one `WARNING` per network naming each such carrier with its yearly supply in TWh; it is not counted, and every variable is still evaluated (OQ-39, owner 2026-11-25). Test: a mock network with an unknown supplying carrier logs the `WARNING` with the carrier name.
 5. `≥ 0` at every location and snapshot (supply is non-negative by definition of `n.statistics.supply`).
 
 Code that implements `E[v](l)` MUST live in `utils.py` (P4), with the classification as one shared table, so that the 15 functions cannot diverge.
