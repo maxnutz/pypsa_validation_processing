@@ -24,5 +24,14 @@ Rules and quantities used by several variables (final energy measured at the con
 | `Price\|Final Energy\|Industry\|Solids\|Biomass` | [Price__Final_Energy__Industry__Solids__Biomass.md](Price__Final_Energy__Industry__Solids__Biomass.md) | exact | reviewed |
 | `Price\|Final Energy\|Industry\|Solids\|Coal` | [Price__Final_Energy__Industry__Solids__Coal.md](Price__Final_Energy__Industry__Solids__Coal.md) | exact | reviewed |
 | `Price\|Final Energy\|Industry\|Liquids\|Oil` | [Price__Final_Energy__Industry__Liquids__Oil.md](Price__Final_Energy__Industry__Liquids__Oil.md) | semantic | reviewed |
+| `Secondary Energy\|Electricity w/o CHP\|Coal` | [Secondary_Energy__Electricity_wo_CHP__Coal.md](Secondary_Energy__Electricity_wo_CHP__Coal.md) | semantic | draft |
+| `Secondary Energy\|Electricity w/o CHP\|Oil` | [Secondary_Energy__Electricity_wo_CHP__Oil.md](Secondary_Energy__Electricity_wo_CHP__Oil.md) | semantic | draft |
+| `Secondary Energy\|Electricity w/o CHP\|Gas Grid Mix` | [Secondary_Energy__Electricity_wo_CHP__Gas_Grid_Mix.md](Secondary_Energy__Electricity_wo_CHP__Gas_Grid_Mix.md) | semantic | draft |
+| `Secondary Energy\|Electricity\|Solar` | [Secondary_Energy__Electricity__Solar.md](Secondary_Energy__Electricity__Solar.md) | exact | draft |
+| `Secondary Energy\|Electricity\|Wind` | [Secondary_Energy__Electricity__Wind.md](Secondary_Energy__Electricity__Wind.md) | exact | draft |
+| `Secondary Energy\|Electricity\|Hydro` | [Secondary_Energy__Electricity__Hydro.md](Secondary_Energy__Electricity__Hydro.md) | exact | draft |
+| `Secondary Energy\|Electricity w/o CHP\|Biomass` | [Secondary_Energy__Electricity_wo_CHP__Biomass.md](Secondary_Energy__Electricity_wo_CHP__Biomass.md) | semantic | draft |
+| `Secondary Energy\|Electricity w/o CHP\|Waste` | [Secondary_Energy__Electricity_wo_CHP__Waste.md](Secondary_Energy__Electricity_wo_CHP__Waste.md) | semantic | draft |
+| `Secondary Energy\|Electricity w/o CHP\|Other` | [Secondary_Energy__Electricity_wo_CHP__Other.md](Secondary_Energy__Electricity_wo_CHP__Other.md) | semantic | draft |
 
-Not yet specified: the 26 `Secondary Energy|Electricity|…` and `Secondary Energy|District Heating|…` variables (#187–#212, WP8; shared definitions D10, D11); `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
+Not yet specified: the 17 `Secondary Energy|Electricity|CHP|…`, `Secondary Energy|District Heating|…`, `Secondary Energy|District Heating w/o CHP|…` and `Secondary Energy|District Heating|CHP|…` variables (#196–#212, WP8; shared definitions D10, D11); `Investment|…` (#106, OQ-36); further industry prices from #76: `industry methanol` price (#172, name to be fixed in its spec) and the aggregates `…|Liquids`, `…|Solids` (#173); `low-temperature heat for industry` out of scope (OQ-35, owner 2026-11-11).
