@@ -211,7 +211,7 @@ Classification `C_el(v)` (component in brackets; measured on all 13 networks in 
 | `Electricity\|Wind` | `onwind`, `offwind-ac`, `offwind-dc` (Generator) | `Wind` = `filter(like="offwind")` + `onwind` |
 | `Electricity\|Hydro` | `ror` (Generator), `hydro` (StorageUnit), `hydro discharger` (Link) | `hydro`, `ror`; `PHS` excluded as storage |
 | `Electricity\|Biomass` | `solid biomass` (Link) | part of `Biomass\|Solid`, which also contains the solid biomass CHPs |
-| `Electricity\|Waste` | none: every waste-fired plant in PyPSA-AT is a CHP; `0.0` at every location (C6.13) | `filter(like="waste CHP")` |
+| `Electricity\|Waste` | none: every waste-fired plant in PyPSA-AT is a CHP; structurally `0.0` at every location (C6.13, OQ-40) | `filter(like="waste CHP")` |
 | `Electricity\|Other` | `nuclear`, `biogas`, `H2 CCGT`, `H2 OCGT`, `H2 retrofit CCGT`, `H2 retrofit OCGT`, `H2 turbine`, `H2 Fuel Cell` (not a CHP, OQ-37), `CCGT methanol`, `CCGT methanol CC`, `OCGT methanol`, `allam methanol` (Link) | `Nuclear`, `Hydrogen`, `Biomass\|Gaseous and Liquid` (`biogas`); methanol plants not evaluated |
 | `Electricity\|CHP\|Coal` | `urban central coal CHP`, `urban central lignite CHP` (Link) | in `Coal` |
 | `Electricity\|CHP\|Oil` | `urban central oil CHP` (Link) | in `Oil` |
@@ -240,9 +240,9 @@ Classification `C_dh(v)` (measured as in D10, all 13 networks):
 | Variable `v` | Carriers `C_dh(v)` | pypsa-de (l.1766-1807) |
 |---|---|---|
 | `District Heating\|Electricity` | `urban central air heat pump`, `urban central resistive heater` (Link) | `Heat\|Electricity` = `filter(like="heat pump")` + `filter(like="resistive heater")` |
-| `District Heating\|Oil` | none: no oil boiler on `urban central heat` in any network; `0.0` at every location (C6.13) | `filter(like="urban central oil")`, i.e. only the oil CHP |
+| `District Heating\|Oil` | none: no oil boiler on `urban central heat` (pypsa-de `prepare_sector_network.py` l.5053-5060 skips `URBAN_CENTRAL`); structurally `0.0` at every location (C6.13, OQ-40) | `filter(like="urban central oil")`, i.e. only the oil CHP |
 | `District Heating\|Gas Grid Mix` | `urban central gas boiler` (Link) | `filter(like="gas")`, also contains the gas CHPs |
-| `District Heating\|Biomass` | none: no solid biomass boiler on `urban central heat` in any network; `0.0` at every location (C6.13) | `filter(like="biomass")`, i.e. only the solid biomass CHPs |
+| `District Heating\|Biomass` | none: no solid biomass boiler on `urban central heat` (pypsa-de `prepare_sector_network.py` l.4540-4551: rural and urban decentral only); structurally `0.0` at every location (C6.13, OQ-40) | `filter(like="biomass")`, i.e. only the solid biomass CHPs |
 | `District Heating\|Other` | `urban central solar thermal` (Generator); `Fischer-Tropsch`, `Haber-Bosch`, `Sabatier`, `methanolisation`, `H2 Electrolysis`, `H2 Fuel Cell` (waste heat, not a CHP, OQ-37) (Link) | `Solar` (`filter(like="solar thermal")`) and `Other` = `Fischer-Tropsch`, `H2 Fuel Cell`, `H2 Electrolysis`, `Sabatier`, `methanolisation`; `Haber-Bosch` not evaluated |
 | `District Heating\|CHP\|Coal` | `urban central coal CHP`, `urban central lignite CHP` (Link) | `Coal` |
 | `District Heating\|CHP\|Oil` | `urban central oil CHP` (Link) | `Oil` |
