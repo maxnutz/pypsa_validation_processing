@@ -79,6 +79,14 @@ Measured with the D10 classification (`resources/20261020_carbon_accounting_run/
 
 AT 2025: `ror` 33.392, `hydro discharger` 9.273 TWh; 2040: 38.478, 9.273 TWh. AT has no `hydro` StorageUnit in this run (reservoirs are modelled with `hydro discharger`). No unclassified carrier on either network (D10 rule 4). These values are a plausibility check for the implementing PR, not acceptance criteria.
 
+Plausibility against official data (owner, PR #214 review 2026-11-25): model AT 2025 vs. the Eurostat energy balance `nrg_bal_c`, AT, 2024, unit `GWH` (latest published year: 2025 is not published, Eurostat API checked 2026-11-25, dataset updated 2026-08-27). Balance: `GEP` (all plants); SIEC: `RA100` (hydro; excludes pure pumped storage, `RA130` = 3.649 TWh in `nrg_bal_peh`, as the model excludes `PHS`).
+
+| | Model AT 2025 | Eurostat AT 2024 | Deviation |
+|---|---|---|---|
+| `Secondary Energy\|Electricity\|Hydro` [TWh] | 42.665 | 45.707 | -7 % |
+
+Plausible (−7 %). Eurostat reports gross production (incl. the plants' own use), the model net supply (D10); the difference is a few percent for thermal plants and negligible for wind and PV. A comparison of one model year with the previous calendar year is a plausibility check only, not an acceptance criterion.
+
 ## 7. Accounting rule and sign convention
 - Formula: `value(l) = E[Hydro](l) = Σ_{c ∈ C_el} S[{AC, low voltage}, c](l)` with `C_el` = `ror`, `hydro`, `hydro discharger` (D10).
 - Sign convention: supply, `≥ 0` at every location and snapshot (D10 rule 5); no negative per-snapshot supply measured on either network (the negative `electricity` Loads are excluded, OQ-38).
@@ -125,6 +133,7 @@ None.
 - #192, milestone "Implement Infra-Enshure Coupling Variables"; infra-ensure/coupling-variables#8 (rename, PR #9)
 - `sister_packages/coupling-variables/definitions/variable/secondary-energy.yaml` (commit `30202ec`); `sister_packages/energy-scenarios-at-workflow/definitions/variable/electricity-generation.yaml`, `tag_electricity-generation-source.yaml`
 - `sister_packages/pypsa-de/scripts/pypsa-de/export_ariadne_variables.py` l.1548-1558, l.1620-1626 (commit `a5baa7e9`)
+- Eurostat `nrg_bal_c` (AT, 2024, `GWH`), local copy `eurostat-energy-balance_processing/resources/estat_nrg_bal_c.tsv`; `nrg_bal_peh` (`RA130`) via the Eurostat API (2026-11-25)
 - PyPSA statistics accessor (`supply`): https://docs.pypsa.org/latest/api/networks/statistics/
 - measurement on `resources/20261020_carbon_accounting_run/networks/solved_{2025,2040}.nc` (2026-11-25)
 - D1, D10 in [shared_definitions.md](shared_definitions.md); C4.5, C6.10, C6.13, C8, C9 in [../contracts.md](../contracts.md); OQ-37–OQ-40 in [../open_questions.md](../open_questions.md)
