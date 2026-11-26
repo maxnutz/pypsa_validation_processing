@@ -35,3 +35,14 @@ pypsa-validation-processing = { path = ".", editable = true }
 mkdocs = ">=1.6"
 mkdocs-material = ">=9.5"
 mkdocstrings = { version = ">=0.26", extras = ["python"] }
+
+[feature.notebook.dependencies]
+marimo = ">=0.24"
+matplotlib = ">=3.8"
+
+[feature.notebook.tasks]
+notebook = "marimo edit notebooks/co2_industry_prices.py"
+
+[environments]
+default = { solve-group = "default" }
+notebook = { features = ["notebook"], solve-group = "default" }
